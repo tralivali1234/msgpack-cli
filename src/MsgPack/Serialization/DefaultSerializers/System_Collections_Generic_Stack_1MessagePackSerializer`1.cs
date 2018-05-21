@@ -2,7 +2,7 @@
 //
 // MessagePack for CLI
 //
-// Copyright (C) 2010-2015 FUJIWARA, Yusuke
+// Copyright (C) 2010-2016 FUJIWARA, Yusuke
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -20,24 +20,29 @@
 
 using System;
 using System.Collections.Generic;
+#if FEATURE_TAP
+using System.Threading;
+using System.Threading.Tasks;
+#endif // FEATURE_TAP
 
 using MsgPack.Serialization.CollectionSerializers;
 
 namespace MsgPack.Serialization.DefaultSerializers
 {
 	// ReSharper disable once InconsistentNaming
+	[Preserve( AllMembers = true )]
 	internal sealed class System_Collections_Generic_Stack_1MessagePackSerializer<TItem> : MessagePackSerializer<Stack<TItem>>, ICollectionInstanceFactory
 	{
 		private readonly MessagePackSerializer<TItem> _itemSerializer;
 
 		public System_Collections_Generic_Stack_1MessagePackSerializer( SerializationContext ownerContext )
-			: base( ownerContext )
+			: base( ownerContext, SerializerCapabilities.PackTo | SerializerCapabilities.UnpackFrom | SerializerCapabilities.UnpackTo )
 		{
 			this._itemSerializer = ownerContext.GetSerializer<TItem>();
 		}
 
-		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "Asserted internally" )]
-		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "1", Justification = "Asserted internally" )]
+		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "Validated internally" )]
+		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "1", Justification = "Validated internally" )]
 		protected internal override void PackToCore( Packer packer, Stack<TItem> objectTree )
 		{
 			packer.PackArrayHeader( objectTree.Count );
@@ -47,24 +52,24 @@ namespace MsgPack.Serialization.DefaultSerializers
 			}
 		}
 
-		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "Asserted internally" )]
+		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "Validated internally" )]
 		protected internal override Stack<TItem> UnpackFromCore( Unpacker unpacker )
 		{
 			if ( !unpacker.IsArrayHeader )
 			{
-				throw SerializationExceptions.NewIsNotArrayHeader();
+				SerializationExceptions.ThrowIsNotArrayHeader( unpacker );
 			}
 
 			return new Stack<TItem>( this.UnpackItemsInReverseOrder( unpacker, UnpackHelpers.GetItemsCount( unpacker ) ) );
 		}
 
-		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "Asserted internally" )]
-		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "1", Justification = "Asserted internally" )]
+		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "Validated internally" )]
+		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "1", Justification = "Validated internally" )]
 		protected internal override void UnpackToCore( Unpacker unpacker, Stack<TItem> collection )
 		{
 			if ( !unpacker.IsArrayHeader )
 			{
-				throw SerializationExceptions.NewIsNotArrayHeader();
+				SerializationExceptions.ThrowIsNotArrayHeader( unpacker );
 			}
 
 			foreach ( var item in this.UnpackItemsInReverseOrder( unpacker, UnpackHelpers.GetItemsCount( unpacker ) ) )
@@ -84,7 +89,7 @@ namespace MsgPack.Serialization.DefaultSerializers
 				{
 					if ( !subTreeUnpacker.Read() )
 					{
-						throw SerializationExceptions.NewUnexpectedEndOfStream();
+						SerializationExceptions.ThrowUnexpectedEndOfStream( unpacker );
 					}
 
 					buffer[ i ] = this._itemSerializer.UnpackFrom( subTreeUnpacker );
@@ -98,5 +103,63 @@ namespace MsgPack.Serialization.DefaultSerializers
 		{
 			return new Stack<TItem>( initialCapacity );
 		}
+
+#if FEATURE_TAP
+
+		protected internal override async Task PackToAsyncCore( Packer packer, Stack<TItem> objectTree, CancellationToken cancellationToken )
+		{
+			await packer.PackArrayHeaderAsync( objectTree.Count, cancellationToken ).ConfigureAwait( false );
+			foreach ( var item in objectTree )
+			{
+				await this._itemSerializer.PackToAsync( packer, item, cancellationToken ).ConfigureAwait( false );
+			}
+		}
+
+		protected internal override async Task<Stack<TItem>> UnpackFromAsyncCore( Unpacker unpacker, CancellationToken cancellationToken )
+		{
+			if ( !unpacker.IsArrayHeader )
+			{
+				SerializationExceptions.ThrowIsNotArrayHeader( unpacker );
+			}
+
+			return new Stack<TItem>( await this.UnpackItemsInReverseOrderAsync( unpacker, UnpackHelpers.GetItemsCount( unpacker ), cancellationToken ).ConfigureAwait( false ) );
+		}
+
+		protected internal override async Task UnpackToAsyncCore( Unpacker unpacker, Stack<TItem> collection, CancellationToken cancellationToken )
+		{
+			if ( !unpacker.IsArrayHeader )
+			{
+				SerializationExceptions.ThrowIsNotArrayHeader( unpacker );
+			}
+
+			foreach ( var item in await this.UnpackItemsInReverseOrderAsync( unpacker, UnpackHelpers.GetItemsCount( unpacker ), cancellationToken ).ConfigureAwait( false ) )
+			{
+				collection.Push( item );
+			}
+		}
+
+		private async Task<IEnumerable<TItem>> UnpackItemsInReverseOrderAsync( Unpacker unpacker, int count, CancellationToken cancellationToken )
+		{
+			var buffer = new TItem[ count ];
+
+			using ( var subTreeUnpacker = unpacker.ReadSubtree() )
+			{
+				// Reverse Order
+				for ( var i = buffer.Length - 1; i >= 0; i-- )
+				{
+					if ( !await subTreeUnpacker.ReadAsync( cancellationToken ).ConfigureAwait( false ) )
+					{
+						SerializationExceptions.ThrowUnexpectedEndOfStream( unpacker );
+					}
+
+					buffer[ i ] = await this._itemSerializer.UnpackFromAsync( subTreeUnpacker, cancellationToken ).ConfigureAwait( false );
+				}
+			}
+
+			return buffer;
+		}
+
+#endif // FEATURE_TAP
+
 	}
 }

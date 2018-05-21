@@ -26,8 +26,11 @@ using MsgPack.Serialization;
 
 namespace Samples
 {
-	// You can tweak serialization behavior via custom attributes.
-	public class MessagePackMemberSample
+    /// <summary>
+    /// Sample code to describe MessagePackMember usage.
+    /// </summary>
+    /// <remarks>You can tweak serialization behavior via custom attributes.</remarks>
+    public class MessagePackMemberSample
 	{
 		[MessagePackMember(
 			0, // Specify 0 based index for serialized array. You should specify this value to ensure interoperability with other platform bindings.
@@ -56,8 +59,14 @@ namespace Samples
 		public string Title { get; set; }
 	}
 
-	// MessagePackMember
-	// MessagePackEnumMember
+	// ... You can "opt-out" with MessagePackIgnore
+	public class OptOutSample
+	{
+		[MessagePackIgnore]
+		public string ShouldNotEmit { get; set; }
+
+		public int ShouldEmit { get; set; }
+	}
 }
 
 namespace System.Runtime.Serialization
@@ -68,4 +77,6 @@ namespace System.Runtime.Serialization
 		public string Name { get; set; }
 		public int Order { get; set; }
 	}
+
+	// This is also about MessagePackIgnoreAttribute, MessagePackMemberAttribute, and MessagePackDeserializationConstructorAttribute.
 }

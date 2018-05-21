@@ -2,7 +2,7 @@
 //
 // MessagePack for CLI
 //
-// Copyright (C) 2010-2015 FUJIWARA, Yusuke
+// Copyright (C) 2010-2016 FUJIWARA, Yusuke
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -25,13 +25,11 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-#if !UNITY
-#if XAMIOS || XAMDROID
+#if FEATURE_MPCONTRACT
 using Contract = MsgPack.MPContract;
 #else
 using System.Diagnostics.Contracts;
-#endif // XAMIOS || XAMDROID
-#endif // !UNITY
+#endif // FEATURE_MPCONTRACT
 using System.Linq;
 using System.Reflection;
 
@@ -45,110 +43,251 @@ namespace MsgPack
 
 		public static bool GetIsValueType( this Type source )
 		{
-#if NETFX_CORE
+#if NETSTANDARD1_1 || NETSTANDARD1_3
 			return source.GetTypeInfo().IsValueType;
 #else
 			return source.IsValueType;
-#endif
+#endif // NETSTANDARD1_1 || NETSTANDARD1_3
 		}
 
 		public static bool GetIsEnum( this Type source )
 		{
-#if NETFX_CORE
+#if NETSTANDARD1_1 || NETSTANDARD1_3
 			return source.GetTypeInfo().IsEnum;
 #else
 			return source.IsEnum;
-#endif
+#endif // NETSTANDARD1_1 || NETSTANDARD1_3
 		}
 
 		public static bool GetIsInterface( this Type source )
 		{
-#if NETFX_CORE
+#if NETSTANDARD1_1 || NETSTANDARD1_3
 			return source.GetTypeInfo().IsInterface;
 #else
 			return source.IsInterface;
-#endif
+#endif // NETSTANDARD1_1 || NETSTANDARD1_3
 		}
 
 		public static bool GetIsAbstract( this Type source )
 		{
-#if NETFX_CORE
+#if NETSTANDARD1_1 || NETSTANDARD1_3
 			return source.GetTypeInfo().IsAbstract;
 #else
 			return source.IsAbstract;
-#endif
+#endif // NETSTANDARD1_1 || NETSTANDARD1_3
 		}
 
 		public static bool GetIsGenericType( this Type source )
 		{
-#if NETFX_CORE
+#if NETSTANDARD1_1 || NETSTANDARD1_3
 			return source.GetTypeInfo().IsGenericType;
 #else
 			return source.IsGenericType;
-#endif
+#endif // NETSTANDARD1_1 || NETSTANDARD1_3
 		}
 
 		public static bool GetIsGenericTypeDefinition( this Type source )
 		{
-#if NETFX_CORE
+#if NETSTANDARD1_1 || NETSTANDARD1_3
 			return source.GetTypeInfo().IsGenericTypeDefinition;
 #else
 			return source.IsGenericTypeDefinition;
-#endif
+#endif // NETSTANDARD1_1 || NETSTANDARD1_3
 		}
 
 #if DEBUG
 		public static bool GetContainsGenericParameters( this Type source )
 		{
-#if NETFX_CORE
+#if NETSTANDARD1_1 || NETSTANDARD1_3
 			return source.GetTypeInfo().ContainsGenericParameters;
 #else
 			return source.ContainsGenericParameters;
-#endif
+#endif // NETSTANDARD1_1 || NETSTANDARD1_3
 		}
 #endif // DEBUG
 
 		public static Assembly GetAssembly( this Type source )
 		{
-#if NETFX_CORE
+#if NETSTANDARD1_1 || NETSTANDARD1_3
 			return source.GetTypeInfo().Assembly;
 #else
 			return source.Assembly;
-#endif
+#endif // NETSTANDARD1_1 || NETSTANDARD1_3
+		}
+
+		public static bool GetIsVisible( this Type source )
+		{
+#if NETSTANDARD1_1 || NETSTANDARD1_3
+			return source.GetTypeInfo().IsVisible;
+#else
+			return source.IsVisible;
+#endif // NETSTANDARD1_1 || NETSTANDARD1_3
 		}
 
 		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Performance", "CA1811:AvoidUncalledPrivateCode", Justification = "Wrong detection" )]
 		public static bool GetIsPublic( this Type source )
 		{
-#if NETFX_CORE
+#if NETSTANDARD1_1 || NETSTANDARD1_3
 			return source.GetTypeInfo().IsPublic;
 #else
 			return source.IsPublic;
-#endif
+#endif // NETSTANDARD1_1 || NETSTANDARD1_3
 		}
+
+		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Performance", "CA1811:AvoidUncalledPrivateCode", Justification = "Wrong detection" )]
+		public static bool GetIsNestedPublic( this Type source )
+		{
+#if NETSTANDARD1_1 || NETSTANDARD1_3
+			return source.GetTypeInfo().IsNestedPublic;
+#else
+			return source.IsNestedPublic;
+#endif // NETSTANDARD1_1 || NETSTANDARD1_3
+		}
+
+#if DEBUG
+		public static bool GetIsPrimitive( this Type source )
+		{
+#if NETSTANDARD1_1 || NETSTANDARD1_3
+			return source.GetTypeInfo().IsPrimitive;
+#else
+			return source.IsPrimitive;
+#endif // NETSTANDARD1_1 || NETSTANDARD1_3
+		}
+#endif // DEBUG
 
 		public static Type GetBaseType( this Type source )
 		{
-#if NETFX_CORE
+#if NETSTANDARD1_1 || NETSTANDARD1_3
 			return source.GetTypeInfo().BaseType;
 #else
 			return source.BaseType;
-#endif
+#endif // NETSTANDARD1_1 || NETSTANDARD1_3
 		}
+		public static MethodBase GetDeclaringMethod( this Type source )
+		{
+#if NETSTANDARD1_1 || NETSTANDARD1_3
+			return source.GetTypeInfo().DeclaringMethod;
+#else
+			return source.DeclaringMethod;
+#endif // NETSTANDARD1_1 || NETSTANDARD1_3
+		}
+
 
 		public static Type[] GetGenericTypeParameters( this Type source )
 		{
-#if NETFX_CORE
+#if NETSTANDARD1_1 || NETSTANDARD1_3
 			return source.GetTypeInfo().GenericTypeParameters;
 #else
 			return source.GetGenericArguments().Where( t => t.IsGenericParameter ).ToArray();
-#endif
+#endif // NETSTANDARD1_1 || NETSTANDARD1_3
 		}
 
-#if NETFX_CORE
+		public static MethodInfo GetRuntimeMethod( this Type source, string name )
+		{
+			var candidates = source.GetRuntimeMethods().Where( m => m.Name == name ).ToArray();
+			switch ( candidates.Length )
+			{
+				case 0:
+				{
+					return null;
+				}
+				case 1:
+				{
+					return candidates[ 0 ];
+				}
+				default:
+				{
+					throw new AmbiguousMatchException();
+				}
+			}
+		}
+
+#if NETSTANDARD1_1 || NETSTANDARD1_3
+		public static MethodInfo GetRuntimeMethod( this Type source, string name, Type[] parameters )
+		{
+			return
+				source.GetRuntimeMethods()
+					.SingleOrDefault(
+						m => m.IsPublic && m.Name == name && m.GetParameters().Select( p => p.ParameterType ).SequenceEqual( parameters )
+					);
+		}
+
+#else // NETSTANDARD1_1 || NETSTANDARD1_3
+		public static MethodInfo GetRuntimeMethod( this Type source, string name, Type[] parameters )
+		{
+			return
+				source.GetMethod(
+					name,
+					BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public,
+					null,
+					parameters,
+					null
+				);
+		}
+
+		public static IEnumerable<MethodInfo> GetRuntimeMethods( this Type source )
+		{
+			return
+				source.GetMethods(
+					BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
+				);
+		}
+
+		public static PropertyInfo GetRuntimeProperty( this Type source, string name )
+		{
+			return
+				source.GetProperty(
+					name,
+					BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
+				);
+		}
+
+#if NET35 || SILVERLIGHT
+		public static IEnumerable<PropertyInfo> GetRuntimeProperties( this Type source )
+		{
+			return source.GetProperties( BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic );
+		}
+#endif // NET35 || SILVERLIGHT
+
+#if DEBUG
+		public static FieldInfo GetRuntimeField( this Type source, string name )
+		{
+			return
+				source.GetField(
+					name,
+					BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
+				);
+		}
+#endif // DEBUG
+
+#endif // NETSTANDARD1_1 || NETSTANDARD1_3
+
+		public static ConstructorInfo GetRuntimeConstructor( this Type source, Type[] parameters )
+		{
+#if NETSTANDARD1_1 || NETSTANDARD1_3
+			return source.GetTypeInfo().DeclaredConstructors.SingleOrDefault( c => c.GetParameters().Select( p => p.ParameterType ).SequenceEqual( parameters ) );
+#else
+			return source.GetConstructor( BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance, null, parameters, null );
+#endif // NETSTANDARD1_1 || NETSTANDARD1_3
+		}
+
+#if NET35 || NET40 || SILVERLIGHT || UNITY
+		public static Delegate CreateDelegate( this MethodInfo source, Type delegateType )
+		{
+			return Delegate.CreateDelegate( delegateType, source );
+		}
+
+		public static Delegate CreateDelegate( this MethodInfo source, Type delegateType, object target )
+		{
+			return Delegate.CreateDelegate( delegateType, target, source );
+		}
+
+#endif // NET35 || NET40 || SILVERLIGHT || UNITY
+
+#if NETSTANDARD1_1 || NETSTANDARD1_3
 		public static MethodInfo GetMethod( this Type source, string name )
 		{
-			return source.GetRuntimeMethods().SingleOrDefault( m => m.Name == name );
+			return source.GetRuntimeMethods().SingleOrDefault( m => m.IsPublic && m.Name == name && m.DeclaringType == source );
 		}
 
 		public static MethodInfo GetMethod( this Type source, string name, Type[] parameters )
@@ -166,7 +305,15 @@ namespace MsgPack
 			return source.GetRuntimeProperty( name );
 		}
 
-#if DEBUG
+		public static PropertyInfo GetProperty( this Type source, string name, Type[] keyTypes )
+		{
+			return
+				source.GetRuntimeProperties()
+					.SingleOrDefault(
+						p => p.Name == name && p.GetMethod.GetParameters().Select( r => r.ParameterType ).SequenceEqual( keyTypes )
+					);
+		}
+
 		public static IEnumerable<PropertyInfo> GetProperties( this Type source )
 		{
 			return source.GetRuntimeProperties();
@@ -176,12 +323,17 @@ namespace MsgPack
 		{
 			return source.GetRuntimeField( name );
 		}
-#endif
 
 		public static ConstructorInfo GetConstructor( this Type source, Type[] parameteres )
 		{
-			return source.GetTypeInfo().DeclaredConstructors.SingleOrDefault( c => c.GetParameters().Select( p => p.ParameterType ).SequenceEqual( parameteres ) );
+			return source.GetTypeInfo().GetConstructor( parameteres );
 		}
+
+		public static ConstructorInfo GetConstructor( this TypeInfo source, Type[] parameteres )
+		{
+			return source.DeclaredConstructors.SingleOrDefault( c => !c.IsStatic && c.GetParameters().Select( p => p.ParameterType ).SequenceEqual( parameteres ) );
+		}
+
 
 		public static IEnumerable<ConstructorInfo> GetConstructors( this Type source )
 		{
@@ -263,12 +415,12 @@ namespace MsgPack
 			return Attribute.GetCustomAttribute( source, typeof( T ) ) as T;
 		}
 
-#if NETFX_35 || NETFX_40 || SILVERLIGHT || UNITY
+#if NET35 || NET40 || SILVERLIGHT || UNITY
 		public static bool IsDefined( this MemberInfo source, Type attributeType )
 		{
 			return Attribute.IsDefined( source, attributeType );
 		}
-#endif // NETFX_35 || NETFX_40 || SILVERLIGHT || UNITY
+#endif // NET35 || NET40 || SILVERLIGHT || UNITY
 
 #if !SILVERLIGHT
 		public static Type GetAttributeType( this CustomAttributeData source )
@@ -287,18 +439,18 @@ namespace MsgPack
 			return source.GetType();
 		}
 #endif // !SILVERLIGHT
-#endif // NETFX_CORE
+#endif // NETSTANDARD1_1 || NETSTANDARD1_3
 
 		public static string GetCultureName( this AssemblyName source )
 		{
-#if NETFX_35 || NETFX_40 || SILVERLIGHT || UNITY
-			return source.CultureInfo.Name;
+#if NET35 || NET40 || SILVERLIGHT || UNITY
+			return source.CultureInfo == null ? null : source.CultureInfo.Name;
 #else
 			return source.CultureName;
 #endif
 		}
 
-#if NETFX_35 || UNITY
+#if NET35 || UNITY
 		public static IEnumerable<CustomAttributeData> GetCustomAttributesData( this MemberInfo source )
 		{
 			return CustomAttributeData.GetCustomAttributes( source );
@@ -308,14 +460,14 @@ namespace MsgPack
 		{
 			return CustomAttributeData.GetCustomAttributes( source );
 		}
-#endif // NETFX_35 || UNITY
+#endif // NET35 || UNITY
 
-#if NETFX_CORE
+#if NETSTANDARD1_1 || NETSTANDARD1_3
 		public static IEnumerable<CustomAttributeData> GetCustomAttributesData( this ParameterInfo source )
 		{
 			return source.CustomAttributes;
 		}
-#endif // NETFX_CORE
+#endif // NETSTANDARD1_1 || NETSTANDARD1_3
 
 #if SILVERLIGHT
 		public static IEnumerable<Attribute> GetCustomAttributesData( this MemberInfo source )
@@ -385,16 +537,9 @@ namespace MsgPack
 		}
 #endif // SILVERLIGHT
 
-#if NETFX_35 || NETFX_40 || UNITY
-		public static Delegate CreateDelegate( this MethodInfo source, Type delegateType )
-		{
-			return Delegate.CreateDelegate( delegateType, source );
-		}
-#endif // NETFX_35 || NETFX_40 || UNITY
-
 		public static bool GetHasDefaultValue( this ParameterInfo source )
 		{
-#if NETFX_35 || NETFX_40 || SILVERLIGHT || UNITY
+#if NET35 || NET40 || SILVERLIGHT || UNITY
 			return source.DefaultValue != DBNull.Value;
 #else
 			return source.HasDefaultValue;

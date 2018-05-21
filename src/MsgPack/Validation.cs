@@ -2,7 +2,7 @@
 //
 // MessagePack for CLI
 //
-// Copyright (C) 2010-2015 FUJIWARA, Yusuke
+// Copyright (C) 2010-2016 FUJIWARA, Yusuke
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -23,13 +23,11 @@
 #endif
 
 using System;
-#if !UNITY
-#if XAMIOS || XAMDROID
+#if FEATURE_MPCONTRACT
 using Contract = MsgPack.MPContract;
 #else
 using System.Diagnostics.Contracts;
-#endif // XAMIOS || XAMDROID
-#endif // !UNITY
+#endif // FEATURE_MPCONTRACT
 using System.Globalization;
 using System.Text.RegularExpressions;
 
@@ -44,6 +42,7 @@ namespace MsgPack
 	// [ArgumentValidator]
 	internal static class Validation
 	{
+#if DEBUG
 		public static void ValidateIsNotNullNorEmpty( string value, string parameterName )
 		{
 			if ( value == null )
@@ -59,6 +58,7 @@ namespace MsgPack
 				);
 			}
 		}
+#endif // DEBUG
 
 		private const string UnicodeTr15Annex7Idneifier =
 			@"[\p{Lu}\p{Ll}\p{Lt}\p{Lm}\p{Lo}\p{Nl}][\p{Lu}\p{Ll}\p{Lt}\p{Lm}\p{Lo}\p{Nl}\p{Mn}\p{Mc}\p{Nd}\p{Pc}\p{Cf}]*";
@@ -66,9 +66,9 @@ namespace MsgPack
 		private static readonly Regex NamespacePattern =
 			new Regex(
 				"^(" + UnicodeTr15Annex7Idneifier + @")(\." + UnicodeTr15Annex7Idneifier + ")*$",
-#if !SILVERLIGHT && !NETFX_CORE && !UNITY
+#if !SILVERLIGHT && !UNITY && !NETSTANDARD1_1 && !NETSTANDARD1_3
 				RegexOptions.Compiled |
-#endif // !SILVERLIGHT && !NETFX_CORE && !UNITY
+#endif // !SILVERLIGHT && !UNITY && !NETSTANDARD1_1 && !NETSTANDARD1_3
 				RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture | RegexOptions.Singleline
 			);
 
@@ -107,9 +107,7 @@ namespace MsgPack
 				}
 			}
 
-#if !UNITY
 			Contract.Assert( position >= 0, "position >= 0" );
-#endif // !UNITY
 
 			var category = CharUnicodeInfo.GetUnicodeCategory( @namespace, position );
 			if ( IsPrintable( category ) )
@@ -122,7 +120,8 @@ namespace MsgPack
 						@namespace[ position ],
 						( ushort )@namespace[ position ],
 						category
-					)
+					),
+					parameterName
 				);
 			}
 			else
@@ -134,7 +133,8 @@ namespace MsgPack
 						position,
 						( ushort )@namespace[ position ],
 						category
-					)
+					),
+					parameterName
 				);
 			}
 		}

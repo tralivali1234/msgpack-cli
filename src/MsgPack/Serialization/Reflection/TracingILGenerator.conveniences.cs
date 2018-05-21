@@ -2,7 +2,7 @@
 //
 // NLiblet
 //
-// Copyright (C) 2011 FUJIWARA, Yusuke
+// Copyright (C) 2011-2016 FUJIWARA, Yusuke
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -19,7 +19,11 @@
 #endregion -- License Terms --
 
 using System;
+#if NETSTANDARD1_1
+using Contract = MsgPack.MPContract;
+#else
 using System.Diagnostics.Contracts;
+#endif // NETSTANDARD1_1
 using System.Globalization;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -37,7 +41,7 @@ namespace MsgPack.Serialization.Reflection
 			Contract.Assert( target != null );
 
 			// TODO: NLiblet
-			if ( target.IsStatic || target.DeclaringType.IsValueType )
+			if ( target.IsStatic || target.DeclaringType.GetIsValueType() )
 			{
 				this.EmitCall( target );
 			}
@@ -90,6 +94,7 @@ namespace MsgPack.Serialization.Reflection
 		}
 
 #if DEBUG
+#if !NETSTANDARD1_1 && !NETSTANDARD1_3
 		private static readonly PropertyInfo _cultureInfo_CurrentCulture = typeof( CultureInfo ).GetProperty( "CurrentCulture" );
 		private static readonly PropertyInfo _cultureInfo_InvariantCulture = typeof( CultureInfo ).GetProperty( "InvariantCulture" );
 
@@ -170,7 +175,7 @@ namespace MsgPack.Serialization.Reflection
 		{
 			Contract.Assert( resource != null );
 			Contract.Assert( resourceKey != null );
-#if !NETFX_35
+#if !NET35
 			Contract.Assert( !String.IsNullOrWhiteSpace( resourceKey ) );
 #else
 			Contract.Assert( !String.IsNullOrEmpty( resourceKey ) );
@@ -179,7 +184,7 @@ namespace MsgPack.Serialization.Reflection
 			Contract.Assert( Contract.ForAll( argumentLoadingEmitters, item => item != null ) );
 
 			this.EmitCurrentCulture();
-			this.EmitGetProperty( resource.GetProperty( resourceKey, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static ) );
+			this.EmitGetProperty( resource.GetRuntimeProperty( resourceKey ) );
 			this.EmitStringFormatArgumentAndCall( temporaryLocalArrayIndex, argumentLoadingEmitters );
 		}
 
@@ -232,7 +237,7 @@ namespace MsgPack.Serialization.Reflection
 		{
 			Contract.Assert( resource != null );
 			Contract.Assert( resourceKey != null );
-#if !NETFX_35
+#if !NET35
 			Contract.Assert( !String.IsNullOrWhiteSpace( resourceKey ) );
 #else
 			Contract.Assert( !String.IsNullOrEmpty( resourceKey ) );
@@ -241,11 +246,11 @@ namespace MsgPack.Serialization.Reflection
 			Contract.Assert( Contract.ForAll( argumentLoadingEmitters, item => item != null ) );
 
 			this.EmitInvariantCulture();
-			this.EmitGetProperty( resource.GetProperty( resourceKey, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static ) );
+			this.EmitGetProperty( resource.GetRuntimeProperty( resourceKey ) );
 			this.EmitStringFormatArgumentAndCall( temporaryLocalArrayIndex, argumentLoadingEmitters );
 		}
 
-		private static readonly MethodInfo _string_Format = typeof( String ).GetMethod( "Format", BindingFlags.Public | BindingFlags.Static, null, new Type[] { typeof( IFormatProvider ), typeof( string ), typeof( object[] ) }, null );
+		private static readonly MethodInfo _string_Format = typeof( String ).GetRuntimeMethod( "Format", new [] { typeof( IFormatProvider ), typeof( string ), typeof( object[] ) } );
 
 		private void EmitStringFormatArgumentAndCall( int temporaryLocalArrayIndex, Action<TracingILGenerator>[] argumentEmitters )
 		{
@@ -253,6 +258,8 @@ namespace MsgPack.Serialization.Reflection
 			this.EmitAnyLdloc( temporaryLocalArrayIndex );
 			this.EmitCall( _string_Format );
 		}
+#endif // !NETSTANDARD1_1 && !NETSTANDARD1_3
+#endif // DEBUG
 
 		/// <summary>
 		///		Emit load 'this' pointer instruction (namely 'ldarg.0').
@@ -262,7 +269,6 @@ namespace MsgPack.Serialization.Reflection
 		{
 			this.EmitLdarg_0();
 		}
-#endif // DEBUG
 
 		/// <summary>
 		///		Emit apprpriate 'ldarg.*' instruction.
@@ -545,6 +551,7 @@ namespace MsgPack.Serialization.Reflection
 		}
 
 #if DEBUG
+#if !NETSTANDARD1_1 && !NETSTANDARD1_3
 		/// <summary>
 		///		Emit array initialization code with initializer.
 		///		Post condition is evaluation stack will no be modified as previous state. 
@@ -620,6 +627,7 @@ namespace MsgPack.Serialization.Reflection
 				this.EmitAnyStelem( elementType, null, i, elementLoadingEmitters[ i ] );
 			}
 		}
+#endif // !NETSTANDARD1_1 && !NETSTANDARD1_3
 #endif // DEBUG
 
 		private void EmitNewarrCore( Type elementType, long length )
@@ -642,12 +650,34 @@ namespace MsgPack.Serialization.Reflection
 		/// <param name="index">Index of array element.</param>
 		public void EmitAnyLdelem( Type elementType, Action<TracingILGenerator> arrayLoadingEmitter, long index )
 		{
-			Contract.Assert( elementType != null );
 			Contract.Assert( 0 <= index );
+			this.EmitAnyLdelem( elementType, arrayLoadingEmitter, il => il.EmitLiteralInteger( index ) );
+		}
+#endif // DEBUG
+
+		/// <summary>
+		///		Emit array element storing instructions.
+		///		Post condition is evaluation stack will no be modified as previous state.
+		/// </summary>
+		/// <param name="elementType"><see cref="Type"/> of array element. This can be generaic parameter.</param>
+		/// <param name="arrayLoadingEmitter">
+		///		Delegate to emittion of array loading instruction. 
+		///		1st argument is this instance.
+		///		Post condition is that exactly one target array will be added on the top of stack and its element type is <paramref name="elementType"/>.
+		///	</param>
+		/// <param name="indexEmitter">
+		///		Delegate to emittion of array index. 
+		///		1st argument is this instance.
+		///		Post condition is that int4 or int8 type value will be added on the top of stack and its element type is <paramref name="elementType"/>.
+		/// </param>
+		public void EmitAnyLdelem( Type elementType, Action<TracingILGenerator> arrayLoadingEmitter, Action<TracingILGenerator> indexEmitter )
+		{
+			Contract.Assert( elementType != null );
+			Contract.Assert( indexEmitter != null );
 			Contract.Assert( arrayLoadingEmitter != null );
 
 			arrayLoadingEmitter( this );
-			this.EmitLiteralInteger( index );
+			indexEmitter( this );
 
 			if ( elementType.IsGenericParameter )
 			{
@@ -656,14 +686,18 @@ namespace MsgPack.Serialization.Reflection
 				return;
 			}
 
-			if ( !elementType.IsValueType )
+			if ( !elementType.GetIsValueType() )
 			{
 				// ref
 				this.EmitLdelem_Ref();
 				return;
 			}
 
+#if !NETSTANDARD1_1 && !NETSTANDARD1_3
 			switch ( Type.GetTypeCode( elementType ) )
+#else
+			switch ( NetStandardCompatibility.GetTypeCode( elementType ) )
+#endif // !NETSTANDARD1_1 && !NETSTANDARD1_3
 			{
 				case TypeCode.Boolean:
 				case TypeCode.SByte:
@@ -724,6 +758,7 @@ namespace MsgPack.Serialization.Reflection
 			}
 		}
 
+#if DEBUG
 		/// <summary>
 		///		Emit array element storing instructions.
 		///		Post condition is evaluation stack will no be modified as previous state.
@@ -784,14 +819,18 @@ namespace MsgPack.Serialization.Reflection
 				return;
 			}
 
-			if ( !elementType.IsValueType )
+			if ( !elementType.GetIsValueType() )
 			{
 				// ref
 				this.EmitStelem_Ref();
 				return;
 			}
 
+#if !NETSTANDARD1_1 && !NETSTANDARD1_3
 			switch ( Type.GetTypeCode( elementType ) )
+#else
+			switch ( NetStandardCompatibility.GetTypeCode( elementType ) )
+#endif // !NETSTANDARD1_1 && !NETSTANDARD1_3
 			{
 				case TypeCode.Boolean:
 				case TypeCode.SByte:

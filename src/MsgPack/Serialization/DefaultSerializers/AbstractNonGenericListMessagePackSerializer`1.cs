@@ -26,6 +26,10 @@ using System;
 #if !UNITY
 using System.Collections;
 #endif // !UNITY
+#if FEATURE_TAP
+using System.Threading;
+using System.Threading.Tasks;
+#endif // FEATURE_TAP
 
 using MsgPack.Serialization.CollectionSerializers;
 using MsgPack.Serialization.Polymorphic;
@@ -33,9 +37,11 @@ using MsgPack.Serialization.Polymorphic;
 namespace MsgPack.Serialization.DefaultSerializers
 {
 #if !UNITY
+	[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Maintainability", "CA1501:AvoidExcessiveInheritance", Justification = "User may not use this hierarchy." )]
 	internal sealed class AbstractNonGenericListMessagePackSerializer<TCollection> : NonGenericListMessagePackSerializer<TCollection>
 		where TCollection : IList
 #else
+#warning TODO: Use generic collection if possible for maintenancibility.
 	internal sealed class AbstractNonGenericListMessagePackSerializer : UnityNonGenericListMessagePackSerializer
 #endif // !UNITY
 	{
@@ -53,12 +59,12 @@ namespace MsgPack.Serialization.DefaultSerializers
 			PolymorphismSchema schema
 		)
 #if !UNITY
-			: base( ownerContext, schema )
+			: base( ownerContext, schema, SerializerCapabilities.PackTo | SerializerCapabilities.UnpackFrom | SerializerCapabilities.UnpackTo )
 #else
-			: base( ownerContext, abstractType, schema )
+			: base( ownerContext, abstractType, schema, SerializerCapabilities.PackTo | SerializerCapabilities.UnpackFrom | SerializerCapabilities.UnpackTo )
 #endif // !UNITY
 		{
-			IMessagePackSingleObjectSerializer serializer;
+			MessagePackSerializer serializer;
 			AbstractCollectionSerializerHelper.GetConcreteSerializer(
 				ownerContext,
 				schema,
@@ -96,6 +102,29 @@ namespace MsgPack.Serialization.DefaultSerializers
 				return base.InternalUnpackFromCore( unpacker );
 			}
 		}
+
+#if FEATURE_TAP
+
+		internal override Task<TCollection> InternalUnpackFromAsyncCore( Unpacker unpacker, CancellationToken cancellationToken )
+		{
+			if ( this._polymorphicDeserializer != null )
+			{
+				return
+					this._polymorphicDeserializer.PolymorphicUnpackFromAsync( unpacker, cancellationToken )
+						.ContinueWith(
+							t => ( TCollection )t.Result,
+							cancellationToken,
+							TaskContinuationOptions.ExecuteSynchronously,
+							TaskScheduler.Current
+						);
+			}
+			else
+			{
+				return base.InternalUnpackFromAsyncCore( unpacker, cancellationToken );
+			}
+		}
+
+#endif // FEATURE_TAP
 
 #if !UNITY
 		protected override TCollection CreateInstance( int initialCapacity )

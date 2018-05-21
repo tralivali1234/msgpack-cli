@@ -2,7 +2,7 @@
 //
 // MessagePack for CLI
 //
-// Copyright (C) 2010-2015 FUJIWARA, Yusuke
+// Copyright (C) 2010-2016 FUJIWARA, Yusuke
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -26,13 +26,18 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+#if FEATURE_TAP
+using System.Threading;
+using System.Threading.Tasks;
+#endif // FEATURE_TAP
 
 namespace MsgPack.Serialization.DefaultSerializers
 {
+	[Preserve( AllMembers = true )]
 	internal sealed class ImmutableDictionarySerializer<T, TKey, TValue> : MessagePackSerializer<T>
 		where T : IEnumerable<KeyValuePair<TKey, TValue>>
 	{
-		private static readonly Func<KeyValuePair<TKey, TValue>[], T> _factory = FindFactory();
+		private readonly Func<KeyValuePair<TKey, TValue>[], T> _factory;
 
 		private static Func<KeyValuePair<TKey, TValue>[], T> FindFactory()
 		{
@@ -80,7 +85,7 @@ namespace MsgPack.Serialization.DefaultSerializers
 								CultureInfo.CurrentCulture,
 								"'{0}' does not have CreateRange({1}[]) public static method.",
 								factoryType.AssemblyQualifiedName,
-								typeof( IEnumerable<KeyValuePair<TKey, TValue>> )
+								typeof( KeyValuePair<TKey, TValue> )
 							)
 						);
 					};
@@ -98,13 +103,14 @@ namespace MsgPack.Serialization.DefaultSerializers
 		private readonly MessagePackSerializer<TValue> _valueSerializer;
 
 		public ImmutableDictionarySerializer( SerializationContext ownerContext, PolymorphismSchema keysSchema, PolymorphismSchema valuesSchema )
-			: base( ownerContext )
+			: base( ownerContext, SerializerCapabilities.PackTo | SerializerCapabilities.UnpackFrom )
 		{
 			this._keySerializer = ownerContext.GetSerializer<TKey>( keysSchema );
 			this._valueSerializer = ownerContext.GetSerializer<TValue>( valuesSchema );
+			this._factory = FindFactory();
 		}
 
-		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "By design" )]
+		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "Validated by caller in base class" )]
 		protected internal override void PackToCore( Packer packer, T objectTree )
 		{
 			packer.PackMapHeader( objectTree.Count() );
@@ -116,12 +122,12 @@ namespace MsgPack.Serialization.DefaultSerializers
 			}
 		}
 
-		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "By design" )]
+		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "Validated by caller in base class" )]
 		protected internal override T UnpackFromCore( Unpacker unpacker )
 		{
 			if ( !unpacker.IsMapHeader )
 			{
-				throw SerializationExceptions.NewIsNotMapHeader();
+				SerializationExceptions.ThrowIsNotMapHeader( unpacker );
 			}
 
 			var buffer = new KeyValuePair<TKey, TValue>[ UnpackHelpers.GetItemsCount( unpacker ) ];
@@ -132,14 +138,14 @@ namespace MsgPack.Serialization.DefaultSerializers
 				{
 					if ( !subTreeUnpacker.Read() )
 					{
-						throw SerializationExceptions.NewUnexpectedEndOfStream();
+						SerializationExceptions.ThrowUnexpectedEndOfStream( unpacker );
 					}
 
 					var key = this._keySerializer.UnpackFrom( unpacker );
 
 					if ( !subTreeUnpacker.Read() )
 					{
-						throw SerializationExceptions.NewUnexpectedEndOfStream();
+						SerializationExceptions.ThrowUnexpectedEndOfStream( unpacker );
 					}
 
 					var value = this._valueSerializer.UnpackFrom( unpacker );
@@ -148,7 +154,7 @@ namespace MsgPack.Serialization.DefaultSerializers
 				}
 			}
 
-			return _factory( buffer );
+			return this._factory( buffer );
 		}
 
 		protected internal override void UnpackToCore( Unpacker unpacker, T collection )
@@ -161,5 +167,66 @@ namespace MsgPack.Serialization.DefaultSerializers
 				)
 			);
 		}
+
+#if FEATURE_TAP
+
+		protected internal override async Task PackToAsyncCore( Packer packer, T objectTree, CancellationToken cancellationToken )
+		{
+			await packer.PackMapHeaderAsync( objectTree.Count(), cancellationToken ).ConfigureAwait( false );
+
+			foreach ( var item in objectTree )
+			{
+				await this._keySerializer.PackToAsync( packer, item.Key, cancellationToken ).ConfigureAwait( false );
+				await this._valueSerializer.PackToAsync( packer, item.Value, cancellationToken ).ConfigureAwait( false );
+			}
+		}
+
+		protected internal override async Task<T> UnpackFromAsyncCore( Unpacker unpacker, CancellationToken cancellationToken )
+		{
+			if ( !unpacker.IsMapHeader )
+			{
+				SerializationExceptions.ThrowIsNotMapHeader( unpacker );
+			}
+
+			var buffer = new KeyValuePair<TKey, TValue>[ UnpackHelpers.GetItemsCount( unpacker ) ];
+
+			using ( var subTreeUnpacker = unpacker.ReadSubtree() )
+			{
+				for ( int i = 0; i < buffer.Length; i++ )
+				{
+					if ( !await subTreeUnpacker.ReadAsync( cancellationToken ).ConfigureAwait( false ) )
+					{
+						SerializationExceptions.ThrowUnexpectedEndOfStream( unpacker );
+					}
+
+					var key = await this._keySerializer.UnpackFromAsync( unpacker, cancellationToken ).ConfigureAwait( false );
+
+					if ( !await subTreeUnpacker.ReadAsync( cancellationToken ).ConfigureAwait( false ) )
+					{
+						SerializationExceptions.ThrowUnexpectedEndOfStream( unpacker );
+					}
+
+					var value = await this._valueSerializer.UnpackFromAsync( unpacker, cancellationToken ).ConfigureAwait( false );
+
+					buffer[ i ] = new KeyValuePair<TKey, TValue>( key, value );
+				}
+			}
+
+			return this._factory( buffer );
+		}
+
+		protected internal override Task UnpackToAsyncCore( Unpacker unpacker, T collection, CancellationToken cancellationToken )
+		{
+			throw new NotSupportedException(
+				String.Format(
+					CultureInfo.CurrentCulture,
+					"Unable to unpack items to existing immutable dictioary '{0}'.",
+					typeof( T )
+				)
+			);
+		}
+
+#endif // FEATURE_TAP
+
 	}
 }

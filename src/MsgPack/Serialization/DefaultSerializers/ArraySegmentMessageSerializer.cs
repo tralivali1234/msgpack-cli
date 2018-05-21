@@ -2,7 +2,7 @@
 //
 // MessagePack for CLI
 //
-// Copyright (C) 2010-2015 FUJIWARA, Yusuke
+// Copyright (C) 2010-2016 FUJIWARA, Yusuke
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -25,23 +25,18 @@
 using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
-#if UNITY
-using System.Reflection;
-#endif // UNITY
+#if FEATURE_TAP
+using System.Threading;
+using System.Threading.Tasks;
+#endif // FEATURE_TAP
 
 namespace MsgPack.Serialization.DefaultSerializers
 {
 	internal static class ArraySegmentMessageSerializer
 	{
 		[SuppressMessage( "Microsoft.Usage", "CA1801:ReviewUnusedParameters", MessageId = "itemSerializer", Justification = "For Delegate signature compatibility" )]
-#if !UNITY
 		public static void PackByteArraySegmentTo( Packer packer, ArraySegment<byte> objectTree, MessagePackSerializer<byte> itemSerializer )
 		{
-#else
-		public static void PackByteArraySegmentTo( Packer packer, object obj, IMessagePackSingleObjectSerializer itemSerializer )
-		{
-			var objectTree = ( ArraySegment<byte> )obj;
-#endif // !UNITY
 			if ( objectTree.Array == null )
 			{
 				packer.PackBinaryHeader( 0 );
@@ -53,20 +48,13 @@ namespace MsgPack.Serialization.DefaultSerializers
 		}
 
 		[SuppressMessage( "Microsoft.Usage", "CA1801:ReviewUnusedParameters", MessageId = "itemSerializer", Justification = "For Delegate signature compatibility" )]
-#if !UNITY
 		public static void PackCharArraySegmentTo( Packer packer, ArraySegment<char> objectTree, MessagePackSerializer<char> itemSerializer )
 		{
-#else
-		public static void PackCharArraySegmentTo( Packer packer, object obj, IMessagePackSingleObjectSerializer itemSerializer )
-		{
-			var objectTree = ( ArraySegment<char> )obj;
-#endif // !UNITY
 			// TODO: More efficient
 			packer.PackStringHeader( objectTree.Count );
 			packer.PackRawBody( MessagePackConvert.EncodeString( new string( objectTree.Array.Skip( objectTree.Offset ).Take( objectTree.Count ).ToArray() ) ) );
 		}
 
-#if !UNITY
 		public static void PackGenericArraySegmentTo<T>( Packer packer, ArraySegment<T> objectTree, MessagePackSerializer<T> itemSerializer )
 		{
 			packer.PackArrayHeader( objectTree.Count );
@@ -75,43 +63,20 @@ namespace MsgPack.Serialization.DefaultSerializers
 				itemSerializer.PackTo( packer, objectTree.Array[ i + objectTree.Offset ] );
 			}
 		}
-#else
-		public static void PackGenericArraySegmentTo( Packer packer, object objectTree, IMessagePackSingleObjectSerializer itemSerializer )
-		{
-			var count = ( int )objectTree.GetType().GetProperty( "Count" ).GetGetMethod().InvokePreservingExceptionType( objectTree );
-			var offset = ( int )objectTree.GetType().GetProperty( "Offset" ).GetGetMethod().InvokePreservingExceptionType( objectTree );
-			var array = objectTree.GetType().GetProperty( "Array" ).GetGetMethod().InvokePreservingExceptionType( objectTree ) as Array;
-			packer.PackArrayHeader( count );
-			for ( int i = 0; i < count; i++ )
-			{
-				itemSerializer.PackTo( packer, array.GetValue( i + offset ) );
-			}
-		}
-#endif // !UNITY
-
 
 		[SuppressMessage( "Microsoft.Usage", "CA1801:ReviewUnusedParameters", MessageId = "itemSerializer", Justification = "For Delegate signature compatibility" )]
-#if !UNITY
 		public static ArraySegment<byte> UnpackByteArraySegmentFrom( Unpacker unpacker, MessagePackSerializer<byte> itemSerializer )
-#else
-		public static object UnpackByteArraySegmentFrom( Unpacker unpacker, Type elementType, IMessagePackSingleObjectSerializer itemSerializer )
-#endif // !UNITY
 		{
 			return new ArraySegment<byte>( unpacker.LastReadData.AsBinary() );
 		}
 
 		[SuppressMessage( "Microsoft.Usage", "CA1801:ReviewUnusedParameters", MessageId = "itemSerializer", Justification = "For Delegate signature compatibility" )]
-#if !UNITY
 		public static ArraySegment<char> UnpackCharArraySegmentFrom( Unpacker unpacker, MessagePackSerializer<char> itemSerializer )
-#else
-		public static object UnpackCharArraySegmentFrom( Unpacker unpacker, Type elementType, IMessagePackSingleObjectSerializer itemSerializer )
-#endif // !UNITY
 		{
 			// TODO: More efficient
 			return new ArraySegment<char>( unpacker.LastReadData.AsCharArray() );
 		}
 
-#if !UNITY
 		public static ArraySegment<T> UnpackGenericArraySegmentFrom<T>( Unpacker unpacker, MessagePackSerializer<T> itemSerializer )
 		{
 			T[] array = new T[ unpacker.ItemsCount ];
@@ -119,7 +84,7 @@ namespace MsgPack.Serialization.DefaultSerializers
 			{
 				if ( !unpacker.Read() )
 				{
-					throw SerializationExceptions.NewMissingItem( i );
+					SerializationExceptions.ThrowMissingItem( i, unpacker );
 				}
 
 				array[ i ] = itemSerializer.UnpackFrom( unpacker );
@@ -127,26 +92,89 @@ namespace MsgPack.Serialization.DefaultSerializers
 
 			return new ArraySegment<T>( array );
 		}
-#else
-		public static object UnpackGenericArraySegmentFrom( Unpacker unpacker, Type elementType, IMessagePackSingleObjectSerializer itemSerializer )
-		{
-			Array array = Array.CreateInstance( elementType, unpacker.ItemsCount );
-			for ( int i = 0; i < array.Length; i++ )
-			{
-				if ( !unpacker.Read() )
-				{
-					throw SerializationExceptions.NewMissingItem( i );
-				}
 
-				array.SetValue( itemSerializer.UnpackFrom( unpacker ), i );
+#if FEATURE_TAP
+
+		[SuppressMessage( "Microsoft.Usage", "CA1801:ReviewUnusedParameters", MessageId = "itemSerializer", Justification = "For Delegate signature compatibility" )]
+		public static async Task PackByteArraySegmentToAsync( Packer packer, ArraySegment<byte> objectTree, MessagePackSerializer<byte> itemSerializer, CancellationToken cancellationToken )
+		{
+			if ( objectTree.Array == null )
+			{
+				await packer.PackBinaryHeaderAsync( 0, cancellationToken ).ConfigureAwait( false );
+				return;
 			}
 
-			return
-				ReflectionExtensions.CreateInstancePreservingExceptionType(
-					typeof( ArraySegment<> ).MakeGenericType( elementType ),
-					array
-				);
+			await packer.PackBinaryHeaderAsync( objectTree.Count , cancellationToken ).ConfigureAwait( false );
+			await packer.PackRawBodyAsync( objectTree.Array.Skip( objectTree.Offset ).Take( objectTree.Count ), cancellationToken ).ConfigureAwait( false );
 		}
-#endif // !UNITY
+
+		[SuppressMessage( "Microsoft.Usage", "CA1801:ReviewUnusedParameters", MessageId = "itemSerializer", Justification = "For Delegate signature compatibility" )]
+		public static async Task PackCharArraySegmentToAsync( Packer packer, ArraySegment<char> objectTree, MessagePackSerializer<char> itemSerializer, CancellationToken cancellationToken )
+		{
+			// TODO: More efficient
+			await packer.PackStringHeaderAsync( objectTree.Count, cancellationToken ).ConfigureAwait( false );
+			await packer.PackRawBodyAsync( MessagePackConvert.EncodeString( new string( objectTree.Array.Skip( objectTree.Offset ).Take( objectTree.Count ).ToArray() ) ), cancellationToken ).ConfigureAwait( false );
+		}
+
+		public static async Task PackGenericArraySegmentToAsync<T>( Packer packer, ArraySegment<T> objectTree, MessagePackSerializer<T> itemSerializer, CancellationToken cancellationToken )
+		{
+			await packer.PackArrayHeaderAsync( objectTree.Count, cancellationToken ).ConfigureAwait( false );
+			for ( int i = 0; i < objectTree.Count; i++ )
+			{
+				await itemSerializer.PackToAsyncCore( packer, objectTree.Array[ i + objectTree.Offset ], cancellationToken ).ConfigureAwait( false );
+			}
+		}
+
+		[SuppressMessage( "Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes", Justification = "Transfers all catched exceptions." )]
+		[SuppressMessage( "Microsoft.Usage", "CA1801:ReviewUnusedParameters", MessageId = "itemSerializer", Justification = "For Delegate signature compatibility" )]
+		public static Task<ArraySegment<byte>> UnpackByteArraySegmentFromAsync( Unpacker unpacker, MessagePackSerializer<byte> itemSerializer, CancellationToken cancellationToken )
+		{
+			var tcs = new TaskCompletionSource<ArraySegment<byte>>();
+			try
+			{
+				tcs.SetResult( UnpackByteArraySegmentFrom( unpacker, itemSerializer ) );
+			}
+			catch ( Exception ex )
+			{
+				tcs.SetException( ex );
+			}
+
+			return tcs.Task;
+		}
+
+		[SuppressMessage( "Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes", Justification = "Transfers all catched exceptions." )]
+		[SuppressMessage( "Microsoft.Usage", "CA1801:ReviewUnusedParameters", MessageId = "itemSerializer", Justification = "For Delegate signature compatibility" )]
+		public static Task<ArraySegment<char>> UnpackCharArraySegmentFromAsync( Unpacker unpacker, MessagePackSerializer<char> itemSerializer, CancellationToken cancellationToken )
+		{
+			var tcs = new TaskCompletionSource<ArraySegment<char>>();
+			try
+			{
+				tcs.SetResult( UnpackCharArraySegmentFrom( unpacker, itemSerializer ) );
+			}
+			catch ( Exception ex )
+			{
+				tcs.SetException( ex );
+			}
+
+			return tcs.Task;
+		}
+
+		public static async Task<ArraySegment<T>> UnpackGenericArraySegmentFromAsync<T>( Unpacker unpacker, MessagePackSerializer<T> itemSerializer, CancellationToken cancellationToken )
+		{
+			T[] array = new T[ unpacker.ItemsCount ];
+			for ( int i = 0; i < array.Length; i++ )
+			{
+				if ( !await unpacker.ReadAsync( cancellationToken ).ConfigureAwait( false ) )
+				{
+					SerializationExceptions.ThrowMissingItem( i, unpacker );
+				}
+
+				array[ i ] = await itemSerializer.UnpackFromAsyncCore( unpacker, cancellationToken ).ConfigureAwait( false );
+			}
+
+			return new ArraySegment<T>( array );
+		}
+#endif // FEATURE_TAP
+
 	}
 }

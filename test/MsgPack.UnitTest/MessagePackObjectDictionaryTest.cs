@@ -1,4 +1,4 @@
-﻿#region -- License Terms --
+#region -- License Terms --
 //
 // MessagePack for CLI
 //
@@ -33,9 +33,9 @@ using Is = NUnit.Framework.Is;
 #endif
 using System.Text;
 using System.IO;
-#if !NETFX_CORE && !SILVERLIGHT
+#if !NETFX_CORE && !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 using System.Runtime.Serialization.Formatters.Binary;
-#endif // !NETFX_CORE && !SILVERLIGHT
+#endif // !NETFX_CORE && !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 
 namespace MsgPack
 {
@@ -907,6 +907,9 @@ namespace MsgPack
 		}
 
 		[Test]
+#if UNITY
+		[Ignore( "IL2CPP runtime does not throw exception." )]
+#endif // UNITY
 		public void ICollectionCopyToInvalidArray()
 		{
 			var dictionary = new MessagePackObjectDictionary();
@@ -1334,7 +1337,7 @@ namespace MsgPack
 			Assert.That( array[ 4 ], Is.EqualTo( MessagePackObject.Nil ) );
 		}
 
-#if !NETFX_CORE && !SILVERLIGHT && !UNITY
+#if !NETFX_CORE && !SILVERLIGHT && !UNITY && !NETSTANDARD1_1 && !NETSTANDARD1_3 && !NETSTANDARD2_0
 		[Test]
 		public void TestRuntimeSerialization_NotEmpty_RoundTripped()
 		{
@@ -1348,7 +1351,7 @@ namespace MsgPack
 				Assert.AreEqual( target, deserialized );
 			}
 		}
-#endif // !NETFX_CORE && !SILVERLIGHT && !UNITY
+#endif // !NETFX_CORE && !SILVERLIGHT && !UNITY && !NETSTANDARD1_1 && !NETSTANDARD1_3 && !NETSTANDARD2_0
 
 		private sealed class MyClass { }
 	}

@@ -1,8 +1,8 @@
-﻿#region -- License Terms --
+#region -- License Terms --
 //
 // MessagePack for CLI
 //
-// Copyright (C) 2010-2015 FUJIWARA, Yusuke
+// Copyright (C) 2010-2016 FUJIWARA, Yusuke
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -24,13 +24,11 @@
 
 using System;
 using System.Diagnostics;
-#if !UNITY
-#if XAMIOS || XAMDROID
+#if FEATURE_MPCONTRACT
 using Contract = MsgPack.MPContract;
 #else
 using System.Diagnostics.Contracts;
-#endif // XAMIOS || XAMDROID
-#endif // !UNITY
+#endif // FEATURE_MPCONTRACT
 using System.Globalization;
 using System.Linq;
 using System.Security;
@@ -45,12 +43,12 @@ namespace MsgPack
 	/// <summary>
 	///		Encapselates <see cref="String"/> and its serialized UTF-8 bytes.
 	/// </summary>
-#if !SILVERLIGHT && !NETFX_CORE
+#if !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3 && !NETSTANDARD2_0
 	[Serializable]
-#endif // if !SILVERLIGHT && !NETFX_CORE
-#if !NETFX_35 && !UNITY
+#endif // !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3 && !NETSTANDARD2_0
+#if !NET35 && !UNITY
 	[SecuritySafeCritical]
-#endif // !NETFX_35 && !UNITY
+#endif // !NET35 && !UNITY
 	[DebuggerDisplay( "{DebuggerDisplayString}" )]
 	[DebuggerTypeProxy( typeof( MessagePackStringDebuggerProxy ) )]
 	internal sealed class MessagePackString
@@ -72,18 +70,16 @@ namespace MsgPack
 
 		public MessagePackString( string decoded )
 		{
-#if !UNITY
 			Contract.Assert( decoded != null, "decoded != null" );
-#endif // !UNITY
+
 			this._decoded = decoded;
 			this._type = BinaryType.String;
 		}
 
 		public MessagePackString( byte[] encoded, bool isBinary )
 		{
-#if !UNITY
 			Contract.Assert( encoded != null, "encoded != null" );
-#endif // !UNITY
+
 			this._encoded = encoded;
 			this._type = isBinary ? BinaryType.Blob : BinaryType.Unknwon;
 			if ( isBinary )
@@ -270,7 +266,7 @@ namespace MsgPack
 				return false;
 			}
 
-#if !UNITY && !WINDOWS_PHONE && !NETFX_CORE
+#if !UNITY && !WINDOWS_PHONE && !NETFX_CORE && !UNITY
 			if ( _isFastEqualsDisabled == 0 )
 			{
 				try
@@ -286,7 +282,7 @@ namespace MsgPack
 					Interlocked.Exchange( ref _isFastEqualsDisabled, 1 );
 				}
 			}
-#endif // if !UNITY && !WINDOWS_PHONE && !NETFX_CORE
+#endif // if !UNITY && !WINDOWS_PHONE && !NETFX_CORE && !UNITY;
 
 			return SlowEquals( left._encoded, right._encoded );
 		}
@@ -304,7 +300,7 @@ namespace MsgPack
 			return true;
 		}
 
-#if !UNITY && !WINDOWS_PHONE && !NETFX_CORE
+#if !UNITY && !WINDOWS_PHONE && !NETFX_CORE && !UNITY
 #if SILVERLIGHT
 		private static int _isFastEqualsDisabled =
 			System.Windows.Application.Current.HasElevatedPermissions ? 0 : 1;
@@ -320,9 +316,9 @@ namespace MsgPack
 		}
 #endif
 
-#if !NETFX_35 && !UNITY
+#if !NET35 && !UNITY
 		[SecuritySafeCritical]
-#endif // !NETFX_35 && !UNITY
+#endif // !NET35 && !UNITY
 		private static bool UnsafeFastEquals( byte[] x, byte[] y )
 		{
 #if DEBUG
@@ -340,11 +336,11 @@ namespace MsgPack
 
 			return result == 0;
 		}
-#endif // if !UNITY && !WINDOWS_PHONE && !NETFX_CORE
+#endif // if !UNITY && !WINDOWS_PHONE && !NETFX_CORE && !UNITY;
 
-#if !SILVERLIGHT && !NETFX_CORE
+#if !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 		[Serializable]
-#endif // if !SILVERLIGHT && !NETFX_CORE
+#endif // !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 		private enum BinaryType
 		{
 			Unknwon = 0,

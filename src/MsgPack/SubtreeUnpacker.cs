@@ -1,4 +1,4 @@
-﻿#region -- License Terms --
+#region -- License Terms --
 //
 // MessagePack for CLI
 //
@@ -23,13 +23,15 @@
 #endif
 
 using System;
-#if !UNITY
-#if XAMIOS || XAMDROID
+#if FEATURE_MPCONTRACT
 using Contract = MsgPack.MPContract;
 #else
 using System.Diagnostics.Contracts;
-#endif // XAMIOS || XAMDROID
-#endif // !UNITY
+#endif // FEATURE_MPCONTRACT
+#if FEATURE_TAP
+using System.Threading;
+using System.Threading.Tasks;
+#endif // FEATURE_TAP
 
 #if !UNITY || MSGPACK_UNITY_FULL
 using BooleanStack = System.Collections.Generic.Stack<System.Boolean>;
@@ -39,13 +41,13 @@ using Int64Stack = System.Collections.Generic.Stack<System.Int64>;
 
 namespace MsgPack
 {
-	// TODO: Expose base subtree unpacker as API
 	/// <summary>
 	///		Defines subtree unpacking unpacker.
 	/// </summary>
 	internal sealed partial class SubtreeUnpacker : Unpacker
 	{
-		private readonly ItemsUnpacker _root;
+		private readonly Unpacker _root;
+		private readonly IRootUnpacker _internalRoot;
 		private readonly SubtreeUnpacker _parent;
 		private readonly BooleanStack _isMap;
 		private readonly Int64Stack _unpacked;
@@ -59,48 +61,51 @@ namespace MsgPack
 
 		public override bool IsArrayHeader
 		{
-			get { return this._root.InternalCollectionType == ItemsUnpacker.CollectionType.Array; }
+			get { return this._internalRoot.CollectionType == CollectionType.Array; }
 		}
 
 		public override bool IsMapHeader
 		{
-			get { return this._root.InternalCollectionType == ItemsUnpacker.CollectionType.Map; }
+			get { return this._internalRoot.CollectionType == CollectionType.Map; }
 		}
 
 		public override bool IsCollectionHeader
 		{
-			get { return this._root.InternalCollectionType != ItemsUnpacker.CollectionType.None; }
+			get { return this._internalRoot.CollectionType != CollectionType.None; }
 		}
 
 		[Obsolete( "Consumer should not use this property. Query LastReadData instead." )]
 		public override MessagePackObject? Data
 		{
-			get { return this._root.InternalData; }
-			protected set { this._root.InternalData = value.GetValueOrDefault(); }
+			get { return this._internalRoot.Data; }
+			protected set { this._internalRoot.Data = value; }
 		}
 
 		public override MessagePackObject LastReadData
 		{
-			get { return this._root.InternalData; }
-			protected set { this._root.InternalData = value; }
+			get { return this._internalRoot.LastReadData; }
+			protected set { this._internalRoot.LastReadData = value; }
 		}
 
 #if DEBUG
 		internal override long? UnderlyingStreamPosition
 		{
-			get { return this._root.UnderlyingStreamPosition; }
+			get { return this._internalRoot.UnderlyingStreamPosition; }
 		}
 #endif
 
-		public SubtreeUnpacker( ItemsUnpacker parent ) : this( parent, null ) { }
+		public SubtreeUnpacker( Unpacker parent ) : this( parent, null ) { }
 
-		private SubtreeUnpacker( ItemsUnpacker root, SubtreeUnpacker parent )
+		private SubtreeUnpacker( Unpacker root, SubtreeUnpacker parent )
 		{
-#if DEBUG && !UNITY
+			var internalRoot = root as IRootUnpacker;
+#if DEBUG
 			Contract.Assert( root != null, "root != null" );
-			Contract.Assert( root.IsArrayHeader || root.IsMapHeader, "root.IsArrayHeader || root.IsMapHeader" );
-#endif // DEBUG && !UNITY
+			Contract.Assert( internalRoot != null, "root is IRootUnpacker" );
+			Contract.Assert( internalRoot.CollectionType == CollectionType.Array || internalRoot.CollectionType == CollectionType.Map, "root.IsArrayHeader || root.IsMapHeader" );
+#endif // DEBUG
 			this._root = root;
+			this._internalRoot = internalRoot;
 			this._parent = parent;
 			this._unpacked = new Int64Stack( 2 );
 
@@ -109,9 +114,9 @@ namespace MsgPack
 
 			if ( root.ItemsCount > 0 )
 			{
-				this._itemsCount.Push( root.InternalItemsCount * ( ( int )root.InternalCollectionType ) );
+				this._itemsCount.Push( root.ItemsCount * ( ( int )internalRoot.CollectionType ) );
 				this._unpacked.Push( 0 );
-				this._isMap.Push( root.InternalCollectionType == ItemsUnpacker.CollectionType.Map );
+				this._isMap.Push( internalRoot.CollectionType == CollectionType.Map );
 			}
 
 			this._state = State.InHead;
@@ -124,10 +129,7 @@ namespace MsgPack
 				if ( this._state != State.Disposed )
 				{
 					// Drain...
-					while ( this.ReadCore() )
-					{
-						// nop
-					}
+					this.Drain();
 					if ( this._parent != null )
 					{
 						this._parent.EndReadSubtree();
@@ -143,6 +145,40 @@ namespace MsgPack
 
 			base.Dispose( disposing );
 		}
+
+		public override void Drain()
+		{
+			if ( this._state >= State.Drained )
+			{
+				return;
+			}
+
+			while ( this.Read() )
+			{
+				// nop
+			}
+
+			this._state  = State.Drained;
+		}
+
+#if FEATURE_TAP
+
+		public override async Task DrainAsync( CancellationToken cancellationToken )
+		{
+			if ( this._state >= State.Drained )
+			{
+				return;
+			}
+
+			while ( await this.ReadAsync( cancellationToken ).ConfigureAwait( false ) )
+			{
+				// nop
+			}
+
+			this._state = State.Drained;
+		}
+
+#endif // FEATURE_TAP
 
 		protected internal override void EndReadSubtree()
 		{
@@ -162,12 +198,12 @@ namespace MsgPack
 				return this;
 			}
 
-			if ( this._unpacked.Count == 0  )
+			if ( this._unpacked.Count == 0 )
 			{
 				ThrowInTailException();
 			}
 
-			if ( this._root.InternalCollectionType == ItemsUnpacker.CollectionType.None )
+			if ( this._internalRoot.CollectionType == CollectionType.None )
 			{
 				ThrowNotInHeadOfCollectionException();
 			}
@@ -189,23 +225,23 @@ namespace MsgPack
 		{
 			this.DiscardCompletedStacks();
 
-			if ( this._itemsCount.Count == 0 || !this._root.ReadSubtreeItem() )
+			if ( this._itemsCount.Count == 0 || !this._root.ReadInternal() )
 			{
 				return false;
 			}
 
-			switch ( this._root.InternalCollectionType )
+			switch ( this._internalRoot.CollectionType )
 			{
-				case ItemsUnpacker.CollectionType.Array:
+				case CollectionType.Array:
 				{
-					this._itemsCount.Push( this._root.InternalItemsCount );
+					this._itemsCount.Push( this._root.ItemsCount );
 					this._unpacked.Push( 0 );
 					this._isMap.Push( false );
 					break;
 				}
-				case ItemsUnpacker.CollectionType.Map:
+				case CollectionType.Map:
 				{
-					this._itemsCount.Push( this._root.InternalItemsCount * 2 );
+					this._itemsCount.Push( this._root.ItemsCount * 2 );
 					this._unpacked.Push( 0 );
 					this._isMap.Push( true );
 					break;
@@ -221,6 +257,46 @@ namespace MsgPack
 			return true;
 		}
 
+#if FEATURE_TAP
+
+		protected override async Task<bool> ReadAsyncCore( CancellationToken cancellationToken )
+		{
+			this.DiscardCompletedStacks();
+
+			if ( this._itemsCount.Count == 0 || !( await this._root.ReadInternalAsync( cancellationToken ).ConfigureAwait( false ) ) )
+			{
+				return false;
+			}
+
+			switch ( this._internalRoot.CollectionType )
+			{
+				case CollectionType.Array:
+				{
+					this._itemsCount.Push( this._root.ItemsCount );
+					this._unpacked.Push( 0 );
+					this._isMap.Push( false );
+					break;
+				}
+				case CollectionType.Map:
+				{
+					this._itemsCount.Push( this._root.ItemsCount * 2 );
+					this._unpacked.Push( 0 );
+					this._isMap.Push( true );
+					break;
+				}
+				default:
+				{
+					this._unpacked.Push( this._unpacked.Pop() + 1 );
+					break;
+				}
+			}
+
+			this._state = State.InProgress;
+			return true;
+		}
+
+#endif // FEATURE_TAP
+
 		protected override long? SkipCore()
 		{
 			this.DiscardCompletedStacks();
@@ -230,7 +306,7 @@ namespace MsgPack
 				return 0;
 			}
 
-			var result = this._root.SkipSubtreeItem();
+			var result = this._root.Skip();
 			if ( result != null )
 			{
 				this._unpacked.Push( this._unpacked.Pop() + 1 );
@@ -239,13 +315,35 @@ namespace MsgPack
 			return result;
 		}
 
+#if FEATURE_TAP
+
+		protected override async Task<long?> SkipAsyncCore( CancellationToken cancellationToken )
+		{
+			this.DiscardCompletedStacks();
+
+			if ( this._itemsCount.Count == 0 )
+			{
+				return 0;
+			}
+
+			var result = await this._root.SkipAsync( cancellationToken ).ConfigureAwait( false );
+			if ( result != null )
+			{
+				this._unpacked.Push( this._unpacked.Pop() + 1 );
+			}
+
+			return result;
+		}
+
+#endif // FEATURE_TAP
+
 		private void DiscardCompletedStacks()
 		{
 			if ( this._itemsCount.Count == 0 )
 			{
-#if DEBUG && !UNITY
+#if DEBUG
 				Contract.Assert( this._unpacked.Count == 0, "this._unpacked.Count == 0" );
-#endif // DEBUG && !UNITY
+#endif // DEBUG
 				return;
 			}
 
@@ -257,9 +355,9 @@ namespace MsgPack
 
 				if ( this._itemsCount.Count == 0 )
 				{
-#if DEBUG && !UNITY
+#if DEBUG
 					Contract.Assert( this._unpacked.Count == 0, "this._unpacked.Count == 0 " );
-#endif // DEBUG && !UNITY
+#endif // DEBUG
 					break;
 				}
 
@@ -270,8 +368,9 @@ namespace MsgPack
 		private enum State
 		{
 			InHead = 0,
-			InProgress,
-			Disposed
+			InProgress = 1,
+			Drained = 2,
+			Disposed = 3,
 		}
 	}
 }

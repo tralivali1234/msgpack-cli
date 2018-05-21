@@ -2,7 +2,7 @@
 //
 // MessagePack for CLI
 //
-// Copyright (C) 2015 FUJIWARA, Yusuke
+// Copyright (C) 2015-2016 FUJIWARA, Yusuke
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -20,6 +20,10 @@
 
 using System;
 using System.Globalization;
+#if FEATURE_TAP
+using System.Threading;
+using System.Threading.Tasks;
+#endif // FEATURE_TAP
 
 namespace MsgPack.Serialization.DefaultSerializers
 {
@@ -27,7 +31,7 @@ namespace MsgPack.Serialization.DefaultSerializers
 	internal sealed class System_Globalization_CultureInfoMessagePackSerializer : MessagePackSerializer<CultureInfo>
 	{
 		public System_Globalization_CultureInfoMessagePackSerializer( SerializationContext ownerContext )
-			: base( ownerContext ) { }
+			: base( ownerContext, SerializerCapabilities.PackTo | SerializerCapabilities.UnpackFrom ) { }
 
 		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "Validated by caller in base class" )]
 		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "1", Justification = "Validated by caller in base class" )]
@@ -36,14 +40,41 @@ namespace MsgPack.Serialization.DefaultSerializers
 			packer.PackString( objectTree.Name );
 		}
 
-		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "Asserted internally" )]
+		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "Validated internally" )]
 		protected internal override CultureInfo UnpackFromCore( Unpacker unpacker )
 		{
-#if SILVERLIGHT || NETFX_CORE
-			return new CultureInfo( unpacker.LastReadData.AsString() );
+#if SILVERLIGHT || NETSTANDARD1_1 || NETSTANDARD1_3
+			return new CultureInfo( unpacker.LastReadData.DeserializeAsString() );
 #else
-			return CultureInfo.GetCultureInfo( unpacker.LastReadData.AsString() );
-#endif // SILVERLIGHT || NETFX_CORE
+			return CultureInfo.GetCultureInfo( unpacker.LastReadData.DeserializeAsString() );
+#endif // SILVERLIGHT || NETSTANDARD1_1 || NETSTANDARD1_3
 		}
+
+#if FEATURE_TAP
+
+		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "Validated by caller in base class" )]
+		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "1", Justification = "Validated by caller in base class" )]
+		protected internal override Task PackToAsyncCore( Packer packer, CultureInfo objectTree, CancellationToken cancellationToken )
+		{
+			return packer.PackStringAsync( objectTree.Name, cancellationToken );
+		}
+
+		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes", Justification = "Transfers all catched exceptions." )]
+		protected internal override Task<CultureInfo> UnpackFromAsyncCore( Unpacker unpacker, CancellationToken cancellationToken )
+		{
+			var tcs = new TaskCompletionSource<CultureInfo>();
+			try
+			{
+				tcs.SetResult( this.UnpackFromCore( unpacker ) );
+			}
+			catch ( Exception ex )
+			{
+				tcs.SetException( ex );
+			}
+
+			return tcs.Task;
+		}
+
+#endif // FEATURE_TAP
 	}
 }

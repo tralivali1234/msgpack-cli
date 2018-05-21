@@ -26,7 +26,10 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using System.Runtime.Serialization;
+#if FEATURE_TAP
+using System.Threading;
+using System.Threading.Tasks;
+#endif // FEATURE_TAP
 
 using MsgPack.Serialization.Reflection;
 
@@ -43,7 +46,7 @@ namespace MsgPack.Serialization.Polymorphic
 		private readonly IDictionary<RuntimeTypeHandle, string> _typeCodeMap;
 
 		public KnownTypePolymorphicMessagePackSerializer( SerializationContext ownerContext, PolymorphismSchema schema )
-			: base( ownerContext )
+			: base( ownerContext, SerializerCapabilities.PackTo | SerializerCapabilities.UnpackFrom | SerializerCapabilities.UnpackTo )
 		{
 			if ( typeof( T ).GetIsValueType() )
 			{
@@ -67,7 +70,7 @@ namespace MsgPack.Serialization.Polymorphic
 			{
 				if ( typeHandleTypeCodeMapping.Count() > 1 )
 				{
-					throw new SerializationException(
+					SerializationExceptions.ThrowSerializationException(
 						String.Format(
 							CultureInfo.CurrentCulture,
 							"Type '{0}' is mapped to multiple extension type codes({1}).",
@@ -75,9 +78,9 @@ namespace MsgPack.Serialization.Polymorphic
 							String.Join(
 								CultureInfo.CurrentCulture.TextInfo.ListSeparator,
 								typeHandleTypeCodeMapping.Select( kv => kv.Key )
-#if NETFX_35 || UNITY
+#if NET35 || UNITY
 								.Select( b => b.ToString( CultureInfo.InvariantCulture ) ).ToArray()
-#endif // NETFX_35 || UNITY
+#endif // NET35 || UNITY
  )
 						)
 					);
@@ -89,12 +92,12 @@ namespace MsgPack.Serialization.Polymorphic
 			return result;
 		}
 
-		private IMessagePackSerializer GetActualTypeSerializer( Type actualType )
+		private MessagePackSerializer GetActualTypeSerializer( Type actualType )
 		{
 			var result = this.OwnerContext.GetSerializer( actualType, this._schema );
 			if ( result == null )
 			{
-				throw new SerializationException(
+				SerializationExceptions.ThrowSerializationException(
 					String.Format( CultureInfo.CurrentCulture, "Cannot get serializer for actual type {0} from context.", actualType )
 				);
 			}
@@ -106,21 +109,25 @@ namespace MsgPack.Serialization.Polymorphic
 		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Usage", "CA2202:DoNotDisposeObjectsMultipleTimes", Justification = "Avoided via ownsStream: false" )]
 		protected internal override void PackToCore( Packer packer, T objectTree )
 		{
+			TypeInfoEncoder.Encode( packer, this.GetTypeCode( objectTree ) );
+			this.GetActualTypeSerializer( objectTree.GetType() ).PackTo( packer, objectTree );
+		}
+
+		private string GetTypeCode( T objectTree )
+		{
 			string typeCode;
 			if ( !this._typeCodeMap.TryGetValue( objectTree.GetType().TypeHandle, out typeCode ) )
 			{
-				throw new SerializationException( 
-					String.Format( 
-						CultureInfo.CurrentCulture, 
+				SerializationExceptions.ThrowSerializationException(
+					String.Format(
+						CultureInfo.CurrentCulture,
 						"Type '{0}' in assembly '{1}' is not defined as known types.",
-						objectTree.GetType().GetFullName(), 
+						objectTree.GetType().GetFullName(),
 						objectTree.GetType().GetAssembly()
-					) 
+					)
 				);
 			}
-
-			TypeInfoEncoder.Encode( packer, this._typeCodeMap[ objectTree.GetType().TypeHandle ] );
-			this.GetActualTypeSerializer( objectTree.GetType() ).PackTo( packer, objectTree );
+			return typeCode;
 		}
 
 		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "Validated by caller in base class" )]
@@ -129,28 +136,58 @@ namespace MsgPack.Serialization.Polymorphic
 			return
 				TypeInfoEncoder.Decode(
 					unpacker,
-					u =>
-					{
-						var typeCode = u.LastReadData.AsString();
-
-						RuntimeTypeHandle typeHandle;
-						if ( !this._typeHandleMap.TryGetValue( typeCode, out typeHandle ) )
-						{
-							throw new SerializationException(
-								String.Format( CultureInfo.CurrentCulture, "Unknown type {0}.", StringEscape.ForDisplay( typeCode ) )
-							);
-						}
-
-						return Type.GetTypeFromHandle( typeHandle );
-					},
+					// Currently, lamda is more efficient than method group.
+					// ReSharper disable once ConvertClosureToMethodGroup
+					c => this.GetTypeFromCode( c ),
 					( t, u ) => ( T ) this.GetActualTypeSerializer( t ).UnpackFrom( u )
 				);
+		}
+
+		private Type GetTypeFromCode( string typeCode )
+		{
+			RuntimeTypeHandle typeHandle;
+			if ( !this._typeHandleMap.TryGetValue( typeCode, out typeHandle ) )
+			{
+				SerializationExceptions.ThrowSerializationException(
+					String.Format( CultureInfo.CurrentCulture, "Unknown type {0}.", StringEscape.ForDisplay( typeCode ) )
+				);
+			}
+
+			return Type.GetTypeFromHandle( typeHandle );
 		}
 
 		object IPolymorphicDeserializer.PolymorphicUnpackFrom( Unpacker unpacker )
 		{
 			return this.UnpackFromCore( unpacker );
 		}
+
+#if FEATURE_TAP
+
+		protected internal override async Task PackToAsyncCore( Packer packer, T objectTree, CancellationToken cancellationToken )
+		{
+			await TypeInfoEncoder.EncodeAsync( packer, this.GetTypeCode( objectTree ), cancellationToken ).ConfigureAwait( false );
+			await this.GetActualTypeSerializer( objectTree.GetType() ).PackToAsync( packer, objectTree, cancellationToken ).ConfigureAwait( false );
+		}
+
+		protected internal override Task<T> UnpackFromAsyncCore( Unpacker unpacker, CancellationToken cancellationToken )
+		{
+			return
+				TypeInfoEncoder.DecodeAsync<T>(
+					unpacker,
+					// Currently, lamda is more efficient than method group.
+					// ReSharper disable once ConvertClosureToMethodGroup
+					c => this.GetTypeFromCode( c ),
+					( t, u, c ) => this.GetActualTypeSerializer( t ).UnpackFromAsync( u, c ),
+					cancellationToken
+				);
+		}
+
+		async Task<object> IPolymorphicDeserializer.PolymorphicUnpackFromAsync( Unpacker unpacker, CancellationToken cancellationToken )
+		{
+			return await this.UnpackFromAsyncCore( unpacker, cancellationToken ).ConfigureAwait( false );
+		}
+
+#endif // FEATURE_TAP
 
 		protected internal override void UnpackToCore( Unpacker unpacker, T collection )
 		{

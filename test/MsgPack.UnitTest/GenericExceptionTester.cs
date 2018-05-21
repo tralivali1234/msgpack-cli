@@ -1,8 +1,8 @@
-﻿#region -- License Terms --
+#region -- License Terms --
 //
 // MessagePack for CLI
 //
-// Copyright (C) 2010-2012 FUJIWARA, Yusuke
+// Copyright (C) 2010-2017 FUJIWARA, Yusuke
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -27,16 +27,16 @@ using System.Linq.Expressions;
 #if NETFX_CORE
 using System.Reflection;
 #endif
-#if !NETFX_CORE && !SILVERLIGHT
+#if !NETFX_CORE && !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 using System.Runtime.Serialization.Formatters.Binary;
 #else
 using System.Runtime.Serialization;
-#endif // !NETFX_CORE && !SILVERLIGHT
+#endif // !NETFX_CORE && !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 using System.Security;
-#if  !NETFX_CORE && !SILVERLIGHT
+#if !NETFX_CORE && !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 using System.Security.Permissions;
 using System.Security.Policy;
-#endif //  !NETFX_CORE && !SILVERLIGHT
+#endif // !NETFX_CORE && !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 #if !MSTEST
 using NUnit.Framework;
 #else
@@ -58,9 +58,9 @@ namespace MsgPack
 	/// </summary>
 	/// <typeparam name="T">Target exception type.</typeparam>
 	public sealed class GenericExceptionTester<T>
-#if  !NETFX_CORE && !SILVERLIGHT
+#if !NETFX_CORE && !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 		: MarshalByRefObject
-#endif //  !NETFX_CORE && !SILVERLIGHT
+#endif // !NETFX_CORE && !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 		where T : Exception
 	{
 		private static readonly Type[] _emptyTypes = new Type[ 0 ];
@@ -144,9 +144,12 @@ namespace MsgPack
 			this.TestMessageConstructor_WithNull_SetToDefaultMessage();
 			this.TestInnerExceptionConstructor_WithMessageAndInnerException_SetToMessageAndInnerException();
 			this.TestInnerExceptionConstructor_Null_SetToDefaultMessageAndNullInnerException();
-#if !NETFX_CORE && !WINDOWS_PHONE && !XAMIOS && !XAMDROID && !UNITY
+#if !SILVERLIGHT && !AOT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 			this.TestSerialization();
-#endif // if !NETFX_CORE && !WINDOWS_PHONE && !XAMIOS && !XAMDROID && !UNITY
+#if !NETSTANDARD2_0
+			this.TestSerializationOnPartialTrust();
+#endif // !NETSTANDARD2_0
+#endif // !SILVERLIGHT && !AOT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 		}
 
 		private void TestDefaultConstructor()
@@ -160,7 +163,7 @@ namespace MsgPack
 		{
 			var message = Guid.NewGuid().ToString();
 			var target = this._messageConstructor( message );
-			Assert.That( target.Message, Is.Not.Null.And.StringContaining( message ), "Message should contain message argument." );
+			Assert.That( target.Message, Is.Not.Null.And.Contains( message ), "Message should contain message argument." );
 			TestToString( target, typeof( T ).Name + "()" );
 		}
 
@@ -168,7 +171,7 @@ namespace MsgPack
 		{
 			var defaultInstance = this._defaultConstructor();
 			var target = this._messageConstructor( null );
-			Assert.That( target.Message, Is.Not.Null.And.StringContaining( defaultInstance.Message ), "Message should equal to default message." );
+			Assert.That( target.Message, Is.Not.Null.And.Contains( defaultInstance.Message ), "Message should equal to default message." );
 			TestToString( target, typeof( T ).Name + "()" );
 		}
 
@@ -177,7 +180,7 @@ namespace MsgPack
 			var message = Guid.NewGuid().ToString();
 			var innerException = new Exception();
 			var target = this._innerExceptionConstructor( message, innerException );
-			Assert.That( target.Message, Is.Not.Null.And.StringContaining( message ), "Message should contain message argument." );
+			Assert.That( target.Message, Is.Not.Null.And.Contains( message ), "Message should contain message argument." );
 			Assert.That( target.InnerException, Is.SameAs( innerException ), "InnerException should contain innerException argument." );
 			TestToString( target, typeof( T ).Name + "()" );
 		}
@@ -186,7 +189,7 @@ namespace MsgPack
 		{
 			var defaultInstance = this._defaultConstructor();
 			var target = this._innerExceptionConstructor( null, null );
-			Assert.That( target.Message, Is.Not.Null.And.StringContaining( defaultInstance.Message ), "Message should equal to default message." );
+			Assert.That( target.Message, Is.Not.Null.And.Contains( defaultInstance.Message ), "Message should equal to default message." );
 			Assert.That( target.InnerException, Is.Null, "InnerException should be null." );
 			TestToString( target, typeof( T ).Name + "()" );
 		}
@@ -210,17 +213,21 @@ namespace MsgPack
 
 		private static void TestToStringCore( T target, string ctor )
 		{
-			Assert.That( target.ToString(), Is.Not.Null.And.Not.Empty.And.StringContaining( target.Message ).And.StringContaining( target.GetType().FullName ).And.StringContaining( target.StackTrace ), "ToString() should contain Message, Type.FullName, and StackTrace ({0}).", ctor );
+			Assert.That( target.ToString(), Is.Not.Null.And.Not.Empty.And.Contains( target.Message ).And.Contains( target.GetType().FullName ).And.Contains( target.StackTrace ), "ToString() should contain Message, Type.FullName, and StackTrace ({0}).", ctor );
 			if ( target.InnerException != null )
 			{
-				Assert.That( target.ToString(), Is.Not.Null.And.StringContaining( target.InnerException.Message ), "ToString() should contain InnerException ({0}).", ctor );
+				Assert.That( target.ToString(), Is.Not.Null.And.Contains( target.InnerException.Message ), "ToString() should contain InnerException ({0}).", ctor );
 			}
 		}
 
-#if !NETFX_CORE && !WINDOWS_PHONE && !XAMIOS && !XAMDROID && !UNITY
+#if !SILVERLIGHT && !AOT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 		private void TestSerialization()
 		{
+#if !NETSTANDARD2_0
 			Assert.That( typeof( T ), Is.BinarySerializable );
+#else // !NETSTANDARD2_0
+			Assert.That( typeof( T ).IsSerializable, Is.True );
+#endif // !NETSTANDARD2_0
 			var innerMessage = Guid.NewGuid().ToString();
 			var message = Guid.NewGuid().ToString();
 			var target = this._innerExceptionConstructor( message, new Exception( innerMessage ) );
@@ -237,11 +244,12 @@ namespace MsgPack
 			}
 		}
 
+#if !NETSTANDARD2_0
 		private void TestSerializationOnPartialTrust()
 		{
 			var appDomainSetUp = new AppDomainSetup() { ApplicationBase = AppDomain.CurrentDomain.SetupInformation.ApplicationBase };
 			var evidence = new Evidence();
-#if MONO || NETFX_35
+#if MONO || NET35
 #pragma warning disable 0612
 			// TODO: patching
 			// currently, Mono does not declare AddHostEvidence
@@ -252,7 +260,7 @@ namespace MsgPack
 			evidence.AddHostEvidence( new Zone( SecurityZone.Internet ) );
 			var permisions = SecurityManager.GetStandardSandbox( evidence );
 #endif
-			AppDomain workerDomain = AppDomain.CreateDomain( "PartialTrust", evidence, appDomainSetUp, permisions, GetStrongName( this.GetType() ) );
+			AppDomain workerDomain = AppDomain.CreateDomain( "PartialTrust", evidence, appDomainSetUp, permisions, GetStrongName( this.GetType() ), GetStrongName( typeof( Assert ) ) );
 			try
 			{
 				var innerMessage = Guid.NewGuid().ToString();
@@ -265,7 +273,7 @@ namespace MsgPack
 				var target = workerDomain.GetData( "MsgPack.GenericExceptionTester.Target" ) as T;
 				Assert.That( target, Is.Not.Null );
 				Assert.That( target.Message, Is.EqualTo( target.Message ) );
-				Assert.That( target.InnerException, Is.Not.Null.And.TypeOf( typeof( Exception ) ) );
+				Assert.That( target.InnerException is Exception, target.InnerException == null ? "(null)" : target.InnerException.GetType().ToString() );
 				Assert.That( target.InnerException.Message, Is.EqualTo( target.InnerException.Message ) );
 			}
 			finally
@@ -274,7 +282,7 @@ namespace MsgPack
 			}
 		}
 
-#if MONO || NETFX_35
+#if MONO || NET35
 		private static PermissionSet GetDefaultInternetZoneSandbox()
 		{
 			var permissions = new PermissionSet( PermissionState.None );
@@ -292,7 +300,8 @@ namespace MsgPack
 			);
 			permissions.AddPermission(
 				new SecurityPermission(
-					SecurityPermissionFlag.Execution
+					SecurityPermissionFlag.Execution |
+					SecurityPermissionFlag.SkipVerification // for unsafe code
 				)
 			);
 			permissions.AddPermission(
@@ -304,7 +313,7 @@ namespace MsgPack
 			
 			return permissions;
 		}
-#endif // if MONO || NETFX_35
+#endif // if MONO || NET35
 
 		public static void TestSerializationOnPartialTrustCore()
 		{
@@ -314,7 +323,7 @@ namespace MsgPack
 			var target = instance.CreateTargetInstance( message, new Exception( innerMessage ) );
 			Assert.That( target, Is.Not.Null );
 			Assert.That( target.Message, Is.EqualTo( target.Message ) );
-			Assert.That( target.InnerException, Is.Not.Null.And.TypeOf( typeof( Exception ) ) );
+			Assert.That( target.InnerException is Exception, target.InnerException == null ? "(null)" : target.InnerException.GetType().ToString() );
 			Assert.That( target.InnerException.Message, Is.EqualTo( target.InnerException.Message ) );
 			AppDomain.CurrentDomain.SetData( "MsgPack.GenericExceptionTester.Target", target );
 		}
@@ -324,6 +333,7 @@ namespace MsgPack
 			var assemblyName = type.Assembly.GetName();
 			return new StrongName( new StrongNamePublicKeyBlob( assemblyName.GetPublicKey() ), assemblyName.Name, assemblyName.Version );
 		}
-#endif // if !NETFX_CORE && !WINDOWS_PHONE && !XAMIOS && !XAMDROID && !UNITY
+#endif // !NETSTANDARD2_0
+#endif // !SILVERLIGHT && !AOT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 	}
 }

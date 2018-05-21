@@ -2,7 +2,7 @@
 //
 // MessagePack for CLI
 //
-// Copyright (C) 2010-2015 FUJIWARA, Yusuke
+// Copyright (C) 2010-2016 FUJIWARA, Yusuke
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -27,13 +27,11 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-#if !UNITY
-#if XAMIOS || XAMDROID
+#if FEATURE_MPCONTRACT
 using Contract = MsgPack.MPContract;
 #else
 using System.Diagnostics.Contracts;
-#endif // XAMIOS || XAMDROID
-#endif // !UNITY
+#endif // FEATURE_MPCONTRACT
 
 namespace MsgPack
 {
@@ -42,9 +40,9 @@ namespace MsgPack
 		/// <summary>
 		///		Represents the collection of values in a <see cref="MessagePackObjectDictionary"/>.
 		/// </summary>
-#if !SILVERLIGHT && !NETFX_CORE
+#if !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 		[Serializable]
-#endif
+#endif // !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 		[DebuggerDisplay( "Count={Count}" )]
 		[DebuggerTypeProxy( typeof( CollectionDebuggerProxy<> ) )]
 		[SuppressMessage( "Microsoft.Design", "CA1034:NestedTypesShouldNotBeVisible", Justification = "ICollection implementing dictionary should return ICollection implementing values." )]
@@ -80,9 +78,7 @@ namespace MsgPack
 
 			internal ValueCollection( MessagePackObjectDictionary dictionary )
 			{
-#if !UNITY
 				Contract.Assert( dictionary != null, "dictionary != null" );
-#endif // !UNITY
 
 				this._dictionary = dictionary;
 			}
@@ -101,10 +97,7 @@ namespace MsgPack
 					throw new ArgumentNullException( "array" );
 				}
 
-#if !UNITY
 				Contract.EndContractBlock();
-#endif // !UNITY
-
 
 				CollectionOperation.CopyTo( this, this.Count, 0, array, 0, this.Count );
 			}
@@ -174,9 +167,7 @@ namespace MsgPack
 					throw new ArgumentException( "Specified array is too small to complete copy operation.", "array" );
 				}
 
-#if !UNITY
 				Contract.EndContractBlock();
-#endif // !UNITY
 
 				CollectionOperation.CopyTo( this, this.Count, index, array, arrayIndex, count );
 			}

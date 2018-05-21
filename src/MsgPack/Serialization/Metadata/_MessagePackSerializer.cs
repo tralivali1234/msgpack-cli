@@ -1,8 +1,8 @@
-﻿#region -- License Terms --
+#region -- License Terms --
 //
 // MessagePack for CLI
 //
-// Copyright (C) 2010-2012 FUJIWARA, Yusuke
+// Copyright (C) 2010-2017 FUJIWARA, Yusuke
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -19,12 +19,21 @@
 #endregion -- License Terms --
 
 using System;
+using System.Linq;
 using System.Reflection;
 
 namespace MsgPack.Serialization.Metadata
 {
+	// ReSharper disable once InconsistentNaming
 	internal static class _MessagePackSerializer
 	{
-		public static readonly MethodInfo Create1_Method = typeof( MessagePackSerializer ).GetMethod( "Create", new[] { typeof( SerializationContext ) } );
+		// ReSharper disable InconsistentNaming
+		public static readonly MethodInfo Create1_Method = typeof( MessagePackSerializer ).GetMethod( nameof( MessagePackSerializer.Create ), new[] { typeof( SerializationContext ) } );
+		// ReSharper restore InconsistentNaming
+		public static readonly PropertyInfo OwnerContext =
+			typeof( MessagePackSerializer )
+			// Use LINQ to get non public property in netstandard 1.x
+			.GetRuntimeProperties()
+			.Single( p => p.Name == nameof( MessagePackSerializer.OwnerContext ) );
 	}
 }

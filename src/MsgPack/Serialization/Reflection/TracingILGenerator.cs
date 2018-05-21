@@ -1,8 +1,8 @@
-﻿#region -- License Terms --
+#region -- License Terms --
 //
 // NLiblet
 //
-// Copyright (C) 2011-2015 FUJIWARA, Yusuke
+// Copyright (C) 2011-2017 FUJIWARA, Yusuke and contributors
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -16,12 +16,19 @@
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
 //
+// Contributors:
+//    Samuel Cragg
+//
 #endregion -- License Terms --
 
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+#if CORE_CLR || NETSTANDARD1_1
+using Contract = MsgPack.MPContract;
+#else
 using System.Diagnostics.Contracts;
+#endif // CORE_CLR || NETSTANDARD1_1
 using System.Globalization;
 using System.IO;
 using System.Reflection;
@@ -37,9 +44,7 @@ namespace MsgPack.Serialization.Reflection
 	internal sealed partial class TracingILGenerator : IDisposable
 	{
 		private readonly ILGenerator _underlying;
-		private readonly TextWriter _realTrace;
 		private readonly TextWriter _trace;
-		private readonly StringBuilder _traceBuffer;
 		private readonly Dictionary<LocalBuilder, string> _localDeclarations = new Dictionary<LocalBuilder, string>();
 		private readonly Dictionary<Label, string> _labels = new Dictionary<Label, string>();
 
@@ -185,7 +190,6 @@ namespace MsgPack.Serialization.Reflection
 		private readonly bool _isDebuggable;
 
 #if DEBUG
-#if !WINDOWS_PHONE
 		/// <summary>
 		///		Initializes a new instance of the <see cref="TracingILGenerator"/> class.
 		/// </summary>
@@ -196,7 +200,6 @@ namespace MsgPack.Serialization.Reflection
 		{
 			Contract.Assert( methodBuilder != null );
 		}
-#endif
 #endif // DEBUG
 
 		/// <summary>
@@ -204,14 +207,15 @@ namespace MsgPack.Serialization.Reflection
 		/// </summary>
 		/// <param name="dynamicMethod">The dynamic method.</param>
 		/// <param name="traceWriter">The trace writer.</param>
-		public TracingILGenerator( DynamicMethod dynamicMethod, TextWriter traceWriter )
-			: this( dynamicMethod != null ? dynamicMethod.GetILGenerator() : null, true, traceWriter, false )
+		/// <param name="isDebuggable"><c>true</c> if the underlying builders are debuggable; othersie <c>false</c>.</param>
+		public TracingILGenerator( DynamicMethod dynamicMethod, TextWriter traceWriter, bool isDebuggable )
+			: this( dynamicMethod != null ? dynamicMethod.GetILGenerator() : null, true, traceWriter, isDebuggable )
 		{
 			Contract.Assert( dynamicMethod != null );
 		}
 
 		// TODO: NLIblet
-#if !WINDOWS_PHONE
+
 		/// <summary>
 		///		Initializes a new instance of the <see cref="TracingILGenerator"/> class.
 		/// </summary>
@@ -236,15 +240,11 @@ namespace MsgPack.Serialization.Reflection
 			Contract.Assert( constructorBuilder != null );
 		}
 
-#endif
-
 		// TODO: NLiblet
 		private TracingILGenerator( ILGenerator underlying, bool isInDynamicMethod, TextWriter traceWriter, bool isDebuggable )
 		{
 			this._underlying = underlying;
-			this._realTrace = traceWriter ?? TextWriter.Null;
-			this._traceBuffer = traceWriter != null ? new StringBuilder() : null;
-			this._trace = traceWriter != null ? new StringWriter( this._traceBuffer, CultureInfo.InvariantCulture ) : TextWriter.Null;
+			this._trace = traceWriter ?? NullTextWriter.Instance;
 			this._isInDynamicMethod = isInDynamicMethod;
 			this._endOfMethod = underlying == null ? default( Label ) : underlying.DefineLabel();
 			this._isDebuggable = isDebuggable;
@@ -274,13 +274,7 @@ namespace MsgPack.Serialization.Reflection
 
 		public void FlushTrace()
 		{
-			if ( this._traceBuffer != null && this._traceBuffer.Length > 0 )
-			{
-				this.TraceLocals();
-				this._trace.Flush();
-				this._realTrace.Write( this._traceBuffer );
-				this._traceBuffer.Clear();
-			}
+			this._trace.Flush();
 		}
 
 		#region -- Locals --
@@ -358,6 +352,7 @@ namespace MsgPack.Serialization.Reflection
 			var result = this._underlying.DeclareLocal( localType );
 			this._localDeclarations.Add( result, name );
 			// TODO: NLiblet
+#if !NETSTANDARD1_1 && !NETSTANDARD1_3 && !NETSTANDARD2_0
 			if ( !this._isInDynamicMethod && this._isDebuggable )
 			{
 				try
@@ -369,6 +364,7 @@ namespace MsgPack.Serialization.Reflection
 					this._isInDynamicMethod = true;
 				}
 			}
+#endif // !NETSTANDARD1_1 && !NETSTANDARD1_3 && !NETSTANDARD2_0
 			return result;
 		}
 
@@ -378,6 +374,7 @@ namespace MsgPack.Serialization.Reflection
 			var result = this._underlying.DeclareLocal( localType, pinned );
 			this._localDeclarations.Add( result, name );
 			// TODO: NLiblet
+#if !NETSTANDARD1_1 && !NETSTANDARD1_3 && !NETSTANDARD2_0
 			if ( !this._isInDynamicMethod && this._isDebuggable )
 			{
 				try
@@ -389,46 +386,14 @@ namespace MsgPack.Serialization.Reflection
 					this._isInDynamicMethod = true;
 				}
 			}
+#endif // !NETSTANDARD1_1 && !NETSTANDARD1_3 && !NETSTANDARD2_0
 			return result;
 		}
 #endif // DEBUG
 
-		private void TraceLocals()
-		{
-			Contract.Assert( this._realTrace != null );
-			// TOOD: without init?
-			this._realTrace.WriteLine( ".locals init (" );
+#endregion
 
-			foreach ( var local in this._localDeclarations )
-			{
-				this.WriteIndent( this._realTrace, 1 );
-
-				this._realTrace.Write( "[" );
-				this._realTrace.Write( local.Key.LocalIndex );
-				this._realTrace.Write( "] " );
-
-				WriteType( this._realTrace, local.Key.LocalType );
-
-				if ( local.Key.IsPinned )
-				{
-					this._realTrace.Write( "(pinned)" );
-				}
-
-				if ( local.Value != null )
-				{
-					this._realTrace.Write( " " );
-					this._realTrace.Write( local.Value );
-				}
-
-				this._realTrace.WriteLine();
-			}
-
-			this._realTrace.WriteLine( ")" );
-		}
-
-		#endregion
-
-		#region -- Exceptions --
+#region -- Exceptions --
 
 		// Note: Leave always leave not leave.s.
 		// FIXME: Integration check.
@@ -473,7 +438,9 @@ namespace MsgPack.Serialization.Reflection
 			Contract.Assert( firstCatchBlock != null );
 			Contract.Assert( firstCatchBlock.Item1 != null && firstCatchBlock.Item2 != null );
 			Contract.Assert( remainingCatchBlockEmitters != null );
+#if !NETSTANDARD1_1 && !NETSTANDARD1_3
 			Contract.Assert( Contract.ForAll( remainingCatchBlockEmitters, item => item != null && item.Item1 != null && item.Item2 != null ) );
+#endif // !NETSTANDARD1_1 && !NETSTANDARD1_3
 
 			this.EmitExceptionBlockCore( tryBlockEmitter, firstCatchBlock, remainingCatchBlockEmitters, null );
 		}
@@ -512,7 +479,9 @@ namespace MsgPack.Serialization.Reflection
 			Contract.Assert( tryBlockEmitter != null );
 			Contract.Assert( finallyBlockEmitter != null );
 			Contract.Assert( catchBlockEmitters != null );
+#if !NETSTANDARD1_1 && !NETSTANDARD1_3
 			Contract.Assert( Contract.ForAll( catchBlockEmitters, item => item != null && item.Item1 != null && item.Item2 != null ) );
+#endif // !NETSTANDARD1_1 && !NETSTANDARD1_3
 
 			this.EmitExceptionBlockCore( tryBlockEmitter, null, catchBlockEmitters, finallyBlockEmitter );
 		}
@@ -543,11 +512,11 @@ namespace MsgPack.Serialization.Reflection
 		}
 #endif // DEBUG
 
-		/// <summary>
-		///		Begin exception block (try in C#) here.
-		///		Note that you do not have to emit leave or laeve.s instrauction at tail of the body.
-		/// </summary>
-		/// <returns><see cref="Label"/> will to be end of begun exception block.</returns>
+			/// <summary>
+			///		Begin exception block (try in C#) here.
+			///		Note that you do not have to emit leave or laeve.s instrauction at tail of the body.
+			/// </summary>
+			/// <returns><see cref="Label"/> will to be end of begun exception block.</returns>
 		public Label BeginExceptionBlock()
 		{
 			Contract.Assert( !this.IsEnded );
@@ -645,9 +614,9 @@ namespace MsgPack.Serialization.Reflection
 			this._endOfExceptionBlocks.Pop();
 		}
 
-		#endregion
+#endregion
 
-		#region -- Labels --
+#region -- Labels --
 
 #if DEBUG
 		/// <summary>
@@ -694,6 +663,7 @@ namespace MsgPack.Serialization.Reflection
 		#region -- Calli --
 
 #if DEBUG
+#if !NETSTANDARD1_1 && !NETSTANDARD1_3 && !NETSTANDARD2_0
 		/// <summary>
 		///		Emit 'calli' instruction for indirect unmanaged function call.
 		/// </summary>
@@ -740,6 +710,7 @@ namespace MsgPack.Serialization.Reflection
 			this._underlying.EmitCalli( OpCodes.Calli, managedCallingConventions, returnType, requiredParameterTypes, optionalParameterTypes );
 		}
 
+#endif // !NETSTANDARD1_1 && !NETSTANDARD1_3 && !NETSTANDARD2_0
 #endif // DEBUG
 		#endregion
 #endif // !SILVERLIGHT
@@ -768,9 +739,9 @@ namespace MsgPack.Serialization.Reflection
 		}
 #endif // DEBUG
 
-		#endregion
+#endregion
 
-		#region -- Readonly. --
+#region -- Readonly. --
 
 #if DEBUG
 		/// <summary>
@@ -795,6 +766,7 @@ namespace MsgPack.Serialization.Reflection
 		#region -- Tail. --
 
 #if DEBUG
+#if !NETSTANDARD1_1 && !NETSTANDARD1_3
 		///	<summary>
 		///		Emit 'call' instruction with specified arguments as tail call.
 		///	</summary>
@@ -837,7 +809,7 @@ namespace MsgPack.Serialization.Reflection
 			this.EmitRet();
 		}
 
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !NETSTANDARD2_0
 		/// <summary>
 		///		Emit 'calli' instruction for indirect unmanaged function call as tail call.
 		/// </summary>
@@ -895,7 +867,8 @@ namespace MsgPack.Serialization.Reflection
 			this.EmitCalli( managedCallingConventions, returnType, requiredParameterTypes, optionalParameterTypes );
 			this.EmitRet();
 		}
-#endif // SILVERLIGHT
+#endif // SILVERLIGHT && !NETSTANDARD2_0
+#endif // !NETSTANDARD1_1 && !NETSTANDARD1_3
 #endif // DEBUG
 
 		#endregion
@@ -920,9 +893,9 @@ namespace MsgPack.Serialization.Reflection
 		}
 #endif // DEBUG
 
-		#endregion
+#endregion
 
-		#region -- Tracing --
+#region -- Tracing --
 
 		/// <summary>
 		///		Write trace message.
@@ -1023,6 +996,10 @@ namespace MsgPack.Serialization.Reflection
 		private static void WriteType( TextWriter writer, Type type )
 		{
 			Contract.Assert( writer != null );
+			if ( writer == NullTextWriter.Instance )
+			{
+				return;
+			}
 
 			if ( type == null || type == typeof( void ) )
 			{
@@ -1030,7 +1007,7 @@ namespace MsgPack.Serialization.Reflection
 			}
 			else if ( type.IsGenericParameter )
 			{
-				writer.Write( "{0}{1}", type.DeclaringMethod == null ? "!" : "!!", type.Name );
+				writer.Write( "{0}{1}", type.GetDeclaringMethod() == null ? "!" : "!!", type.Name );
 			}
 			else
 			{
@@ -1038,7 +1015,7 @@ namespace MsgPack.Serialization.Reflection
 				var endOfAssemblySimpleName = type.Assembly.FullName.IndexOf( ',' );
 				writer.Write( "[{0}]{1}", endOfAssemblySimpleName < 0 ? type.Assembly.FullName : type.Assembly.FullName.Remove( endOfAssemblySimpleName ), type.FullName );
 #else
-				writer.Write( "[{0}]{1}", type.Assembly.GetName().Name, type.FullName );
+				writer.Write( "[{0}]{1}", type.GetAssembly().GetName().Name, type.GetFullName() );
 #endif
 			}
 		}
@@ -1054,6 +1031,7 @@ namespace MsgPack.Serialization.Reflection
 			// TODO: NLiblet
 #if !SILVERLIGHT
 			var asFieldBuilder = field as FieldBuilder;
+#if !NETSTANDARD1_1 && !NETSTANDARD1_3
 			if ( asFieldBuilder == null )
 			{
 				var modreqs = field.GetRequiredCustomModifiers();
@@ -1082,11 +1060,12 @@ namespace MsgPack.Serialization.Reflection
 					this._trace.Write( ") " );
 				}
 			}
-#endif
+#endif // !NETSTANDARD1_1 && !NETSTANDARD1_3
+#endif // !SILVERLIGHT
 
 #if !SILVERLIGHT
 			if ( this._isInDynamicMethod || asFieldBuilder == null ) // declaring type of the field should be omitted for same type.
-#endif
+#endif // !SILVERLIGHT
 			{
 				WriteType( this._trace, field.DeclaringType );
 			}
@@ -1157,6 +1136,18 @@ namespace MsgPack.Serialization.Reflection
 #if !WINDOWS_PHONE
 			bool isMethodBuilder = method is MethodBuilder || method is ConstructorBuilder;
 #endif
+			if ( !isMethodBuilder )
+			{
+				try
+				{
+					method.GetParameters();
+				}
+				catch ( NotSupportedException )
+				{
+					// For internal MethodBuilderInstantiationType
+					isMethodBuilder = true;
+				}
+			}
 
 			/*
 			 *	<instr_method> <callConv> <type> [ <typeSpec> :: ] <methodName> ( <parameters> ) 
@@ -1175,7 +1166,7 @@ namespace MsgPack.Serialization.Reflection
 #endif
 			{
 				// TODO: C++/CLI etc...
-				var dllImport = Attribute.GetCustomAttribute( method, typeof( DllImportAttribute ) ) as DllImportAttribute;
+				var dllImport = method.GetCustomAttribute<DllImportAttribute>();
 				if ( dllImport != null )
 				{
 					unamanagedCallingConvention = dllImport.CallingConvention;
@@ -1253,6 +1244,10 @@ namespace MsgPack.Serialization.Reflection
 		private static void WriteCallingConventions( TextWriter writer, CallingConventions? managedCallingConverntions, CallingConvention? unamangedCallingConvention )
 		{
 			Contract.Assert( writer != null );
+			if ( writer == NullTextWriter.Instance )
+			{
+				return;
+			}
 
 			bool needsSpace = false;
 			if ( managedCallingConverntions != null )
@@ -1332,7 +1327,7 @@ namespace MsgPack.Serialization.Reflection
 		private void TraceOperand( string value )
 		{
 			// QSTRING
-			this._trace.Write( String.Format( CultureInfo.InvariantCulture, "\"{0:L}\"", value ) );
+			this._trace.Write( "\"{0:L}\"", value );
 		}
 
 		private void TraceOperand( Label value )
@@ -1373,29 +1368,35 @@ namespace MsgPack.Serialization.Reflection
 		private void TraceOperandToken( Type target )
 		{
 			this.TraceType( target );
+#if !NETSTANDARD1_1 && !NETSTANDARD1_3
 			this.TraceOperandTokenValue( target.MetadataToken );
+#endif // !NETSTANDARD1_1 && !NETSTANDARD1_3
 		}
 
 		private void TraceOperandToken( FieldInfo target )
 		{
 			this._trace.Write( "field " );
 			this.TraceField( target );
+#if !NETSTANDARD1_1 && !NETSTANDARD1_3
 			this.TraceOperandTokenValue( target.MetadataToken );
+#endif // !NETSTANDARD1_1 && !NETSTANDARD1_3
 		}
 
 		private void TraceOperandToken( MethodBase target )
 		{
 			this._trace.Write( "method " );
 			this.TraceMethod( target );
+#if !NETSTANDARD1_1 && !NETSTANDARD1_3
 			this.TraceOperandTokenValue( target.MetadataToken );
+#endif // !NETSTANDARD1_1 && !NETSTANDARD1_3
 		}
 
+#if !NETSTANDARD1_1 && !NETSTANDARD1_3
 		private void TraceOperandTokenValue( int value )
 		{
-			this._trace.Write( "<" );
-			this._trace.Write( value.ToString( "x8", CultureInfo.InvariantCulture ) );
-			this._trace.Write( ">" );
+			this._trace.Write( "<{0:x8}>", value );
 		}
+#endif // !NETSTANDARD1_1 && !NETSTANDARD1_3
 
 		private void TraceStart()
 		{
@@ -1439,6 +1440,6 @@ namespace MsgPack.Serialization.Reflection
 			this._indentLevel--;
 		}
 
-		#endregion
+#endregion
 	}
 }

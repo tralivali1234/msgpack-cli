@@ -2,7 +2,7 @@
 //
 // MessagePack for CLI
 //
-// Copyright (C) 2010-2014 FUJIWARA, Yusuke
+// Copyright (C) 2010-2016 FUJIWARA, Yusuke
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -22,9 +22,12 @@
 #define UNITY
 #endif
 
-#if !UNITY && !WINDOWS_PHONE
 using System;
 using System.Numerics;
+#if FEATURE_TAP
+using System.Threading;
+using System.Threading.Tasks;
+#endif // FEATURE_TAP
 
 namespace MsgPack.Serialization.DefaultSerializers
 {
@@ -32,9 +35,9 @@ namespace MsgPack.Serialization.DefaultSerializers
 	internal sealed class System_Numerics_ComplexMessagePackSerializer : MessagePackSerializer<Complex>
 	{
 		public System_Numerics_ComplexMessagePackSerializer( SerializationContext ownerContext )
-			: base( ownerContext ) { }
+			: base( ownerContext, SerializerCapabilities.PackTo | SerializerCapabilities.UnpackFrom ) { }
 
-		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "Asserted internally" )]
+		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "Validated internally" )]
 		protected internal override void PackToCore( Packer packer, Complex objectTree )
 		{
 			packer.PackArrayHeader( 2 );
@@ -42,25 +45,62 @@ namespace MsgPack.Serialization.DefaultSerializers
 			packer.Pack( objectTree.Imaginary );
 		}
 
-		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "Asserted internally" )]
+		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "Validated internally" )]
 		protected internal override Complex UnpackFromCore( Unpacker unpacker )
 		{
-			if ( !unpacker.Read() )
+			if ( !unpacker.IsArrayHeader )
 			{
-				throw SerializationExceptions.NewUnexpectedEndOfStream();
+				SerializationExceptions.ThrowInvalidArrayItemsCount( unpacker, typeof( Complex ), 2 );
 			}
 
-			var real = unpacker.LastReadData.AsDouble();
-
-			if ( !unpacker.Read() )
+			long length = UnpackHelpers.GetItemsCount( unpacker );
+			if ( length != 2 )
 			{
-				throw SerializationExceptions.NewUnexpectedEndOfStream();
+				SerializationExceptions.ThrowInvalidArrayItemsCount( unpacker, typeof( Complex ), 2 );
 			}
 
-			var imaginary = unpacker.LastReadData.AsDouble();
+			double real, imaginary;
+			if ( !unpacker.ReadDouble( out real ) )
+			{
+				SerializationExceptions.ThrowUnexpectedEndOfStream( unpacker );
+			}
+
+
+			if ( !unpacker.ReadDouble( out imaginary ) )
+			{
+				SerializationExceptions.ThrowUnexpectedEndOfStream( unpacker );
+			}
 
 			return new Complex( real, imaginary );
 		}
+
+#if FEATURE_TAP
+
+		protected internal override async Task PackToAsyncCore( Packer packer, Complex objectTree, CancellationToken cancellationToken )
+		{
+			await packer.PackArrayHeaderAsync( 2, cancellationToken ).ConfigureAwait( false );
+			await packer.PackAsync( objectTree.Real, cancellationToken ).ConfigureAwait( false );
+			await packer.PackAsync( objectTree.Imaginary, cancellationToken ).ConfigureAwait( false );
+		}
+
+		protected internal override async Task<Complex> UnpackFromAsyncCore( Unpacker unpacker, CancellationToken cancellationToken )
+		{
+			var real = await unpacker.ReadDoubleAsync( cancellationToken ).ConfigureAwait( false );
+			if ( !real.Success )
+			{
+				SerializationExceptions.ThrowUnexpectedEndOfStream( unpacker );
+			}
+
+			var imaginary = await unpacker.ReadDoubleAsync( cancellationToken ).ConfigureAwait( false );
+			if ( !imaginary.Success )
+			{
+				SerializationExceptions.ThrowUnexpectedEndOfStream( unpacker );
+			}
+
+			return new Complex( real.Value, imaginary.Value );
+		}
+
+#endif // FEATURE_TAP
+
 	}
 }
-#endif // !UNITY && !WINDOWS_PHONE

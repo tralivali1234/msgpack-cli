@@ -1,5 +1,5 @@
-﻿<#+ 
-private void GenerateCore( string serializationMethod, string emitterFlavor, bool canDump, bool forIos )
+<#+ 
+private void GenerateCore( string serializationMethod, string emitterFlavor, bool canDump, bool forIos, string language = "" )
 {
 	var testCases =
 		new []
@@ -61,7 +61,7 @@ private void GenerateCore( string serializationMethod, string emitterFlavor, boo
 //
 // MessagePack for CLI
 //
-// Copyright (C) 2014 FUJIWARA, Yusuke
+// Copyright (C) 2014-2017 FUJIWARA, Yusuke
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -89,14 +89,22 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text.RegularExpressions;
+#if FEATURE_TAP
+using System.Threading;
+using System.Threading.Tasks;
+#endif // FEATURE_TAP
 
 <#+
 	if ( !forIos )
 	{
 #>
-#if !NETFX_CORE && !WINDOWS_PHONE && !XAMIOS && !XAMDROID && !UNITY_IPHONE && !UNITY_ANDROID
+#if !SILVERLIGHT && !AOT && !NETSTANDARD1_1 && !NETSTANDARD1_3 && !XAMARIN
+using MsgPack.Serialization.CodeDomSerializers;
+#endif // !SILVERLIGHT && !AOT && !NETSTANDARD1_1 && !NETSTANDARD1_3 && !XAMARIN
+#if !SILVERLIGHT && !AOT && !NETSTANDARD1_1
 using MsgPack.Serialization.EmittingSerializers;
-#endif // !NETFX_CORE && !WINDOWS_PHONE && !XAMIOS && !XAMDROID && !UNITY_IPHONE && !UNITY_ANDROID
+#endif // !SILVERLIGHT && !AOT && !NETSTANDARD1_1
 <#+
 	}
 #>
@@ -106,6 +114,8 @@ using NUnit.Framework;
 #else
 using TestFixtureAttribute = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestClassAttribute;
 using TestAttribute = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestMethodAttribute;
+using SetUpAttribute = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestInitializeAttribute;
+using TearDownAttribute = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestCleanupAttribute;
 using TimeoutAttribute = NUnit.Framework.TimeoutAttribute;
 using Assert = NUnit.Framework.Assert;
 using Is = NUnit.Framework.Is;
@@ -115,7 +125,7 @@ namespace MsgPack.Serialization
 {
 	[TestFixture]
 	[Timeout( 30000 )]
-	public class <#= serializationMethod #><#= emitterFlavor #>EnumSerializerTest
+	public class <#= serializationMethod #><#= language #><#= emitterFlavor #>EnumSerializerTest
 	{
 		private SerializationContext GetSerializationContext()
 		{
@@ -123,7 +133,9 @@ namespace MsgPack.Serialization
 	if ( !forIos )
 	{
 #>
-			return new SerializationContext { SerializationMethod = SerializationMethod.<#= serializationMethod #>, EmitterFlavor = EmitterFlavor.<#=  emitterFlavor #> };
+			var context = new SerializationContext { SerializationMethod = SerializationMethod.<#= serializationMethod #> };
+			context.SerializerOptions.EmitterFlavor = EmitterFlavor.<#= emitterFlavor #>;
+			return context;
 <#+
 	}
 	else
@@ -143,33 +155,59 @@ namespace MsgPack.Serialization
 			get { return <#= canDump.ToString().ToLowerInvariant() #>; }
 		}
 
-#if !NETFX_CORE && !WINDOWS_PHONE && !XAMIOS && !XAMDROID && !UNITY_IPHONE && !UNITY_ANDROID
+#if !SILVERLIGHT && !AOT && !XAMARIN
 		[SetUp]
 		public void SetUp()
 		{
-			SerializerDebugging.DeletePastTemporaries();
+<#+
+		if ( emitterFlavor == "ExpressionBased" )
+		{
+#>
+#warning TODO: true async
+			SerializerDebugging.IsNaiveAsyncAllowed = true;
+<#+
+		}
+#>
+#if !NETSTANDARD1_1 && !NETSTANDARD1_3
 			//SerializerDebugging.TraceEnabled = true;
 			//SerializerDebugging.DumpEnabled = true;
 			if ( SerializerDebugging.TraceEnabled )
 			{
 				Tracer.Emit.Listeners.Clear();
 				Tracer.Emit.Switch.Level = SourceLevels.All;
+#if NETSTANDARD2_0
+				Tracer.Emit.Listeners.Add( new TextWriterTraceListener( Console.Out ) );
+#else // NETSTANDRD2_0
 				Tracer.Emit.Listeners.Add( new ConsoleTraceListener() );
+#endif // NETSTANDRD2_0
 			}
 
-			SerializerDebugging.OnTheFlyCodeDomEnabled = true;
+			SerializerDebugging.DependentAssemblyManager = new TempFileDependentAssemblyManager( TestContext.CurrentContext.TestDirectory );
+			SerializerDebugging.DeletePastTemporaries();
+			SerializerDebugging.OnTheFlyCodeGenerationEnabled = true;
+
+#if NET35
+			SerializerDebugging.SetCodeCompiler( CodeDomCodeGeneration.Compile );
+#else
+			SerializerDebugging.SetCodeCompiler( RoslynCodeGeneration.Compile );
+#endif // NET35
+
+			SerializerDebugging.DumpDirectory = TestContext.CurrentContext.TestDirectory;
 			SerializerDebugging.AddRuntimeAssembly( typeof( AddOnlyCollection<> ).Assembly.Location );
 			if( typeof( AddOnlyCollection<> ).Assembly != this.GetType().Assembly )
 			{
 				SerializerDebugging.AddRuntimeAssembly( this.GetType().Assembly.Location );
 			}
+#endif // !NETSTANDARD1_1 && !NETSTANDARD1_3
 		}
 
 		[TearDown]
 		public void TearDown()
 		{
+#if !NETSTANDARD1_1 && !NETSTANDARD1_3
 			if ( SerializerDebugging.DumpEnabled && this.CanDump )
 			{
+#if !NETSTANDARD2_0
 				try
 				{
 					SerializerDebugging.Dump();
@@ -180,27 +218,23 @@ namespace MsgPack.Serialization
 				}
 				finally
 				{
-					DefaultSerializationMethodGeneratorManager.Refresh();
+					SerializationMethodGeneratorManager.Refresh();
 				}
+#else // !NETSTANDARD2_0
+				SerializationMethodGeneratorManager.Refresh();
+#endif // !NETSTANDARD2_0
 			}
 
 			SerializerDebugging.Reset();
-			SerializerDebugging.OnTheFlyCodeDomEnabled = false;
+			SerializerDebugging.OnTheFlyCodeGenerationEnabled = false;
+#endif // !NETSTANDARD1_1 && !NETSTANDARD1_3
 		}
-#endif // !NETFX_CORE && !WINDOWS_PHONE && !XAMIOS && !XAMDROID && !UNITY_IPHONE && !UNITY_ANDROID
+#endif // !SILVERLIGHT && !AOT && !XAMARIN
 <#+
 	} // if !forIos
 #>
-		private void TestEnumForByName<T>( SerializationContext context, T value, string property )
+		private static void TestEnumForByNameCore<T>( Stream stream, T value, T deserialized, string property )
 		{
-			var serializer = context.GetSerializer<T>();
-
-			using ( var stream = new MemoryStream() )
-			{
-				serializer.Pack( stream, value );
-				stream.Position = 0;
-				var deserialized = serializer.Unpack( stream );
-
 				if ( property == null )
 				{
 					Assert.That( deserialized, Is.EqualTo( value ) );
@@ -251,27 +285,9 @@ namespace MsgPack.Serialization
 	}
 #>
 				}
-			}
 		}
 
-		private void TestEnumForByName( SerializationContext context, Type builtType, params string[] builtMembers )
-		{
-			var serializer = context.GetSerializer( builtType );
-			var value = Enum.Parse( builtType, String.Join( ",", builtMembers ) );
-
-			using ( var stream = new MemoryStream() )
-			{
-				serializer.PackTo( Packer.Create( stream, false ), value );
-				stream.Position = 0;
-				var deserialized = serializer.Unpack( stream );
-
-				Assert.That( deserialized, Is.EqualTo( value ) );
-				stream.Position = 0;
-				Assert.That( Unpacking.UnpackString( stream ), Is.EqualTo( value.ToString() ) );
-			}
-		}
-
-		private void TestEnumForByUnderlyingValue<T>( SerializationContext context, T value, string property )
+		private static void TestEnumForByName<T>( SerializationContext context, T value, string property )
 		{
 			var serializer = context.GetSerializer<T>();
 
@@ -280,6 +296,29 @@ namespace MsgPack.Serialization
 				serializer.Pack( stream, value );
 				stream.Position = 0;
 				var deserialized = serializer.Unpack( stream );
+				TestEnumForByNameCore( stream, value, deserialized, property );
+			}
+		}
+
+#if FEATURE_TAP
+
+		private static async Task TestEnumForByNameAsync<T>( SerializationContext context, T value, string property )
+		{
+			var serializer = context.GetSerializer<T>();
+
+			using ( var stream = new MemoryStream() )
+			{
+				await serializer.PackAsync( stream, value, CancellationToken.None ).ConfigureAwait( false );
+				stream.Position = 0;
+				var deserialized = await serializer.UnpackAsync( stream, CancellationToken.None ).ConfigureAwait( false );
+				TestEnumForByNameCore( stream, value, deserialized, property );
+			}
+		}
+
+#endif // FEATURE_TAP
+
+		private static void TestEnumForByUnderlyingValueCore<T>( Stream stream, T value, T deserialized, string property )
+		{
 
 				if ( property == null )
 				{
@@ -335,29 +374,38 @@ namespace MsgPack.Serialization
 	}
 #>
 				}
-			}
 		}
 
-		private void TestEnumForByUnderlyingValue( SerializationContext context, Type builtType, params string[] builtMembers )
+		private static void TestEnumForByUnderlyingValue<T>( SerializationContext context, T value, string property )
 		{
-			var serializer = context.GetSerializer( builtType );
-			var value = ( IFormattable )Enum.Parse( builtType, String.Join( ",", builtMembers ) );
+			var serializer = context.GetSerializer<T>();
 
 			using ( var stream = new MemoryStream() )
 			{
-				serializer.PackTo( Packer.Create( stream, false ), value );
+				serializer.Pack( stream, value );
 				stream.Position = 0;
 				var deserialized = serializer.Unpack( stream );
-
-				Assert.That( deserialized, Is.EqualTo( value ) );
-				stream.Position = 0;
-				var result = Unpacking.UnpackObject( stream );
-				Assert.That( 
-					result.ToString().Equals( value.ToString( "D", null ) ),
-					result + " == " + value.ToString( "D", null ) 
-				);
+				TestEnumForByUnderlyingValueCore( stream, value, deserialized, property );
 			}
 		}
+
+#if FEATURE_TAP
+
+		private static async Task TestEnumForByUnderlyingValueAsync<T>( SerializationContext context, T value, string property )
+		{
+			var serializer = context.GetSerializer<T>();
+
+			using ( var stream = new MemoryStream() )
+			{
+				await serializer.PackAsync( stream, value, CancellationToken.None ).ConfigureAwait( false );
+				stream.Position = 0;
+				var deserialized = await serializer.UnpackAsync( stream, CancellationToken.None ).ConfigureAwait( false );
+				TestEnumForByUnderlyingValueCore( stream, value, deserialized, property );
+			}
+		}
+
+
+#endif // FEATURE_TAP
 
 <#+
 	foreach ( var testCase in testCases )
@@ -377,7 +425,7 @@ namespace MsgPack.Serialization
 		if ( testCase.Item1 != null )
 		{
 #>
-			context.EnumSerializationMethod = EnumSerializationMethod.<#= testCase.Item1 #>;
+			context.EnumSerializationOptions.SerializationMethod = EnumSerializationMethod.<#= testCase.Item1 #>;
 			try
 			{
 <#+
@@ -391,13 +439,54 @@ namespace MsgPack.Serialization
 			}
 			finally
 			{
-				context.EnumSerializationMethod = EnumSerializationMethod.ByName;
+				context.EnumSerializationOptions.SerializationMethod = EnumSerializationMethod.ByName;
 			}
 <#+
 		}
 #>
 		}
 <#+
+
+		if ( testCase.Item1 == null && testCase.Item3 == null )
+		{
+			// Most normal case, so let's test async.
+#>
+
+#if FEATURE_TAP
+
+		[Test]
+		public async Task TestAsyncSerializationMethod_ContextIs<#= testCase.Item1 ?? "Default" #>_TypeIs<#= testCase.Item2 ?? "None" #>_MemberIs<#= testCase.Item3 ?? "None" #>()
+		{
+			var context = this.GetSerializationContext();
+<#+
+		if ( testCase.Item1 != null )
+		{
+#>
+			context.EnumSerializationOptions.SerializationMethod = EnumSerializationMethod.<#= testCase.Item1 #>;
+			try
+			{
+<#+
+		}
+#>
+			await <#= testCase.Item1 != null ? "\t" : "" #>TestEnumFor<#= testCase.Item4 #>Async( context, <#= testCase.Item3 != null ? "new EnumMemberObject()" : "Enum" + ( testCase.Item2 ?? "Default" ) + ".Foo" #>, <#= testCase.Item3 == null ? "null" : "\"" + ( testCase.Item2 ?? "Default" ) + ( testCase.Item3 ?? "NoAttribute" ) + "Property\""  #> );
+<#+
+		if ( testCase.Item1 != null )
+		{
+#>
+			}
+			finally
+			{
+				context.EnumSerializationOptions.SerializationMethod = EnumSerializationMethod.ByName;
+			}
+<#+
+		}
+#>
+		}
+
+#endif // FEATURE_TAP
+
+<#+
+		}
 	}
 
 	foreach ( var underlyingType in underlyingTypes )
@@ -405,17 +494,152 @@ namespace MsgPack.Serialization
 		CreateEnumTest( underlyingType.Item2, false, true );
 	}
 #>
+
+		// Issue #184
+		[Test]
+		public void TestEnumKeyTransformer_Default_AsIs()
+		{
+			var context = this.GetSerializationContext();
+			context.EnumSerializationOptions.SerializationMethod = EnumSerializationMethod.ByName;
+			Assert.That( context.EnumSerializationOptions.NameTransformer, Is.Null, "default value" );
+			TestEnumKeyCore( context, "ToEven", isAsync: false );
+		}
+
+#if FEATURE_TAP
+
+		[Test]
+		public void TestEnumKeyTransformer_Default_AsIs_Async()
+		{
+			var context = this.GetSerializationContext();
+			context.EnumSerializationOptions.SerializationMethod = EnumSerializationMethod.ByName;
+			Assert.That( context.EnumSerializationOptions.NameTransformer, Is.Null, "default value" );
+			TestEnumKeyCore( context, "ToEven", isAsync: true );
+		}
+
+#endif // FEATURE_TAP
+
+		[Test]
+		public void TestEnumKeyTransformer_LowerCamel()
+		{
+			var context = this.GetSerializationContext();
+			context.EnumSerializationOptions.SerializationMethod = EnumSerializationMethod.ByName;
+			context.EnumSerializationOptions.NameTransformer = EnumNameTransformers.LowerCamel;
+			TestEnumKeyCore( context, "toEven", isAsync: false );
+		}
+
+#if FEATURE_TAP
+
+		[Test]
+		public void TestEnumKeyTransformer_LowerCamel_Async()
+		{
+			var context = this.GetSerializationContext();
+			context.EnumSerializationOptions.SerializationMethod = EnumSerializationMethod.ByName;
+			context.EnumSerializationOptions.NameTransformer = EnumNameTransformers.LowerCamel;
+			TestEnumKeyCore( context, "toEven", isAsync: true );
+		}
+
+#endif // FEATURE_TAP
+
+		[Test]
+		public void TestEnumKeyTransformer_AllUpper()
+		{
+			var context = this.GetSerializationContext();
+			context.EnumSerializationOptions.SerializationMethod = EnumSerializationMethod.ByName;
+			context.EnumSerializationOptions.NameTransformer = EnumNameTransformers.UpperSnake;
+			TestEnumKeyCore( context, "TO_EVEN", isAsync: false );
+		}
+
+#if FEATURE_TAP
+
+		[Test]
+		public void TestEnumKeyTransformer_AllUpper_Async()
+		{
+			var context = GetSerializationContext();
+			context.EnumSerializationOptions.SerializationMethod = EnumSerializationMethod.ByName;
+			context.EnumSerializationOptions.NameTransformer = EnumNameTransformers.UpperSnake;
+			TestEnumKeyCore( context, "TO_EVEN", isAsync: true );
+		}
+
+#endif // FEATURE_TAP
+
+		[Test]
+		public void TestEnumKeyTransformer_Custom()
+		{
+			var context = this.GetSerializationContext();
+			context.EnumSerializationOptions.SerializationMethod = EnumSerializationMethod.ByName;
+			context.EnumSerializationOptions.NameTransformer = 
+				key => Regex.Replace( key, "[A-Z]", match => match.Index == 0 ? match.Value.ToLower() : "-" + match.Value.ToLower() );
+			TestEnumKeyCore( context, "to-even", isAsync: false );
+		}
+
+#if FEATURE_TAP
+
+		[Test]
+		public void TestEnumKeyTransformer_Custom_Async()
+		{
+			var context = this.GetSerializationContext();
+			context.EnumSerializationOptions.SerializationMethod = EnumSerializationMethod.ByName;
+			context.EnumSerializationOptions.NameTransformer = 
+				key => Regex.Replace( key, "[A-Z]", match => match.Index == 0 ? match.Value.ToLower() : "-" + match.Value.ToLower() );
+			TestEnumKeyCore( context, "to-even", isAsync: true );
+		}
+
+#endif // FEATURE_TAP
+
+		private static void TestEnumKeyCore( SerializationContext context, string expected, bool isAsync )
+		{
+			var serializer = context.GetSerializer<MidpointRounding>();
+			var obj = MidpointRounding.ToEven;
+			using ( var buffer = new MemoryStream() )
+			{
+#if FEATURE_TAP
+				if ( isAsync )
+				{
+					serializer.PackAsync( buffer, obj, CancellationToken.None ).Wait();
+				}
+				else
+				{
+#endif // FEATURE_TAP
+					serializer.Pack( buffer, obj );
+#if FEATURE_TAP
+				}
+#endif // FEATURE_TAP
+
+				buffer.Position = 0;
+				var stringValue = MessagePackSerializer.UnpackMessagePackObject( buffer ).AsString();
+
+				Assert.That( stringValue, Is.EqualTo( expected ) );
+
+				buffer.Position = 0;
+
+				MidpointRounding deserialized;
+#if FEATURE_TAP
+				if ( isAsync )
+				{
+					deserialized = serializer.UnpackAsync( buffer, CancellationToken.None ).Result;
+				}
+				else
+				{
+#endif // FEATURE_TAP
+					deserialized = serializer.Unpack( buffer );
+#if FEATURE_TAP
+				}
+#endif // FEATURE_TAP
+
+				Assert.That( deserialized, Is.EqualTo( obj ) );
+			}
+		}
 	}
 }
 <#+
-}
+} // GenerateCore()
 
 private void CreateEnumTest( Type underlyingType, bool useBuilder, bool canBeFlags, params string[] builtMemberNames )
 {
 	if ( useBuilder )
 	{
 #>
-#if !NETFX_CORE && !WINDOWS_PHONE && !XAMIOS && !UNITY_IPHONE && !XAMDROID && !UNITY_ANDDROID
+#if !SILVERLIGHT && !AOT
 <#+
 	}
 #>
@@ -424,7 +648,7 @@ private void CreateEnumTest( Type underlyingType, bool useBuilder, bool canBeFla
 		public void TestEnum<#= underlyingType.Name #>_WithoutFlags_ByName()
 		{
 			var context = this.GetSerializationContext();
-			context.EnumSerializationMethod = EnumSerializationMethod.ByName;
+			context.EnumSerializationOptions.SerializationMethod = EnumSerializationMethod.ByName;
 			try
 			{
 <#+
@@ -444,7 +668,7 @@ private void CreateEnumTest( Type underlyingType, bool useBuilder, bool canBeFla
 			}
 			finally
 			{
-				context.EnumSerializationMethod = EnumSerializationMethod.ByName;
+				context.EnumSerializationOptions.SerializationMethod = EnumSerializationMethod.ByName;
 			}
 		}
 
@@ -452,7 +676,7 @@ private void CreateEnumTest( Type underlyingType, bool useBuilder, bool canBeFla
 		public void TestEnum<#= underlyingType.Name #>_WithoutFlags_ByUnderlyingValue()
 		{
 			var context = this.GetSerializationContext();
-			context.EnumSerializationMethod = EnumSerializationMethod.ByUnderlyingValue;
+			context.EnumSerializationOptions.SerializationMethod = EnumSerializationMethod.ByUnderlyingValue;
 			try
 			{
 <#+
@@ -472,7 +696,7 @@ private void CreateEnumTest( Type underlyingType, bool useBuilder, bool canBeFla
 			}
 			finally
 			{
-				context.EnumSerializationMethod = EnumSerializationMethod.ByName;
+				context.EnumSerializationOptions.SerializationMethod = EnumSerializationMethod.ByName;
 			}
 		}
 <#+
@@ -484,7 +708,7 @@ private void CreateEnumTest( Type underlyingType, bool useBuilder, bool canBeFla
 		public void TestEnum<#= underlyingType.Name #>_WithFlags_ByName()
 		{
 			var context = this.GetSerializationContext();
-			context.EnumSerializationMethod = EnumSerializationMethod.ByName;
+			context.EnumSerializationOptions.SerializationMethod = EnumSerializationMethod.ByName;
 			try
 			{
 <#+
@@ -504,7 +728,7 @@ private void CreateEnumTest( Type underlyingType, bool useBuilder, bool canBeFla
 			}
 			finally
 			{
-				context.EnumSerializationMethod = EnumSerializationMethod.ByName;
+				context.EnumSerializationOptions.SerializationMethod = EnumSerializationMethod.ByName;
 			}
 		}
 
@@ -512,7 +736,7 @@ private void CreateEnumTest( Type underlyingType, bool useBuilder, bool canBeFla
 		public void TestEnum<#= underlyingType.Name #>_WithFlags_ByUnderlyingValue()
 		{
 			var context = this.GetSerializationContext();
-			context.EnumSerializationMethod = EnumSerializationMethod.ByUnderlyingValue;
+			context.EnumSerializationOptions.SerializationMethod = EnumSerializationMethod.ByUnderlyingValue;
 			try
 			{
 <#+
@@ -532,17 +756,18 @@ private void CreateEnumTest( Type underlyingType, bool useBuilder, bool canBeFla
 			}
 			finally
 			{
-				context.EnumSerializationMethod = EnumSerializationMethod.ByName;
+				context.EnumSerializationOptions.SerializationMethod = EnumSerializationMethod.ByName;
 			}
 		}
 <#+
-	}
+	} // if canBeFlags
 
 	if ( useBuilder )
 	{
 #>
-#endif // !NETFX_CORE && !WINDOWS_PHONE && !XAMIOS && !UNITY_IPHONE && !XAMDROID && !UNITY_ANDDROID
+#endif // !SILVERLIGHT && !AOT
 <#+
 	}
-}
+
+} // CreateEnumTest()
 #>

@@ -1,8 +1,10 @@
-﻿#region -- License Terms --
+
+
+#region -- License Terms --
 //
 // MessagePack for CLI
 //
-// Copyright (C) 2010-2015 FUJIWARA, Yusuke
+// Copyright (C) 2010-2017 FUJIWARA, Yusuke
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -18,8 +20,13 @@
 //
 #endregion -- License Terms --
 
+#if MSTEST
+#pragma warning disable 162
+#endif // MSTEST
+
 using System;
 using System.IO;
+using System.Threading.Tasks;
 #if !MSTEST
 using NUnit.Framework;
 #else
@@ -32,18 +39,31 @@ using Is = NUnit.Framework.Is;
 
 namespace MsgPack
 {
+	// This file was generated from UnpackerTest.Skip.tt T4Template.
+	// Do not modify this file. Edit UnpackerTest.Skip.tt instead.
+
 	// ReSharper disable once InconsistentNaming
-	[TestFixture]
-	[Timeout( 1000 )]
-	public partial class UnpackerTest_Skip
+	partial class UnpackerTest
 	{
 		[Test]
 		public void TestSkip_Empty_Null()
 		{
-			using ( var stream = new MemoryStream( new byte[ 0 ] ) )
-			using ( var target = Unpacker.Create( stream, false ) )
+			if ( this.CanReadFromEmptySource )
 			{
-				Assert.That( target.Skip(), Is.Null );
+				using ( var buffer = new MemoryStream( new byte[ 0 ] ) )
+				using ( var target = this.CreateUnpacker( buffer ) )
+				{
+					Assert.That( target.Skip(), Is.Null );
+				}
+			}
+			else
+			{
+				using ( var buffer = new MemoryStream( new byte[ 0 ] ) )
+				{
+					Assert.Throws<ArgumentException>(
+						() => this.CreateUnpacker( buffer )
+					);
+				}
 			}
 		}
 
@@ -51,7 +71,7 @@ namespace MsgPack
 		public void TestSkip_FixNum_1()
 		{
 			using ( var stream = new MemoryStream( new byte[] { 1 } ) )
-			using ( var target = Unpacker.Create( stream, false ) )
+			using ( var target = this.CreateUnpacker( stream ) )
 			{
 				Assert.That( target.Skip(), Is.EqualTo( stream.Length ) );
 			}
@@ -61,7 +81,7 @@ namespace MsgPack
 		public void TestSkip_Scalar_AsIs()
 		{
 			using ( var stream = new MemoryStream( new byte[] { 0xD2, 0x1, 0x2, 0x3, 0x4 } ) )
-			using ( var target = Unpacker.Create( stream, false ) )
+			using ( var target = this.CreateUnpacker( stream ) )
 			{
 				Assert.That( target.Skip(), Is.EqualTo( stream.Length ) );
 			}
@@ -71,7 +91,7 @@ namespace MsgPack
 		public void TestSkip_ContinuousScalar_ReportedSeparately()
 		{
 			using ( var stream = new MemoryStream( new byte[] { 0xD2, 0x1, 0x2, 0x3, 0x4, 0x1 } ) )
-			using ( var target = Unpacker.Create( stream, false ) )
+			using ( var target = this.CreateUnpacker( stream ) )
 			{
 				Assert.That( target.Skip(), Is.EqualTo( 5L ) );
 				Assert.That( target.Skip(), Is.EqualTo( 1L ) );
@@ -82,7 +102,7 @@ namespace MsgPack
 		public void TestSkip_RawEmpty_0()
 		{
 			using ( var stream = new MemoryStream( new byte[] { 0xA0 } ) )
-			using ( var target = Unpacker.Create( stream, false ) )
+			using ( var target = this.CreateUnpacker( stream ) )
 			{
 				Assert.That( target.Skip(), Is.EqualTo( stream.Length ) );
 			}
@@ -92,7 +112,7 @@ namespace MsgPack
 		public void TestSkip_FixRaw_1()
 		{
 			using ( var stream = new MemoryStream( new byte[] { 0xA1, ( byte )'A' } ) )
-			using ( var target = Unpacker.Create( stream, false ) )
+			using ( var target = this.CreateUnpacker( stream ) )
 			{
 				Assert.That( target.Skip(), Is.EqualTo( stream.Length ) );
 			}
@@ -102,7 +122,7 @@ namespace MsgPack
 		public void TestSkip_Raw_AsIs()
 		{
 			using ( var stream = new MemoryStream( new byte[] { 0xDB, 0x0, 0x0, 0x0, 0x1, ( byte )'A' } ) )
-			using ( var target = Unpacker.Create( stream, false ) )
+			using ( var target = this.CreateUnpacker( stream ) )
 			{
 				Assert.That( target.Skip(), Is.EqualTo( stream.Length ) );
 			}
@@ -112,7 +132,7 @@ namespace MsgPack
 		public void TestSkip_ContinuousRaw_ReportedSeparately()
 		{
 			using ( var stream = new MemoryStream( new byte[] { 0xA2, ( byte )'A', ( byte )'B', 0xA2, ( byte )'C', ( byte )'D' } ) )
-			using ( var target = Unpacker.Create( stream, false ) )
+			using ( var target = this.CreateUnpacker( stream ) )
 			{
 				Assert.That( target.Skip(), Is.EqualTo( 3L ) );
 				Assert.That( target.Skip(), Is.EqualTo( 3L ) );
@@ -124,7 +144,7 @@ namespace MsgPack
 		public void TestSkip_FixArrayEmpty_AsIs()
 		{
 			using ( var stream = new MemoryStream( new byte[] { 0x90 } ) )
-			using ( var target = Unpacker.Create( stream, false ) )
+			using ( var target = this.CreateUnpacker( stream ) )
 			{
 				Assert.That( target.Skip(), Is.EqualTo( stream.Length ) );
 			}
@@ -134,7 +154,7 @@ namespace MsgPack
 		public void TestSkip_FixArrayFixNum_AsIs()
 		{
 			using ( var stream = new MemoryStream( new byte[] { 0x92, 0x1, 0x2 } ) )
-			using ( var target = Unpacker.Create( stream, false ) )
+			using ( var target = this.CreateUnpacker( stream ) )
 			{
 				Assert.That( target.Skip(), Is.EqualTo( stream.Length ) );
 			}
@@ -144,7 +164,7 @@ namespace MsgPack
 		public void TestSkip_ArrayEmpty_AsIs()
 		{
 			using ( var stream = new MemoryStream( new byte[] { 0xDD, 0x0, 0x0, 0x0, 0x0 } ) )
-			using ( var target = Unpacker.Create( stream, false ) )
+			using ( var target = this.CreateUnpacker( stream ) )
 			{
 				Assert.That( target.Skip(), Is.EqualTo( stream.Length ) );
 			}
@@ -153,10 +173,9 @@ namespace MsgPack
 		[Test]
 		public void TestSkip_ArrayScalar_AsIs()
 		{
-			using ( var stream = new MemoryStream() )
-			using ( var target = Unpacker.Create( stream, false ) )
+			using ( var stream = new MemoryStream( new byte[] { 0xDD, 0x0, 0x0, 0x0, 0x2, 0xD2, 0x1, 0x2, 0x3, 0x4, 0xD2, 0x1, 0x2, 0x3, 0x4 } ) )
+			using ( var target = this.CreateUnpacker( stream ) )
 			{
-				stream.Feed( new byte[] { 0xDD, 0x0, 0x0, 0x0, 0x2, 0xD2, 0x1, 0x2, 0x3, 0x4, 0xD2, 0x1, 0x2, 0x3, 0x4 } );
 				Assert.That( target.Skip(), Is.EqualTo( stream.Length ) );
 			}
 		}
@@ -165,7 +184,7 @@ namespace MsgPack
 		public void TestSkip_CotinuousArray_ReportsSeparately()
 		{
 			using ( var stream = new MemoryStream( new byte[] { 0x92, 0x1, 0x2, 0x91, 0x3 } ) )
-			using ( var target = Unpacker.Create( stream, false ) )
+			using ( var target = this.CreateUnpacker( stream ) )
 			{
 				Assert.That( target.Skip(), Is.EqualTo( 3L ) );
 				Assert.That( target.Skip(), Is.EqualTo( 2L ) );
@@ -176,7 +195,7 @@ namespace MsgPack
 		public void TestSkip_NestedArray_AsIs()
 		{
 			using ( var stream = new MemoryStream( new byte[] { 0x92, 0x91, 0x1, 0x91, 0x1 } ) )
-			using ( var target = Unpacker.Create( stream, false ) )
+			using ( var target = this.CreateUnpacker( stream ) )
 			{
 				Assert.That( target.Skip(), Is.EqualTo( stream.Length ) );
 			}
@@ -186,7 +205,7 @@ namespace MsgPack
 		public void TestSkip_NestedArrayContainsEmpty_AsIs()
 		{
 			using ( var stream = new MemoryStream( new byte[] { 0x92, 0x90, 0x91, 0x1 } ) )
-			using ( var target = Unpacker.Create( stream, false ) )
+			using ( var target = this.CreateUnpacker( stream ) )
 			{
 				Assert.That( target.Skip(), Is.EqualTo( stream.Length ) );
 			}
@@ -197,7 +216,7 @@ namespace MsgPack
 		public void TestSkip_FixMapEmpty_AsIs()
 		{
 			using ( var stream = new MemoryStream( new byte[] { 0x80 } ) )
-			using ( var target = Unpacker.Create( stream, false ) )
+			using ( var target = this.CreateUnpacker( stream ) )
 			{
 				Assert.That( target.Skip(), Is.EqualTo( stream.Length ) );
 			}
@@ -207,7 +226,7 @@ namespace MsgPack
 		public void TestSkip_FixMapFixNum_AsIs()
 		{
 			using ( var stream = new MemoryStream( new byte[] { 0x82, 0x1, 0x1, 0x2, 0x2 } ) )
-			using ( var target = Unpacker.Create( stream, false ) )
+			using ( var target = this.CreateUnpacker( stream ) )
 			{
 				Assert.That( target.Skip(), Is.EqualTo( stream.Length ) );
 			}
@@ -217,7 +236,7 @@ namespace MsgPack
 		public void TestSkip_MapEmpty_AsIs()
 		{
 			using ( var stream = new MemoryStream( new byte[] { 0xDF, 0x0, 0x0, 0x0, 0x0 } ) )
-			using ( var target = Unpacker.Create( stream, false ) )
+			using ( var target = this.CreateUnpacker( stream ) )
 			{
 				Assert.That( target.Skip(), Is.EqualTo( stream.Length ) );
 			}
@@ -226,10 +245,9 @@ namespace MsgPack
 		[Test]
 		public void TestSkip_MapScalar_AsIs()
 		{
-			using ( var stream = new MemoryStream() )
-			using ( var target = Unpacker.Create( stream, false ) )
+			using ( var stream = new MemoryStream( new byte[] { 0xDE, 0x0, 0x2, 0xD0, 0x1, 0xD0, 0x1, 0xD0, 0x2, 0xD0, 0x2 } ) )
+			using ( var target = this.CreateUnpacker( stream ) )
 			{
-				stream.Feed( new byte[] { 0xDE, 0x0, 0x2, 0xD0, 0x1, 0xD0, 0x1, 0xD0, 0x2, 0xD0, 0x2 } );
 				Assert.That( target.Skip(), Is.EqualTo( stream.Length ) );
 			}
 		}
@@ -238,7 +256,7 @@ namespace MsgPack
 		public void TestSkip_CotinuousMap_ReportsSeparately()
 		{
 			using ( var stream = new MemoryStream( new byte[] { 0x82, 0x1, 0x1, 0x2, 0x2, 0x81, 0x3, 0x3 } ) )
-			using ( var target = Unpacker.Create( stream, false ) )
+			using ( var target = this.CreateUnpacker( stream ) )
 			{
 				Assert.That( target.Skip(), Is.EqualTo( 5L ) );
 				Assert.That( target.Skip(), Is.EqualTo( 3L ) );
@@ -249,7 +267,7 @@ namespace MsgPack
 		public void TestSkip_NestedMap_AsIs()
 		{
 			using ( var stream = new MemoryStream( new byte[] { 0x82, 0x1, 0x81, 0x2, 0x2, 0x3, 0x81, 0x4, 0x4 } ) )
-			using ( var target = Unpacker.Create( stream, false ) )
+			using ( var target = this.CreateUnpacker( stream ) )
 			{
 				Assert.That( target.Skip(), Is.EqualTo( stream.Length ) );
 			}
@@ -258,8 +276,13 @@ namespace MsgPack
 		[Test]
 		public void TestSkip_SubtreeReader_NestedMapContainsEmpty_AsIs()
 		{
+			if ( !this.ShouldCheckSubtreeUnpacker )
+			{
+				Assert.Ignore( "Cannot test subtree unpacker in " + this.GetType().Name );
+			}
+
 			using ( var stream = new MemoryStream( new byte[] { 0x82, 0x1, 0x80, 0x2, 0x81, 0x3, 0x3 } ) )
-			using ( var target = Unpacker.Create( stream, false ) )
+			using ( var target = this.CreateUnpacker( stream ) )
 			{
 				Assert.That( target.Skip(), Is.EqualTo( stream.Length ) );
 			}
@@ -269,8 +292,13 @@ namespace MsgPack
 		[Test]
 		public void TestSkip_SubtreeReader_NestedArray_AsIs()
 		{
+			if ( !this.ShouldCheckSubtreeUnpacker )
+			{
+				Assert.Ignore( "Cannot test subtree unpacker in " + this.GetType().Name );
+			}
+
 			using ( var stream = new MemoryStream( new byte[] { 0x92, 0x91, 0x1, 0x91, 0x1 } ) )
-			using ( var target = Unpacker.Create( stream, false ) )
+			using ( var target = this.CreateUnpacker( stream ) )
 			{
 				Assert.That( target.Read() );
 				Assert.That( target.Read() );
@@ -292,8 +320,13 @@ namespace MsgPack
 		[Test]
 		public void TestSkip_SubtreeReader_NestedArrayContainsEmpty_AsIs()
 		{
+			if ( !this.ShouldCheckSubtreeUnpacker )
+			{
+				Assert.Ignore( "Cannot test subtree unpacker in " + this.GetType().Name );
+			}
+
 			using ( var stream = new MemoryStream( new byte[] { 0x92, 0x90, 0x91, 0x1 } ) )
-			using ( var target = Unpacker.Create( stream, false ) )
+			using ( var target = this.CreateUnpacker( stream ) )
 			{
 				Assert.That( target.Read() );
 				Assert.That( target.Read() );
@@ -315,8 +348,13 @@ namespace MsgPack
 		[Test]
 		public void TestSkip_BetweenSubtreeReader_NestedArray_AsIs()
 		{
+			if ( !this.ShouldCheckSubtreeUnpacker )
+			{
+				Assert.Ignore( "Cannot test subtree unpacker in " + this.GetType().Name );
+			}
+
 			using ( var stream = new MemoryStream( new byte[] { 0x93, 0x91, 0x1, 0x2, 0x91, 0x1 } ) )
-			using ( var target = Unpacker.Create( stream, false ) )
+			using ( var target = this.CreateUnpacker( stream ) )
 			{
 				Assert.That( target.Read() );
 				Assert.That( target.Read() );
@@ -339,8 +377,13 @@ namespace MsgPack
 		[Test]
 		public void TestSkip_SubtreeReader_NestedMap_AsIs()
 		{
+			if ( !this.ShouldCheckSubtreeUnpacker )
+			{
+				Assert.Ignore( "Cannot test subtree unpacker in " + this.GetType().Name );
+			}
+
 			using ( var stream = new MemoryStream( new byte[] { 0x82, 0x1, 0x81, 0x2, 0x2, 0x3, 0x81, 0x4, 0x4 } ) )
-			using ( var target = Unpacker.Create( stream, false ) )
+			using ( var target = this.CreateUnpacker( stream ) )
 			{
 				Assert.That( target.Read() );
 				Assert.That( target.IsMapHeader );
@@ -369,8 +412,13 @@ namespace MsgPack
 		[Test]
 		public void TestSkip_NestedMapContainsEmpty_AsIs()
 		{
+			if ( !this.ShouldCheckSubtreeUnpacker )
+			{
+				Assert.Ignore( "Cannot test subtree unpacker in " + this.GetType().Name );
+			}
+
 			using ( var stream = new MemoryStream( new byte[] { 0x82, 0x1, 0x80, 0x2, 0x81, 0x3, 0x3 } ) )
-			using ( var target = Unpacker.Create( stream, false ) )
+			using ( var target = this.CreateUnpacker( stream ) )
 			{
 				Assert.That( target.Read() );
 				Assert.That( target.IsMapHeader );
@@ -398,8 +446,13 @@ namespace MsgPack
 		[Test]
 		public void TestSkip_BetweenSubtreeReader_NestedMap_AsIs()
 		{
+			if ( !this.ShouldCheckSubtreeUnpacker )
+			{
+				Assert.Ignore( "Cannot test subtree unpacker in " + this.GetType().Name );
+			}
+
 			using ( var stream = new MemoryStream( new byte[] { 0x83, 0x1, 0x81, 0x2, 0x2, 0x3, 0x3, 0x4, 0x81, 0x4, 0x4 } ) )
-			using ( var target = Unpacker.Create( stream, false ) )
+			using ( var target = this.CreateUnpacker( stream ) )
 			{
 				Assert.That( target.Read() );
 				Assert.That( target.Skip(), Is.EqualTo( 1 ) );
@@ -423,61 +476,477 @@ namespace MsgPack
 				}
 			}
 		}
-	}
 
-	// TODO: NLiblet
-	internal static class StreamExtensions
-	{
-		public static void Write( this Stream source, byte[] buffer )
+#if FEATURE_TAP
+
+		[Test]
+		public void TestSkipAsync_Empty_Null()
 		{
-			if ( source == null )
+			if ( this.CanReadFromEmptySource )
 			{
-				throw new ArgumentNullException( "source" );
+				using ( var buffer = new MemoryStream( new byte[ 0 ] ) )
+				using ( var target = this.CreateUnpacker( buffer ) )
+				{
+					Assert.That( target.SkipAsync().Result, Is.Null );
+				}
 			}
-
-			if ( buffer == null )
+			else
 			{
-				throw new ArgumentNullException( "buffer" );
+				using ( var buffer = new MemoryStream( new byte[ 0 ] ) )
+				{
+					Assert.Throws<ArgumentException>(
+						() => this.CreateUnpacker( buffer )
+					);
+				}
 			}
-
-			source.Write( buffer, 0, buffer.Length );
 		}
 
-		public static void Feed( this Stream source, byte[] buffer )
+		[Test]
+		public async Task TestSkipAsync_FixNum_1()
 		{
-			if ( source == null )
+			using ( var stream = new MemoryStream( new byte[] { 1 } ) )
+			using ( var target = this.CreateUnpacker( stream ) )
 			{
-				throw new ArgumentNullException( "source" );
+				Assert.That( await target.SkipAsync(), Is.EqualTo( stream.Length ) );
 			}
-
-			if ( buffer == null )
-			{
-				throw new ArgumentNullException( "buffer" );
-			}
-
-			if ( !source.CanSeek )
-			{
-				throw new NotSupportedException();
-			}
-
-			source.Write( buffer, 0, buffer.Length );
-			source.Position -= buffer.Length;
 		}
 
-		public static void Feed( this Stream source, byte value )
+		[Test]
+		public async Task TestSkipAsync_Scalar_AsIs()
 		{
-			if ( source == null )
+			using ( var stream = new MemoryStream( new byte[] { 0xD2, 0x1, 0x2, 0x3, 0x4 } ) )
+			using ( var target = this.CreateUnpacker( stream ) )
 			{
-				throw new ArgumentNullException( "source" );
+				Assert.That( await target.SkipAsync(), Is.EqualTo( stream.Length ) );
 			}
-
-			if ( !source.CanSeek )
-			{
-				throw new NotSupportedException();
-			}
-
-			source.WriteByte( value );
-			source.Position--;
 		}
+
+		[Test]
+		public async Task TestSkipAsync_ContinuousScalar_ReportedSeparately()
+		{
+			using ( var stream = new MemoryStream( new byte[] { 0xD2, 0x1, 0x2, 0x3, 0x4, 0x1 } ) )
+			using ( var target = this.CreateUnpacker( stream ) )
+			{
+				Assert.That( await target.SkipAsync(), Is.EqualTo( 5L ) );
+				Assert.That( await target.SkipAsync(), Is.EqualTo( 1L ) );
+			}
+		}
+
+		[Test]
+		public async Task TestSkipAsync_RawEmpty_0()
+		{
+			using ( var stream = new MemoryStream( new byte[] { 0xA0 } ) )
+			using ( var target = this.CreateUnpacker( stream ) )
+			{
+				Assert.That( await target.SkipAsync(), Is.EqualTo( stream.Length ) );
+			}
+		}
+
+		[Test]
+		public async Task TestSkipAsync_FixRaw_1()
+		{
+			using ( var stream = new MemoryStream( new byte[] { 0xA1, ( byte )'A' } ) )
+			using ( var target = this.CreateUnpacker( stream ) )
+			{
+				Assert.That( await target.SkipAsync(), Is.EqualTo( stream.Length ) );
+			}
+		}
+
+		[Test]
+		public async Task TestSkipAsync_Raw_AsIs()
+		{
+			using ( var stream = new MemoryStream( new byte[] { 0xDB, 0x0, 0x0, 0x0, 0x1, ( byte )'A' } ) )
+			using ( var target = this.CreateUnpacker( stream ) )
+			{
+				Assert.That( await target.SkipAsync(), Is.EqualTo( stream.Length ) );
+			}
+		}
+
+		[Test]
+		public async Task TestSkipAsync_ContinuousRaw_ReportedSeparately()
+		{
+			using ( var stream = new MemoryStream( new byte[] { 0xA2, ( byte )'A', ( byte )'B', 0xA2, ( byte )'C', ( byte )'D' } ) )
+			using ( var target = this.CreateUnpacker( stream ) )
+			{
+				Assert.That( await target.SkipAsync(), Is.EqualTo( 3L ) );
+				Assert.That( await target.SkipAsync(), Is.EqualTo( 3L ) );
+			}
+		}
+
+
+		[Test]
+		public async Task TestSkipAsync_FixArrayEmpty_AsIs()
+		{
+			using ( var stream = new MemoryStream( new byte[] { 0x90 } ) )
+			using ( var target = this.CreateUnpacker( stream ) )
+			{
+				Assert.That( await target.SkipAsync(), Is.EqualTo( stream.Length ) );
+			}
+		}
+
+		[Test]
+		public async Task TestSkipAsync_FixArrayFixNum_AsIs()
+		{
+			using ( var stream = new MemoryStream( new byte[] { 0x92, 0x1, 0x2 } ) )
+			using ( var target = this.CreateUnpacker( stream ) )
+			{
+				Assert.That( await target.SkipAsync(), Is.EqualTo( stream.Length ) );
+			}
+		}
+
+		[Test]
+		public async Task TestSkipAsync_ArrayEmpty_AsIs()
+		{
+			using ( var stream = new MemoryStream( new byte[] { 0xDD, 0x0, 0x0, 0x0, 0x0 } ) )
+			using ( var target = this.CreateUnpacker( stream ) )
+			{
+				Assert.That( await target.SkipAsync(), Is.EqualTo( stream.Length ) );
+			}
+		}
+
+		[Test]
+		public async Task TestSkipAsync_ArrayScalar_AsIs()
+		{
+			using ( var stream = new MemoryStream( new byte[] { 0xDD, 0x0, 0x0, 0x0, 0x2, 0xD2, 0x1, 0x2, 0x3, 0x4, 0xD2, 0x1, 0x2, 0x3, 0x4 } ) )
+			using ( var target = this.CreateUnpacker( stream ) )
+			{
+				Assert.That( await target.SkipAsync(), Is.EqualTo( stream.Length ) );
+			}
+		}
+
+		[Test]
+		public async Task TestSkipAsync_CotinuousArray_ReportsSeparately()
+		{
+			using ( var stream = new MemoryStream( new byte[] { 0x92, 0x1, 0x2, 0x91, 0x3 } ) )
+			using ( var target = this.CreateUnpacker( stream ) )
+			{
+				Assert.That( await target.SkipAsync(), Is.EqualTo( 3L ) );
+				Assert.That( await target.SkipAsync(), Is.EqualTo( 2L ) );
+			}
+		}
+
+		[Test]
+		public async Task TestSkipAsync_NestedArray_AsIs()
+		{
+			using ( var stream = new MemoryStream( new byte[] { 0x92, 0x91, 0x1, 0x91, 0x1 } ) )
+			using ( var target = this.CreateUnpacker( stream ) )
+			{
+				Assert.That( await target.SkipAsync(), Is.EqualTo( stream.Length ) );
+			}
+		}
+
+		[Test]
+		public async Task TestSkipAsync_NestedArrayContainsEmpty_AsIs()
+		{
+			using ( var stream = new MemoryStream( new byte[] { 0x92, 0x90, 0x91, 0x1 } ) )
+			using ( var target = this.CreateUnpacker( stream ) )
+			{
+				Assert.That( await target.SkipAsync(), Is.EqualTo( stream.Length ) );
+			}
+		}
+
+
+		[Test]
+		public async Task TestSkipAsync_FixMapEmpty_AsIs()
+		{
+			using ( var stream = new MemoryStream( new byte[] { 0x80 } ) )
+			using ( var target = this.CreateUnpacker( stream ) )
+			{
+				Assert.That( await target.SkipAsync(), Is.EqualTo( stream.Length ) );
+			}
+		}
+
+		[Test]
+		public async Task TestSkipAsync_FixMapFixNum_AsIs()
+		{
+			using ( var stream = new MemoryStream( new byte[] { 0x82, 0x1, 0x1, 0x2, 0x2 } ) )
+			using ( var target = this.CreateUnpacker( stream ) )
+			{
+				Assert.That( await target.SkipAsync(), Is.EqualTo( stream.Length ) );
+			}
+		}
+
+		[Test]
+		public async Task TestSkipAsync_MapEmpty_AsIs()
+		{
+			using ( var stream = new MemoryStream( new byte[] { 0xDF, 0x0, 0x0, 0x0, 0x0 } ) )
+			using ( var target = this.CreateUnpacker( stream ) )
+			{
+				Assert.That( await target.SkipAsync(), Is.EqualTo( stream.Length ) );
+			}
+		}
+
+		[Test]
+		public async Task TestSkipAsync_MapScalar_AsIs()
+		{
+			using ( var stream = new MemoryStream( new byte[] { 0xDE, 0x0, 0x2, 0xD0, 0x1, 0xD0, 0x1, 0xD0, 0x2, 0xD0, 0x2 } ) )
+			using ( var target = this.CreateUnpacker( stream ) )
+			{
+				Assert.That( await target.SkipAsync(), Is.EqualTo( stream.Length ) );
+			}
+		}
+		
+		[Test]
+		public async Task TestSkipAsync_CotinuousMap_ReportsSeparately()
+		{
+			using ( var stream = new MemoryStream( new byte[] { 0x82, 0x1, 0x1, 0x2, 0x2, 0x81, 0x3, 0x3 } ) )
+			using ( var target = this.CreateUnpacker( stream ) )
+			{
+				Assert.That( await target.SkipAsync(), Is.EqualTo( 5L ) );
+				Assert.That( await target.SkipAsync(), Is.EqualTo( 3L ) );
+			}
+		}
+
+		[Test]
+		public async Task TestSkipAsync_NestedMap_AsIs()
+		{
+			using ( var stream = new MemoryStream( new byte[] { 0x82, 0x1, 0x81, 0x2, 0x2, 0x3, 0x81, 0x4, 0x4 } ) )
+			using ( var target = this.CreateUnpacker( stream ) )
+			{
+				Assert.That( await target.SkipAsync(), Is.EqualTo( stream.Length ) );
+			}
+		}
+
+		[Test]
+		public async Task TestSkipAsync_SubtreeReader_NestedMapContainsEmpty_AsIs()
+		{
+			if ( !this.ShouldCheckSubtreeUnpacker )
+			{
+#if MSTEST
+				// MSTEST cannot handle inconclusive in async test correctly.
+				await Task.Delay( 0 );
+				return;
+#endif // MSTEST
+				Assert.Ignore( "Cannot test subtree unpacker in " + this.GetType().Name );
+			}
+
+			using ( var stream = new MemoryStream( new byte[] { 0x82, 0x1, 0x80, 0x2, 0x81, 0x3, 0x3 } ) )
+			using ( var target = this.CreateUnpacker( stream ) )
+			{
+				Assert.That( await target.SkipAsync(), Is.EqualTo( stream.Length ) );
+			}
+		}
+
+
+		[Test]
+		public async Task TestSkipAsync_SubtreeReader_NestedArray_AsIs()
+		{
+			if ( !this.ShouldCheckSubtreeUnpacker )
+			{
+#if MSTEST
+				// MSTEST cannot handle inconclusive in async test correctly.
+				await Task.Delay( 0 );
+				return;
+#endif // MSTEST
+				Assert.Ignore( "Cannot test subtree unpacker in " + this.GetType().Name );
+			}
+
+			using ( var stream = new MemoryStream( new byte[] { 0x92, 0x91, 0x1, 0x91, 0x1 } ) )
+			using ( var target = this.CreateUnpacker( stream ) )
+			{
+				Assert.That( await target.ReadAsync() );
+				Assert.That( await target.ReadAsync() );
+
+				using ( var subTreeReader = target.ReadSubtree() )
+				{
+					Assert.That( await subTreeReader.SkipAsync(), Is.EqualTo( 1 ) );
+				}
+
+				Assert.That( await target.ReadAsync() );
+
+				using ( var subTreeReader = target.ReadSubtree() )
+				{
+					Assert.That( await subTreeReader.SkipAsync(), Is.EqualTo( 1 ) );
+				}
+			}
+		}
+
+		[Test]
+		public async Task TestSkipAsync_SubtreeReader_NestedArrayContainsEmpty_AsIs()
+		{
+			if ( !this.ShouldCheckSubtreeUnpacker )
+			{
+#if MSTEST
+				// MSTEST cannot handle inconclusive in async test correctly.
+				await Task.Delay( 0 );
+				return;
+#endif // MSTEST
+				Assert.Ignore( "Cannot test subtree unpacker in " + this.GetType().Name );
+			}
+
+			using ( var stream = new MemoryStream( new byte[] { 0x92, 0x90, 0x91, 0x1 } ) )
+			using ( var target = this.CreateUnpacker( stream ) )
+			{
+				Assert.That( await target.ReadAsync() );
+				Assert.That( await target.ReadAsync() );
+
+				using ( var subTreeReader = target.ReadSubtree() )
+				{
+					Assert.That( await subTreeReader.SkipAsync(), Is.EqualTo( 0 ) );
+				}
+
+				Assert.That( await target.ReadAsync() );
+
+				using ( var subTreeReader = target.ReadSubtree() )
+				{
+					Assert.That( await subTreeReader.SkipAsync(), Is.EqualTo( 1 ) );
+				}
+			}
+		}
+
+		[Test]
+		public async Task TestSkipAsync_BetweenSubtreeReader_NestedArray_AsIs()
+		{
+			if ( !this.ShouldCheckSubtreeUnpacker )
+			{
+#if MSTEST
+				// MSTEST cannot handle inconclusive in async test correctly.
+				await Task.Delay( 0 );
+				return;
+#endif // MSTEST
+				Assert.Ignore( "Cannot test subtree unpacker in " + this.GetType().Name );
+			}
+
+			using ( var stream = new MemoryStream( new byte[] { 0x93, 0x91, 0x1, 0x2, 0x91, 0x1 } ) )
+			using ( var target = this.CreateUnpacker( stream ) )
+			{
+				Assert.That( await target.ReadAsync() );
+				Assert.That( await target.ReadAsync() );
+
+				using ( var subTreeReader = target.ReadSubtree() )
+				{
+					Assert.That( await subTreeReader.SkipAsync(), Is.EqualTo( 1 ) );
+				}
+
+				Assert.That( await target.SkipAsync(), Is.EqualTo( 1 ) );
+				Assert.That( await target.ReadAsync() );
+
+				using ( var subTreeReader = target.ReadSubtree() )
+				{
+					Assert.That( await subTreeReader.SkipAsync(), Is.EqualTo( 1 ) );
+				}
+			}
+		}
+
+		[Test]
+		public async Task TestSkipAsync_SubtreeReader_NestedMap_AsIs()
+		{
+			if ( !this.ShouldCheckSubtreeUnpacker )
+			{
+#if MSTEST
+				// MSTEST cannot handle inconclusive in async test correctly.
+				await Task.Delay( 0 );
+				return;
+#endif // MSTEST
+				Assert.Ignore( "Cannot test subtree unpacker in " + this.GetType().Name );
+			}
+
+			using ( var stream = new MemoryStream( new byte[] { 0x82, 0x1, 0x81, 0x2, 0x2, 0x3, 0x81, 0x4, 0x4 } ) )
+			using ( var target = this.CreateUnpacker( stream ) )
+			{
+				Assert.That( await target.ReadAsync() );
+				Assert.That( target.IsMapHeader );
+				Assert.That( await target.ReadAsync() );
+				Assert.That( target.LastReadData.Equals( 0x1 ) );
+				Assert.That( await target.ReadAsync() );
+
+				using ( var subTreeReader = target.ReadSubtree() )
+				{
+					Assert.That( await subTreeReader.SkipAsync(), Is.EqualTo( 1 ) );
+					Assert.That( await subTreeReader.SkipAsync(), Is.EqualTo( 1 ) );
+				}
+
+				Assert.That( await target.ReadAsync() );
+				Assert.That( target.LastReadData.Equals( 0x3 ) );
+				Assert.That( await target.ReadAsync() );
+
+				using ( var subTreeReader = target.ReadSubtree() )
+				{
+					Assert.That( await subTreeReader.SkipAsync(), Is.EqualTo( 1 ) );
+					Assert.That( await subTreeReader.SkipAsync(), Is.EqualTo( 1 ) );
+				}
+			}
+		}
+
+		[Test]
+		public async Task TestSkipAsync_NestedMapContainsEmpty_AsIs()
+		{
+			if ( !this.ShouldCheckSubtreeUnpacker )
+			{
+#if MSTEST
+				// MSTEST cannot handle inconclusive in async test correctly.
+				await Task.Delay( 0 );
+				return;
+#endif // MSTEST
+				Assert.Ignore( "Cannot test subtree unpacker in " + this.GetType().Name );
+			}
+
+			using ( var stream = new MemoryStream( new byte[] { 0x82, 0x1, 0x80, 0x2, 0x81, 0x3, 0x3 } ) )
+			using ( var target = this.CreateUnpacker( stream ) )
+			{
+				Assert.That( await target.ReadAsync() );
+				Assert.That( target.IsMapHeader );
+				Assert.That( await target.ReadAsync() );
+				Assert.That( target.LastReadData.Equals( 0x1 ) );
+				Assert.That( await target.ReadAsync() );
+
+				using ( var subTreeReader = target.ReadSubtree() )
+				{
+					Assert.That( await subTreeReader.SkipAsync(), Is.EqualTo( 0 ) );
+				}
+
+				Assert.That( await target.ReadAsync() );
+				Assert.That( target.LastReadData.Equals( 0x2 ) );
+				Assert.That( await target.ReadAsync() );
+
+				using ( var subTreeReader = target.ReadSubtree() )
+				{
+					Assert.That( await subTreeReader.SkipAsync(), Is.EqualTo( 1 ) );
+					Assert.That( await subTreeReader.SkipAsync(), Is.EqualTo( 1 ) );
+				}
+			}
+		}
+
+		[Test]
+		public async Task TestSkipAsync_BetweenSubtreeReader_NestedMap_AsIs()
+		{
+			if ( !this.ShouldCheckSubtreeUnpacker )
+			{
+#if MSTEST
+				// MSTEST cannot handle inconclusive in async test correctly.
+				await Task.Delay( 0 );
+				return;
+#endif // MSTEST
+				Assert.Ignore( "Cannot test subtree unpacker in " + this.GetType().Name );
+			}
+
+			using ( var stream = new MemoryStream( new byte[] { 0x83, 0x1, 0x81, 0x2, 0x2, 0x3, 0x3, 0x4, 0x81, 0x4, 0x4 } ) )
+			using ( var target = this.CreateUnpacker( stream ) )
+			{
+				Assert.That( await target.ReadAsync() );
+				Assert.That( await target.SkipAsync(), Is.EqualTo( 1 ) );
+				Assert.That( await target.ReadAsync() );
+
+				using ( var subTreeReader = target.ReadSubtree() )
+				{
+					Assert.That( await subTreeReader.SkipAsync(), Is.EqualTo( 1 ) );
+					Assert.That( await subTreeReader.SkipAsync(), Is.EqualTo( 1 ) );
+				}
+
+				Assert.That( await target.SkipAsync(), Is.EqualTo( 1 ) );
+				Assert.That( await target.SkipAsync(), Is.EqualTo( 1 ) );
+				Assert.That( await target.SkipAsync(), Is.EqualTo( 1 ) );
+				Assert.That( await target.ReadAsync() );
+
+				using ( var subTreeReader = target.ReadSubtree() )
+				{
+					Assert.That( await subTreeReader.SkipAsync(), Is.EqualTo( 1 ) );
+					Assert.That( await subTreeReader.SkipAsync(), Is.EqualTo( 1 ) );
+				}
+			}
+		}
+
+#endif // FEATURE_TAP
+
 	}
 }

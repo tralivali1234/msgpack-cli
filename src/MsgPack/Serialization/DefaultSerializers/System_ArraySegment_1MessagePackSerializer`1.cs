@@ -2,7 +2,7 @@
 //
 // MessagePack for CLI
 //
-// Copyright (C) 2010-2015 FUJIWARA, Yusuke
+// Copyright (C) 2010-2016 FUJIWARA, Yusuke
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -23,11 +23,15 @@
 #endif
 
 using System;
+#if FEATURE_TAP
+using System.Threading;
+using System.Threading.Tasks;
+#endif // FEATURE_TAP
 
 namespace MsgPack.Serialization.DefaultSerializers
 {
-#if !UNITY
 	// ReSharper disable once InconsistentNaming
+	[Preserve( AllMembers = true )]
 	internal class System_ArraySegment_1MessagePackSerializer<T> : MessagePackSerializer<ArraySegment<T>>
 	{
 		private static readonly Action<Packer, ArraySegment<T>, MessagePackSerializer<T>> _packing = InitializePacking();
@@ -77,10 +81,61 @@ namespace MsgPack.Serialization.DefaultSerializers
 			}
 		}
 
+#if FEATURE_TAP
+
+		private static readonly Func<Packer, ArraySegment<T>, MessagePackSerializer<T>, CancellationToken, Task> _asyncPacking = InitializeAsyncPacking();
+		private static readonly Func<Unpacker, MessagePackSerializer<T>, CancellationToken, Task<ArraySegment<T>>> _asyncUnpacking = InitializeAsyncUnpacking();
+
+		private static Func<Packer, ArraySegment<T>, MessagePackSerializer<T>, CancellationToken, Task> InitializeAsyncPacking()
+		{
+			if ( typeof( T ) == typeof( byte ) )
+			{
+				return
+					new Func<Packer, ArraySegment<byte>, MessagePackSerializer<byte>, CancellationToken, Task>(
+						ArraySegmentMessageSerializer.PackByteArraySegmentToAsync
+					) as Func<Packer, ArraySegment<T>, MessagePackSerializer<T>, CancellationToken, Task>;
+			}
+			else if ( typeof( T ) == typeof( char ) )
+			{
+				return
+					new Func<Packer, ArraySegment<char>, MessagePackSerializer<char>, CancellationToken, Task>(
+						ArraySegmentMessageSerializer.PackCharArraySegmentToAsync
+					) as Func<Packer, ArraySegment<T>, MessagePackSerializer<T>, CancellationToken, Task>;
+			}
+			else
+			{
+				return ArraySegmentMessageSerializer.PackGenericArraySegmentToAsync;
+			}
+		}
+
+		private static Func<Unpacker, MessagePackSerializer<T>, CancellationToken, Task<ArraySegment<T>>> InitializeAsyncUnpacking()
+		{
+			if ( typeof( T ) == typeof( byte ) )
+			{
+				return
+					new Func<Unpacker, MessagePackSerializer<byte>, CancellationToken, Task<ArraySegment<byte>>>(
+							ArraySegmentMessageSerializer.UnpackByteArraySegmentFromAsync
+						) as Func<Unpacker, MessagePackSerializer<T>, CancellationToken, Task<ArraySegment<T>>>;
+			}
+			else if ( typeof( T ) == typeof( char ) )
+			{
+				return
+					new Func<Unpacker, MessagePackSerializer<char>, CancellationToken, Task<ArraySegment<char>>>(
+							ArraySegmentMessageSerializer.UnpackCharArraySegmentFromAsync
+						) as Func<Unpacker, MessagePackSerializer<T>, CancellationToken, Task<ArraySegment<T>>>;
+			}
+			else
+			{
+				return ArraySegmentMessageSerializer.UnpackGenericArraySegmentFromAsync;
+			}
+		}
+
+#endif // FEATURE_TAP
+
 		private readonly MessagePackSerializer<T> _itemSerializer;
 
 		public System_ArraySegment_1MessagePackSerializer( SerializationContext ownerContext )
-			: base( ownerContext )
+			: base( ownerContext, SerializerCapabilities.PackTo | SerializerCapabilities.UnpackFrom )
 		{
 			this._itemSerializer = ownerContext.GetSerializer<T>();
 		}
@@ -94,67 +149,19 @@ namespace MsgPack.Serialization.DefaultSerializers
 		{
 			return _unpacking( unpacker, this._itemSerializer );
 		}
+
+#if FEATURE_TAP
+
+		protected internal override Task PackToAsyncCore( Packer packer, ArraySegment<T> objectTree, CancellationToken cancellationToken )
+		{
+			return _asyncPacking( packer, objectTree, this._itemSerializer, cancellationToken );
+		}
+
+		protected internal override Task<ArraySegment<T>> UnpackFromAsyncCore( Unpacker unpacker, CancellationToken cancellationToken )
+		{
+			return _asyncUnpacking( unpacker, this._itemSerializer, cancellationToken );
+		}
+
+#endif // FEATURE_TAP
 	}
-#else
-	// ReSharper disable once InconsistentNaming
-	internal class System_ArraySegment_1MessagePackSerializer : NonGenericMessagePackSerializer
-	{
-		private readonly Type _elementType;
-		private readonly IMessagePackSingleObjectSerializer _itemSerializer;
-		private readonly Action<Packer, object, IMessagePackSingleObjectSerializer> _packing;
-		private readonly Func<Unpacker, Type, IMessagePackSingleObjectSerializer, object> _unpacking;
-		
-		public System_ArraySegment_1MessagePackSerializer( SerializationContext ownerContext, Type targetType )
-			: base( ownerContext, targetType )
-		{
-			var elementType = targetType.GetGenericArguments()[ 0 ];
-			this._elementType = elementType;
-			this._itemSerializer = ownerContext.GetSerializer( elementType );
-			this._packing = InitializePacking( elementType );
-			this._unpacking = InitializeUnpacking( elementType );
-		}
-
-		private static Action<Packer, object, IMessagePackSingleObjectSerializer> InitializePacking( Type elementType )
-		{
-			if ( elementType == typeof( byte ) )
-			{
-				return ArraySegmentMessageSerializer.PackByteArraySegmentTo;
-			}
-			else if ( elementType == typeof( char ) )
-			{
-				return ArraySegmentMessageSerializer.PackCharArraySegmentTo;
-			}
-			else
-			{
-				return ArraySegmentMessageSerializer.PackGenericArraySegmentTo;
-			}
-		}
-
-		private static Func<Unpacker, Type, IMessagePackSingleObjectSerializer, object> InitializeUnpacking( Type elementType )
-		{
-			if ( elementType == typeof( byte ) )
-			{
-				return ArraySegmentMessageSerializer.UnpackByteArraySegmentFrom;
-			}
-			else if ( elementType == typeof( char ) )
-			{
-				return ArraySegmentMessageSerializer.UnpackCharArraySegmentFrom;
-			}
-			else
-			{
-				return ArraySegmentMessageSerializer.UnpackGenericArraySegmentFrom;
-			}
-		}
-
-		protected internal sealed override void PackToCore( Packer packer, object objectTree )
-		{
-			this._packing( packer, objectTree, this._itemSerializer );
-		}
-
-		protected internal sealed override object UnpackFromCore( Unpacker unpacker )
-		{
-			return this._unpacking( unpacker, this._elementType, this._itemSerializer );
-		}
-	}
-#endif // !UNITY
 }

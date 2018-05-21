@@ -2,7 +2,7 @@
 //
 // MessagePack for CLI
 //
-// Copyright (C) 2010-2015 FUJIWARA, Yusuke
+// Copyright (C) 2010-2017 FUJIWARA, Yusuke and contributors
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -16,6 +16,9 @@
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
 //
+// Contributors:
+//    Samuel Cragg
+//
 #endregion -- License Terms --
 
 #if UNITY_5 || UNITY_STANDALONE || UNITY_WEBPLAYER || UNITY_WII || UNITY_IPHONE || UNITY_ANDROID || UNITY_PS3 || UNITY_XBOX360 || UNITY_FLASH || UNITY_BKACKBERRY || UNITY_WINRT
@@ -23,22 +26,23 @@
 #endif
 
 using System;
-#if !NETFX_35 && !UNITY && !WINDOWS_PHONE
+#if !NET35 && !UNITY && !WINDOWS_PHONE
 using System.Collections.Concurrent;
-#endif // !NETFX_35 && !UNITY && !WINDOWS_PHONE
+#endif // !NET35 && !UNITY && !WINDOWS_PHONE
 using System.Collections.Generic;
-#if !UNITY
-#if XAMIOS || XAMDROID
+using System.Diagnostics;
+#if FEATURE_MPCONTRACT
 using Contract = MsgPack.MPContract;
 #else
 using System.Diagnostics.Contracts;
-#endif // XAMIOS || XAMDROID
-#endif // !UNITY
+#endif // FEATURE_MPCONTRACT
 using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Runtime.CompilerServices;
+using System.Text;
 using System.Threading;
 
 namespace MsgPack.Serialization
@@ -48,7 +52,8 @@ namespace MsgPack.Serialization
 	/// </summary>
 	internal static class SerializerDebugging
 	{
-#if !XAMIOS && !XAMDROID && !UNITY
+#if !UNITY
+#if DEBUG
 		[ThreadStatic]
 		private static bool _traceEnabled;
 
@@ -80,8 +85,10 @@ namespace MsgPack.Serialization
 			get { return _dumpEnabled; }
 			set { _dumpEnabled = value; }
 		}
-#endif // !XAMIOS && !XAMDROID && !UNITY
+#endif // DEBUG
+#endif // !UNITY
 
+#if DEBUG
 		[ThreadStatic]
 		private static bool _avoidsGenericSerializer;
 
@@ -98,12 +105,13 @@ namespace MsgPack.Serialization
 			get { return _avoidsGenericSerializer; }
 			set { _avoidsGenericSerializer = value; }
 		}
+#endif // DEBUG
 
-#if !XAMIOS && !XAMDROID && !UNITY
-#if !NETFX_CORE
+#if !UNITY && !SILVERLIGHT && !NETSTANDARD1_1 && !WINDOWS_UWP
+#if DEBUG
 		[ThreadStatic]
 		private static StringWriter _ilTraceWriter;
-#endif // !NETFX_CORE
+#endif // DEBUG
 
 		/// <summary>
 		///		Gets the <see cref="TextWriter"/> for IL tracing.
@@ -116,10 +124,10 @@ namespace MsgPack.Serialization
 		{
 			get
 			{
-#if !NETFX_CORE
+#if DEBUG
 				if ( !_traceEnabled )
 				{
-					return TextWriter.Null;
+					return NullTextWriter.Instance;
 				}
 
 				if ( _ilTraceWriter == null )
@@ -129,48 +137,72 @@ namespace MsgPack.Serialization
 
 				return _ilTraceWriter;
 #else
-				return TextWriter.Null;
-#endif // !NETFX_CORE
+				return NullTextWriter.Instance;
+#endif // DEBUG
 			}
 		}
 
+#if DEBUG
 		/// <summary>
-		///		Traces the specific event.
+		///		Traces the emitting event.
 		/// </summary>
 		/// <param name="format">The format string.</param>
 		/// <param name="args">The args for formatting.</param>
-#if NETFX_CORE || WINDOWS_PHONE
 		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Usage", "CA1801:ReviewUnusedParameters", MessageId = "format", Justification = "Used in other platforms" )]
 		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Usage", "CA1801:ReviewUnusedParameters", MessageId = "args", Justification = "Used in other platforms" )]
-#endif // NETFX_CORE || WINDOWS_PHONE
-		public static void TraceEvent( string format, params object[] args )
+		public static void TraceEmitEvent( string format, params object[] args )
 		{
-#if !NETFX_CORE && !WINDOWS_PHONE
 			if ( !_traceEnabled )
 			{
 				return;
 			}
 
 			Tracer.Emit.TraceEvent( Tracer.EventType.DefineType, Tracer.EventId.DefineType, format, args );
-#endif // !NETFX_CORE && !WINDOWS_PHONE
 		}
+#endif // DEBUG
+#endif // !UNITY && !SILVERLIGHT && !NETSTANDARD1_1 && !WINDOWS_UWP
 
 		/// <summary>
-		///		Flushes the trace data.
+		///		Traces the polymorphic schema event.
 		/// </summary>
-		public static void FlushTraceData()
+		/// <param name="format">The format string.</param>
+		/// <param name="memberInfo">The target of schema.</param>
+		/// <param name="schema">The schema.</param>
+		[Conditional( "DEBUG" )]
+		public static void TracePolimorphicSchemaEvent( string format, MemberInfo memberInfo, PolymorphismSchema schema )
 		{
-#if !NETFX_CORE && !WINDOWS_PHONE
+#if DEBUG
+#if !UNITY && !SILVERLIGHT && !WINDOWS_UWP
 			if ( !_traceEnabled )
 			{
 				return;
 			}
 
-			Tracer.Emit.TraceData( Tracer.EventType.DefineType, Tracer.EventId.DefineType, _ilTraceWriter.ToString() );
-#endif // !NETFX_CORE && !WINDOWS_PHONE
+			Tracer.Emit.TraceEvent( Tracer.EventType.PolimorphicSchema, Tracer.EventId.PolimorphicSchema, format, memberInfo, schema == null ? "(null)" : schema.DebugString );
+#endif // !UNITY && !SILVERLIGHT && !WINDOWS_UWP
+#endif
 		}
 
-#if !NETFX_CORE && !SILVERLIGHT && !NETFX_35
+#if DEBUG
+
+#if !UNITY && !SILVERLIGHT && !NETSTANDARD1_1 && !WINDOWS_UWP
+		/// <summary>
+		///		Flushes the trace data.
+		/// </summary>
+		public static void FlushTraceData()
+		{
+			if ( !_traceEnabled )
+			{
+				return;
+			}
+
+			_ilTraceWriter.WriteLine();
+			Tracer.Emit.TraceData( Tracer.EventType.DefineType, Tracer.EventId.DefineType, _ilTraceWriter.ToString() );
+			_ilTraceWriter.GetStringBuilder().Length = 0;
+		}
+
+#if !NETSTANDARD1_3
+#if !NETSTANDARD2_0
 		[ThreadStatic]
 		private static AssemblyBuilder _assemblyBuilder;
 
@@ -195,6 +227,7 @@ namespace MsgPack.Serialization
 		/// <summary>
 		///		Prepares the dump with dedicated internal <see cref="AssemblyBuilder"/>.
 		/// </summary>
+		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Performance", "CA1811:AvoidUncalledPrivateCode", Justification = "For unit testing" )]
 		public static void PrepareDump()
 		{
 			_assemblyBuilder =
@@ -206,161 +239,90 @@ namespace MsgPack.Serialization
 			_moduleBuilder =
 				_assemblyBuilder.DefineDynamicModule( "ExpressionTreeSerializerLogics", "ExpressionTreeSerializerLogics.dll", true );
 		}
-#endif // !NETFX_CORE && !SILVERLIGHT && !NETFX_35
-		// TODO: Cleanup %Temp% to delete temp assemblies generated for on the fly code DOM.
+#endif // !NETSTANDARD2_0
 
-#if !NETFX_CORE && !SILVERLIGHT
-		[ThreadStatic]
-		private static IList<string> _runtimeAssemblies;
+#if !FERATURE_CONCURRENT
+		private static volatile DependentAssemblyManager _dependentAssemblyManager = DependentAssemblyManager.Default;
 
-		[ThreadStatic]
-		private static IList<string> _compiledCodeDomSerializerAssemblies;
-
-		public static IEnumerable<string> CodeDomSerializerDependentAssemblies
+		public static DependentAssemblyManager DependentAssemblyManager
 		{
-			get
-			{
-				EnsureDependentAssembliesListsInitialized();
-#if DEBUG
-				Contract.Assert( _compiledCodeDomSerializerAssemblies != null );
-#endif // DEBUG
-				// FCL dependencies and msgpack core libs
-				foreach ( var runtimeAssembly in _runtimeAssemblies )
-				{
-					yield return runtimeAssembly;
-				}
-
-				// dependents
-				foreach ( var compiledAssembly in _compiledCodeDomSerializerAssemblies )
-				{
-					yield return compiledAssembly;
-				}
-			}
+			get { return _dependentAssemblyManager; }
+			set { _dependentAssemblyManager = value; }
 		}
-#endif // !NETFX_CORE && !SILVERLIGHT
-#if NETFX_CORE || SILVERLIGHT
-		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Usage", "CA1801:ReviewUnusedParameters", MessageId = "pathToAssembly", Justification = "For API compatibility" )]
-#endif // NETFX_CORE || SILVERLIGHT
-		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Performance", "CA1811:AvoidUncalledPrivateCode", Justification = "For unit testing" )]
+#else
+		private static DependentAssemblyManager _dependentAssemblyManager = DependentAssemblyManager.Default;
+
+		public static DependentAssemblyManager DependentAssemblyManager
+		{
+			get { return Volatile.Read( ref _dependentAssemblyManager ); }
+			set { Volatile.Write( ref _dependentAssemblyManager, value ); }
+		}
+#endif // FERATURE_CONCURRENT
+
+		public static IEnumerable<object> CodeSerializerDependentAssemblies
+		{
+			get { return _dependentAssemblyManager.CodeSerializerDependentAssemblies; }
+		}
+
 		public static void AddRuntimeAssembly( string pathToAssembly )
 		{
-#if !NETFX_CORE && !SILVERLIGHT
-			EnsureDependentAssembliesListsInitialized();
-			_runtimeAssemblies.Add( pathToAssembly );
-#endif // !NETFX_CORE && !SILVERLIGHT
+			_dependentAssemblyManager.AddRuntimeAssembly( pathToAssembly );
 		}
 
-#if NETFX_CORE || SILVERLIGHT
-		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Usage", "CA1801:ReviewUnusedParameters", MessageId = "pathToAssembly", Justification = "For API compatibility" )]
-#endif // NETFX_CORE || SILVERLIGHT
-		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Performance", "CA1811:AvoidUncalledPrivateCode", Justification = "For unit testing" )]
-		public static void AddCompiledCodeDomAssembly( string pathToAssembly )
+		public static void AddCompiledCodeAssembly( string pathToAssembly )
 		{
-#if !NETFX_CORE && !SILVERLIGHT
-			EnsureDependentAssembliesListsInitialized();
-			_compiledCodeDomSerializerAssemblies.Add( pathToAssembly );
-#endif // !NETFX_CORE && !SILVERLIGHT
+			_dependentAssemblyManager.AddCompiledCodeAssembly( pathToAssembly );
+		}
+
+		public static void AddCompiledCodeAssembly( string name, byte[] image )
+		{
+			_dependentAssemblyManager.AddCompiledCodeAssembly( name, image );
 		}
 
 		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Performance", "CA1811:AvoidUncalledPrivateCode", Justification = "For unit testing" )]
 		public static void ResetDependentAssemblies()
 		{
-#if !NETFX_CORE && !SILVERLIGHT
-			EnsureDependentAssembliesListsInitialized();
-
-#if !NETFX_35
-			File.AppendAllLines( GetHistoryFilePath(), _compiledCodeDomSerializerAssemblies );
-#else
-			File.AppendAllText( GetHistoryFilePath(), String.Join( Environment.NewLine, _compiledCodeDomSerializerAssemblies.ToArray() ) + Environment.NewLine );
-#endif // !NETFX_35
-			_compiledCodeDomSerializerAssemblies.Clear();
-			ResetRuntimeAssemblies();
-#endif // !NETFX_CORE && !SILVERLIGHT
+			_dependentAssemblyManager.ResetDependentAssemblies();
 		}
 
-#if !NETFX_CORE && !SILVERLIGHT
-		private static int _wasDeleted;
-		private const string HistoryFile = "MsgPack.Serialization.SerializationGenerationDebugging.CodeDOM.History.txt";
+		public static string DumpDirectory
+		{
+			get { return _dependentAssemblyManager.DumpDirectory; }
+#if DEBUG
+			set { _dependentAssemblyManager.DumpDirectory = value; }
+#endif // DEBUG
+		}
 
-		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Performance", "CA1811:AvoidUncalledPrivateCode" , Justification = "For unit testing")]
+		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Performance", "CA1811:AvoidUncalledPrivateCode", Justification = "For unit testing" )]
 		public static void DeletePastTemporaries()
 		{
-			if ( Interlocked.CompareExchange( ref _wasDeleted, 1, 0 ) != 0 )
-			{
-				return;
-			}
-
-			try
-			{
-				var historyFilePath = GetHistoryFilePath();
-				if ( !File.Exists( historyFilePath ) )
-				{
-					return;
-				}
-
-				foreach ( var pastAssembly in File.ReadAllLines( historyFilePath ) )
-				{
-					if ( !String.IsNullOrEmpty( pastAssembly ) )
-					{
-						File.Delete( pastAssembly );
-					}
-				}
-
-				new FileStream( historyFilePath, FileMode.Truncate ).Close();
-			}
-			catch ( IOException ) { }
+			_dependentAssemblyManager.DeletePastTemporaries();
 		}
 
-		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Performance", "CA1811:AvoidUncalledPrivateCode" , Justification = "For unit testing")]
-		private static string GetHistoryFilePath()
+		public static Assembly LoadAssembly( string path )
 		{
-			return Path.Combine( Path.GetTempPath(), HistoryFile );
+			return _dependentAssemblyManager.LoadAssembly( path );
 		}
-
-		private static void EnsureDependentAssembliesListsInitialized()
-		{
-			if ( _runtimeAssemblies == null )
-			{
-				_runtimeAssemblies = new List<string>();
-				ResetRuntimeAssemblies();
-			}
-
-			if ( _compiledCodeDomSerializerAssemblies == null )
-			{
-				_compiledCodeDomSerializerAssemblies = new List<string>();
-			}
-		}
-
-		private static void ResetRuntimeAssemblies()
-		{
-			_runtimeAssemblies.Add( "System.dll" );
-#if NETFX_35
-			_runtimeAssemblies.Add( typeof( Enumerable ).Assembly.Location );
-#else
-			_runtimeAssemblies.Add( "System.Core.dll" );
-			_runtimeAssemblies.Add( "System.Numerics.dll" );
-#endif // NETFX_35
-			_runtimeAssemblies.Add( typeof( SerializerDebugging ).Assembly.Location );
-		}
-#endif // !NETFX_CORE && !SILVERLIGHT
 
 		[ThreadStatic]
 		private static bool _onTheFlyCodeDomEnabled;
 
 		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Performance", "CA1811:AvoidUncalledPrivateCode", Justification = "For unit testing" )]
-		public static bool OnTheFlyCodeDomEnabled
+		public static bool OnTheFlyCodeGenerationEnabled
 		{
 			get { return _onTheFlyCodeDomEnabled; }
 			set { _onTheFlyCodeDomEnabled = value; }
 		}
 
-#if !NETFX_CORE && !SILVERLIGHT && !NETFX_35
+#if !NETSTANDARD2_0
 		/// <summary>
 		///		Creates the new type builder for the serializer.
 		/// </summary>
 		/// <param name="targetType">The serialization target type.</param>
 		/// <returns></returns>
 		/// <exception cref="System.InvalidOperationException">PrepareDump() was not called.</exception>
+		[Obsolete( "", true )]
+		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Performance", "CA1811:AvoidUncalledPrivateCode", Justification = "For unit testing" )]
 		public static TypeBuilder NewTypeBuilder( Type targetType )
 		{
 			if ( _moduleBuilder == null )
@@ -371,23 +333,21 @@ namespace MsgPack.Serialization
 			return
 				_moduleBuilder.DefineType( IdentifierUtility.EscapeTypeName( targetType ) + "SerializerLogics" );
 		}
-#endif // !NETFX_CORE && !SILVERLIGHT && !NETFX_35
 
-#if !NETFX_CORE && !SILVERLIGHT
 		/// <summary>
 		///		Takes dump of instructions.
 		/// </summary>
-		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Performance", "CA1811:AvoidUncalledPrivateCode" , Justification = "For unit testing")]
+		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Performance", "CA1811:AvoidUncalledPrivateCode", Justification = "For unit testing" )]
 		public static void Dump()
 		{
-#if !NETFX_35
+#if !NET35
 			if ( _assemblyBuilder != null )
 			{
 				_assemblyBuilder.Save( _assemblyBuilder.GetName().Name + ".dll" );
 			}
-#endif // !NETFX_35
+#endif // !NET35
 		}
-#endif // !NETFX_CORE && !SILVERLIGHT
+#endif // !NETSTANDARD2_0
 
 		/// <summary>
 		///		Resets debugging states.
@@ -395,21 +355,117 @@ namespace MsgPack.Serialization
 		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Performance", "CA1811:AvoidUncalledPrivateCode", Justification = "For unit testing" )]
 		public static void Reset()
 		{
-#if !NETFX_CORE && !SILVERLIGHT && !NETFX_35
+#if !NETSTANDARD2_0
 			_assemblyBuilder = null;
 			_moduleBuilder = null;
+#endif // !NETSTANDARD2_0
+			_dumpEnabled = false;
 
 			if ( _ilTraceWriter != null )
 			{
 				_ilTraceWriter.Dispose();
 				_ilTraceWriter = null;
 			}
-#endif // !NETFX_CORE && !SILVERLIGHT && !NETFX_35
 
-			_dumpEnabled = false;
 			_traceEnabled = false;
+			_codeWriter = null;
 			ResetDependentAssemblies();
 		}
-#endif // !XAMIOS && !XAMDROID && !UNITY
+#endif // !NETSTANDARD1_3
+#endif // !UNITY && !SILVERLIGHT && !NETSTANDARD1_1 && !WINDOWS_UWP
+
+#if NET35 || UNITY || SILVERLIGHT
+		private static int _useLegacyNullMapEntryHandling;
+#else
+		private static bool _useLegacyNullMapEntryHandling;
+#endif // NET35 || UNITY || SILVERLIGHT
+
+		internal static bool UseLegacyNullMapEntryHandling
+		{
+			get
+			{
+#if NET35 || UNITY || SILVERLIGHT
+				return Volatile.Read( ref _useLegacyNullMapEntryHandling ) == 1;
+#else
+				return Volatile.Read( ref _useLegacyNullMapEntryHandling );
+#endif
+			}
+			set
+			{
+#if NET35 || UNITY || SILVERLIGHT
+				Volatile.Write( ref _useLegacyNullMapEntryHandling, value ? 1 : 0 );
+#else
+				Volatile.Write( ref _useLegacyNullMapEntryHandling, value );
+#endif
+			}
+		}
+
+
+#if DEBUG && FEATURE_TAP
+
+		private static bool _isNaiveAsyncAllowed;
+
+		internal static bool IsNaiveAsyncAllowed
+		{
+			get { return Volatile.Read( ref _isNaiveAsyncAllowed ); }
+			set { Volatile.Write( ref _isNaiveAsyncAllowed, value ); }
+		}
+
+		internal static void EnsureNaiveAsyncAllowed( object source, [CallerMemberName]string method = null )
+		{
+			if ( !Volatile.Read( ref _isNaiveAsyncAllowed ) )
+			{
+				throw new NotImplementedException( "This method is not implemented as generated method. " + source + "." + method );
+			}
+		}
+
+#endif // DEBUG && FEATURE_TAP
+
+#if !NETSTANDARD1_1 && !NETSTANDARD1_3
+		[ThreadStatic]
+		private static StringWriter _codeWriter;
+
+		public static StringWriter CodeWriter
+		{
+			get
+			{
+				if ( _codeWriter == null )
+				{
+					_codeWriter = new StringWriter( CultureInfo.InvariantCulture );
+				}
+
+				return _codeWriter;
+			}
+		}
+
+		public static void CompileAssembly( bool isDebug, out Assembly compiledAssembly, out IList<string> errors, out IList<string> warnings )
+		{
+			_codeCompiler( CodeWriter.ToString(), isDebug, out compiledAssembly, out errors, out warnings );
+		}
+
+		public static void ClearCodeBuffer()
+		{
+			// Clears buffer and enable reopen.
+			_codeWriter = null;
+		}
+
+#if FEATURE_CONCURRENT
+		private static CodeCompiler _codeCompiler;
+#else
+		private static volatile CodeCompiler _codeCompiler;
+#endif
+
+		public static void SetCodeCompiler( CodeCompiler codeCompiler )
+		{
+#if FEATURE_CONCURRENT
+			Volatile.Write( ref _codeCompiler, codeCompiler );
+#else
+			_codeCompiler = codeCompiler;
+#endif
+		}
+
+		public delegate void CodeCompiler( string code, bool isDebug, out Assembly compiledAssembly, out IList<string> errors, out IList<string> warnings );
+#endif // !NETSTANDARD1_1 && !NETSTANDARD1_3
+#endif // DEBUG
 	}
 }

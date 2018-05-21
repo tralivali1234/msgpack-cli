@@ -1,8 +1,8 @@
-﻿#region -- License Terms --
+#region -- License Terms --
 //
 // MessagePack for CLI
 //
-// Copyright (C) 2010-2015 FUJIWARA, Yusuke
+// Copyright (C) 2010-2017 FUJIWARA, Yusuke
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -58,7 +58,7 @@ namespace MsgPack.Serialization
 			Assert.Throws<ArgumentNullException>( () => target.GetSerializer( null ) );
 		}
 
-#if !XAMIOS && !XAMDROID && !UNITY
+#if !AOT
 		[Test]
 		public void TestGetSerializer_Concurrent()
 		{
@@ -67,19 +67,19 @@ namespace MsgPack.Serialization
 				target.GetSerializer<ComplexType>
 			).Test();
 		}
-#endif // !XAMIOS && !XAMDROID && !UNITY
+#endif // !AOT
 
 		[Test]
 		public void TestGetSerializer_Type()
 		{
 			var target = new SerializationContext();
 			Assert.That( target.GetSerializer( typeof( int ) ), Is.Not.Null );
-#if !XAMIOS && !XAMDROID && !UNITY
+#if !AOT
 			Assert.That( target.GetSerializer( typeof( ComplexType ) ), Is.Not.Null );
-#endif // !XAMIOS && !XAMDROID && !UNITY
+#endif // !AOT
 		}
 
-#if !XAMIOS && !XAMDROID && !UNITY
+#if !AOT
 		[Test]
 		public void TestGetSerializer_TypeConcurrent()
 		{
@@ -88,29 +88,29 @@ namespace MsgPack.Serialization
 				() => ( MessagePackSerializer<ComplexType> )target.GetSerializer( typeof( ComplexType ) )
 			).Test();
 		}
-#endif // !XAMIOS && !XAMDROID && !UNITY
+#endif // !AOT
 
 		[Test]
 		public void TestDefaultCollectionTypes_Default_Check()
 		{
 			var context = new SerializationContext();
 			Assert.That( context.DefaultCollectionTypes.Get( typeof( IList<> ) ), Is.EqualTo( typeof( List<> ) ) );
-#if !NETFX_35
+#if !NET35
 			Assert.That( context.DefaultCollectionTypes.Get( typeof( ISet<> ) ), Is.EqualTo( typeof( HashSet<> ) ) );
 #endif
 			Assert.That( context.DefaultCollectionTypes.Get( typeof( ICollection<> ) ), Is.EqualTo( typeof( List<> ) ) );
-#if !NETFX_35 && !UNITY && !NETFX_40
+#if !NET35 && !UNITY && !NET40 && !SILVERLIGHT
 		    Assert.That( context.DefaultCollectionTypes.Get( typeof( IReadOnlyCollection<> ) ), Is.EqualTo( typeof( List<> ) ) );
-#endif // !NETFX_35 && !UNITY && !NETFX_40
+#endif // !NET35 && !UNITY && !NET40 && !SILVERLIGHT
 			Assert.That( context.DefaultCollectionTypes.Get( typeof( IEnumerable<> ) ), Is.EqualTo( typeof( List<> ) ) );
 		    Assert.That( context.DefaultCollectionTypes.Get( typeof( IDictionary<,> ) ), Is.EqualTo( typeof( Dictionary<,> ) ) );
-#if !NETFX_35 && !UNITY && !NETFX_40
+#if !NET35 && !UNITY && !NET40 && !SILVERLIGHT
 		    Assert.That( context.DefaultCollectionTypes.Get( typeof( IReadOnlyDictionary<,> ) ), Is.EqualTo( typeof( Dictionary<,> ) ) );
-#endif // !NETFX_35 && !UNITY && !NETFX_40
-		    Assert.That( context.DefaultCollectionTypes.Get( typeof( IList ) ), Is.EqualTo( typeof( List<MessagePackObject> ) ) );
-#if !NETFX_35 && !UNITY && !NETFX_40
+#endif // !NET35 && !UNITY && !NET40 && !SILVERLIGHT
+			Assert.That( context.DefaultCollectionTypes.Get( typeof( IList ) ), Is.EqualTo( typeof( List<MessagePackObject> ) ) );
+#if !NET35 && !UNITY && !NET40 && !SILVERLIGHT
 		    Assert.That( context.DefaultCollectionTypes.Get( typeof( IReadOnlyList<> ) ), Is.EqualTo( typeof( List<> ) ) );
-#endif // !NETFX_35 && !UNITY && !NETFX_40
+#endif // !NET35 && !UNITY && !NET40 && !SILVERLIGHT
 			Assert.That( context.DefaultCollectionTypes.Get( typeof( ICollection ) ), Is.EqualTo( typeof( List<MessagePackObject> ) ) );
 			Assert.That( context.DefaultCollectionTypes.Get( typeof( IEnumerable ) ), Is.EqualTo( typeof( List<MessagePackObject> ) ) );
 			Assert.That( context.DefaultCollectionTypes.Get( typeof( IDictionary ) ), Is.EqualTo( typeof( MessagePackObjectDictionary ) ) );
@@ -204,11 +204,11 @@ namespace MsgPack.Serialization
 		public void TestDefault_SafeAndEasySettings()
 		{
 			Assert.That( SerializationContext.Default, Is.Not.Null );
-			Assert.That( SerializationContext.Default.DefaultDateTimeConversionMethod, Is.EqualTo( DateTimeConversionMethod.Native ) );
-			Assert.That( SerializationContext.Default.EnumSerializationMethod, Is.EqualTo( EnumSerializationMethod.ByName ) );
-#if !XAMIOS && !UNITY
-			Assert.That( SerializationContext.Default.GeneratorOption, Is.EqualTo( SerializationMethodGeneratorOption.Fast ) );
-#endif // !XAMIOS && !UNITY
+			Assert.That( SerializationContext.Default.DefaultDateTimeConversionMethod, Is.EqualTo( DateTimeConversionMethod.Timestamp ) );
+			Assert.That( SerializationContext.Default.EnumSerializationOptions.SerializationMethod, Is.EqualTo( EnumSerializationMethod.ByName ) );
+#if !AOT && !UNITY && !SILVERLIGHT
+			Assert.That( SerializationContext.Default.SerializerOptions.GeneratorOption, Is.EqualTo( SerializationMethodGeneratorOption.Fast ) );
+#endif // !AOT && !UNITY && !SILVERLIGHT
 			Assert.That( SerializationContext.Default.SerializationMethod, Is.EqualTo( SerializationMethod.Array ) );
 		}
 
@@ -218,10 +218,10 @@ namespace MsgPack.Serialization
 			var context = SerializationContext.CreateClassicContext();
 			Assert.That( context, Is.Not.Null );
 			Assert.That( context.DefaultDateTimeConversionMethod, Is.EqualTo( DateTimeConversionMethod.UnixEpoc ) );
-			Assert.That( context.EnumSerializationMethod, Is.EqualTo( EnumSerializationMethod.ByName ) );
-#if !XAMIOS && !UNITY
-			Assert.That( context.GeneratorOption, Is.EqualTo( SerializationMethodGeneratorOption.Fast ) );
-#endif // !XAMIOS && !UNITY
+			Assert.That( context.EnumSerializationOptions.SerializationMethod, Is.EqualTo( EnumSerializationMethod.ByName ) );
+#if !AOT && !UNITY && !SILVERLIGHT
+			Assert.That( context.SerializerOptions.GeneratorOption, Is.EqualTo( SerializationMethodGeneratorOption.Fast ) );
+#endif // !AOT && !UNITY && !SILVERLIGHT
 			Assert.That( context.SerializationMethod, Is.EqualTo( SerializationMethod.Array ) );
 		}
 
@@ -237,20 +237,20 @@ namespace MsgPack.Serialization
 				Assert.That( result, Is.SameAs( previous ) );
 				// result is default settings.
 				Assert.That( result, Is.Not.Null );
-				Assert.That( result.DefaultDateTimeConversionMethod, Is.EqualTo( DateTimeConversionMethod.Native ) );
-				Assert.That( result.EnumSerializationMethod, Is.EqualTo( EnumSerializationMethod.ByName ) );
-#if !XAMIOS && !UNITY
-				Assert.That( result.GeneratorOption, Is.EqualTo( SerializationMethodGeneratorOption.Fast ) );
-#endif // !XAMIOS && !UNITY
+				Assert.That( result.DefaultDateTimeConversionMethod, Is.EqualTo( DateTimeConversionMethod.Timestamp ) );
+				Assert.That( result.EnumSerializationOptions.SerializationMethod, Is.EqualTo( EnumSerializationMethod.ByName ) );
+#if !AOT && !UNITY && !SILVERLIGHT
+				Assert.That( result.SerializerOptions.GeneratorOption, Is.EqualTo( SerializationMethodGeneratorOption.Fast ) );
+#endif // !AOT && !UNITY && !SILVERLIGHT
 				Assert.That( result.SerializationMethod, Is.EqualTo( SerializationMethod.Array ) );
 
 				// default is now classic
 				Assert.That( SerializationContext.Default, Is.Not.Null );
 				Assert.That( SerializationContext.Default.DefaultDateTimeConversionMethod, Is.EqualTo( DateTimeConversionMethod.UnixEpoc ) );
-				Assert.That( SerializationContext.Default.EnumSerializationMethod, Is.EqualTo( EnumSerializationMethod.ByName ) );
-#if !XAMIOS && !UNITY
-				Assert.That( SerializationContext.Default.GeneratorOption, Is.EqualTo( SerializationMethodGeneratorOption.Fast ) );
-#endif // !XAMIOS && !UNITY
+				Assert.That( SerializationContext.Default.EnumSerializationOptions.SerializationMethod, Is.EqualTo( EnumSerializationMethod.ByName ) );
+#if !AOT && !UNITY && !SILVERLIGHT
+				Assert.That( SerializationContext.Default.SerializerOptions.GeneratorOption, Is.EqualTo( SerializationMethodGeneratorOption.Fast ) );
+#endif // !AOT && !UNITY && !SILVERLIGHT
 				Assert.That( SerializationContext.Default.SerializationMethod, Is.EqualTo( SerializationMethod.Array ) );
 			}
 			finally
@@ -259,11 +259,11 @@ namespace MsgPack.Serialization
 			}
 
 			// Verify restore
-			Assert.That( SerializationContext.Default.DefaultDateTimeConversionMethod, Is.EqualTo( DateTimeConversionMethod.Native ) );
-			Assert.That( SerializationContext.Default.EnumSerializationMethod, Is.EqualTo( EnumSerializationMethod.ByName ) );
-#if !XAMIOS && !UNITY
-			Assert.That( SerializationContext.Default.GeneratorOption, Is.EqualTo( SerializationMethodGeneratorOption.Fast ) );
-#endif // !XAMIOS && !UNITY
+			Assert.That( SerializationContext.Default.DefaultDateTimeConversionMethod, Is.EqualTo( DateTimeConversionMethod.Timestamp ) );
+			Assert.That( SerializationContext.Default.EnumSerializationOptions.SerializationMethod, Is.EqualTo( EnumSerializationMethod.ByName ) );
+#if !AOT && !UNITY && !SILVERLIGHT
+			Assert.That( SerializationContext.Default.SerializerOptions.GeneratorOption, Is.EqualTo( SerializationMethodGeneratorOption.Fast ) );
+#endif // !AOT && !UNITY && !SILVERLIGHT
 			Assert.That( SerializationContext.Default.SerializationMethod, Is.EqualTo( SerializationMethod.Array ) );
 		}
 
@@ -436,9 +436,9 @@ namespace MsgPack.Serialization
 			var result = context.GetSerializer<Image>();
 			Assert.That( raised, Is.EqualTo( 1 ) );
 			Assert.That( result, Is.Not.Null );
-#if !NETFX_35 && !UNITY && !NETFX_CORE && !SILVERLIGHT && !XAMIOS && !XAMDROID
+#if !NET35 && !AOT && !NETFX_CORE && !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3 && !XAMARIN
 			Assert.That( result.GetType().GetAssembly().IsDynamic );
-#endif // !NETFX_35 && !UNITY && !NETFX_CORE && !SILVERLIGHT && !XAMIOS && !XAMDROID
+#endif // !NET35 && !AOT && !NETFX_CORE && !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3 && !XAMARIN
 		}
 
 
@@ -502,7 +502,7 @@ namespace MsgPack.Serialization
 			}
 		}
 
-#if !XAMIOS && !XAMDROID && !UNITY
+#if !AOT
 		private sealed class ConcurrentHelper<T> : IDisposable
 			where T : class
 		{
@@ -566,8 +566,49 @@ namespace MsgPack.Serialization
 #endif
 				}
 			}
+
+#if SILVERLIGHT
+
+			private sealed class Barrier : IDisposable
+			{
+				private int _participants;
+				private int _waiting;
+				// This is too naive for ping-pong
+				private readonly ManualResetEvent _waitSignal;
+
+				public Barrier( int participants )
+				{
+					Interlocked.Exchange( ref this._participants, participants );
+					this._waitSignal = new ManualResetEvent( false );
+				}
+
+				public void Dispose()
+				{
+					this._waitSignal.Dispose();
+				}
+
+				public void AddParticipant()
+				{
+					Interlocked.Increment( ref this._participants );
+				}
+
+				public void SignalAndWait()
+				{
+					if ( Interlocked.Increment( ref this._waiting ) == Interlocked.CompareExchange( ref this._waiting, 0, 0 ) )
+					{
+						this._waitSignal.Set();
+						Interlocked.Exchange( ref this._waiting, 0 );
+					}
+					else
+					{
+						this._waitSignal.WaitOne();
+					}
+				}
+			}
+
+#endif // SILVERLIGHT
 		}
-#endif // !XAMIOS && !XAMDROID && !UNITY
+#endif // !AOT
 
 		public abstract class NewAbstractCollection<T> : Collection<T>
 		{

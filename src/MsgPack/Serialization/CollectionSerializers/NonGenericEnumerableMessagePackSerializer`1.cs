@@ -2,7 +2,7 @@
 // 
 // MessagePack for CLI
 // 
-// Copyright (C) 2015 FUJIWARA, Yusuke
+// Copyright (C) 2015-2016 FUJIWARA, Yusuke
 // 
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -26,6 +26,10 @@ using System;
 using System.Collections;
 using System.Linq;
 using System.Runtime.Serialization;
+#if FEATURE_TAP
+using System.Threading;
+using System.Threading.Tasks;
+#endif // FEATURE_TAP
 
 namespace MsgPack.Serialization.CollectionSerializers
 {
@@ -52,6 +56,21 @@ namespace MsgPack.Serialization.CollectionSerializers
 			: base( ownerContext, schema ) { }
 
 		/// <summary>
+		///		Initializes a new instance of the <see cref="NonGenericCollectionMessagePackSerializer{TCollection}"/> class.
+		/// </summary>
+		/// <param name="ownerContext">A <see cref="SerializationContext"/> which owns this serializer.</param>
+		/// <param name="schema">
+		///		The schema for collection itself or its items for the member this instance will be used to. 
+		///		<c>null</c> will be considered as <see cref="PolymorphismSchema.Default"/>.
+		/// </param>
+		/// <param name="capabilities">A serializer calability flags represents capabilities of this instance.</param>
+		/// <exception cref="ArgumentNullException">
+		///		<paramref name="ownerContext"/> is <c>null</c>.
+		/// </exception>
+		protected NonGenericEnumerableMessagePackSerializer( SerializationContext ownerContext, PolymorphismSchema schema, SerializerCapabilities capabilities )
+			: base( ownerContext, schema, capabilities ) { }
+
+		/// <summary>
 		///		Serializes specified object with specified <see cref="Packer"/>.
 		/// </summary>
 		/// <param name="packer"><see cref="Packer"/> which packs values in <paramref name="objectTree"/>. This value will not be <c>null</c>.</param>
@@ -60,7 +79,7 @@ namespace MsgPack.Serialization.CollectionSerializers
 		///		<typeparamref name="TCollection"/> is not serializable etc.
 		/// </exception>
 		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "Validated by caller in base class" )]
-		protected internal sealed override void PackToCore( Packer packer, TCollection objectTree )
+		protected internal override void PackToCore( Packer packer, TCollection objectTree )
 		{
 			ICollection asICollection;
 			if ( ( asICollection = objectTree as ICollection ) == null )
@@ -69,16 +88,58 @@ namespace MsgPack.Serialization.CollectionSerializers
 			}
 
 			packer.PackArrayHeader( asICollection.Count );
+
+			foreach ( var item in asICollection )
+			{
+				this.ItemSerializer.PackTo( packer, item );
+			}
 		}
+
+#if FEATURE_TAP
+
+		/// <summary>
+		///		Serializes specified object with specified <see cref="Packer"/> asynchronously.
+		/// </summary>
+		/// <param name="packer"><see cref="Packer"/> which packs values in <paramref name="objectTree"/>. This value will not be <c>null</c>.</param>
+		/// <param name="objectTree">Object to be serialized.</param>
+		/// <param name="cancellationToken">The token to monitor for cancellation requests. The default value is <see cref="CancellationToken.None"/>.</param>
+		/// <returns>
+		///		A <see cref="Task"/> that represents the asynchronous operation. 
+		/// </returns>
+		/// <exception cref="System.Runtime.Serialization.SerializationException">
+		///		Failed to serialize object.
+		/// </exception>
+		/// <exception cref="NotSupportedException">
+		///		<typeparamref name="TCollection"/> is not serializable even if it can be deserialized.
+		/// </exception>
+		/// <seealso cref="P:Capabilities"/>
+		protected internal override async Task PackToAsyncCore( Packer packer, TCollection objectTree, CancellationToken cancellationToken )
+		{
+			ICollection asICollection;
+			if ( ( asICollection = objectTree as ICollection ) == null )
+			{
+				asICollection = objectTree.Cast<object>().ToArray();
+			}
+
+			await packer.PackArrayHeaderAsync( asICollection.Count, cancellationToken ).ConfigureAwait( false );
+
+			foreach ( var item in asICollection )
+			{
+				await this.ItemSerializer.PackToAsync( packer, item, cancellationToken ).ConfigureAwait( false );
+			}
+		}
+
+#endif // FEATURE_TAP
 	}
 
 #if UNITY
+#warning TODO: Remove if possible for maintenancibility.
 	internal abstract class UnityNonGenericEnumerableMessagePackSerializer : UnityNonGenericEnumerableMessagePackSerializerBase
 	{
-		protected UnityNonGenericEnumerableMessagePackSerializer( SerializationContext ownerContext, Type targetType, PolymorphismSchema schema )
-			: base( ownerContext, targetType, schema ) { }
+		protected UnityNonGenericEnumerableMessagePackSerializer( SerializationContext ownerContext, Type targetType, PolymorphismSchema schema, SerializerCapabilities capabilities )
+			: base( ownerContext, targetType, schema, capabilities ) { }
 
-		protected internal sealed override void PackToCore( Packer packer, object objectTree )
+		protected internal override void PackToCore( Packer packer, object objectTree )
 		{
 			var asEnumerable = objectTree as IEnumerable;
 			int count;
@@ -94,6 +155,11 @@ namespace MsgPack.Serialization.CollectionSerializers
 			}
 
 			packer.PackArrayHeader( count );
+
+			foreach ( var item in asEnumerable )
+			{
+				this.ItemSerializer.PackTo( packer, item );
+			}
 		}
 	}
 #endif // UNITY

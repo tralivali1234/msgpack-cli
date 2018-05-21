@@ -2,7 +2,7 @@
 //
 // MessagePack for CLI
 //
-// Copyright (C) 2010-2015 FUJIWARA, Yusuke
+// Copyright (C) 2010-2016 FUJIWARA, Yusuke
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -26,13 +26,18 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+#if FEATURE_TAP
+using System.Threading;
+using System.Threading.Tasks;
+#endif // FEATURE_TAP
 
 namespace MsgPack.Serialization.DefaultSerializers
 {
+	[Preserve( AllMembers = true )]
 	internal class ImmutableCollectionSerializer<T, TItem> : MessagePackSerializer<T>
 		where T : IEnumerable<TItem>
 	{
-		protected static readonly Func<TItem[], T> factory = FindFactory();
+		protected readonly Func<TItem[], T> Factory;
 
 		private static Func<TItem[], T> FindFactory()
 		{
@@ -93,31 +98,32 @@ namespace MsgPack.Serialization.DefaultSerializers
 #endif // !UNITY
 		}
 
-		private readonly MessagePackSerializer<TItem> _itemSerializer;
+		protected readonly MessagePackSerializer<TItem> ItemSerializer;
 
 		public ImmutableCollectionSerializer( SerializationContext ownerContext, PolymorphismSchema itemsSchema )
-			: base( ownerContext )
+			: base( ownerContext, SerializerCapabilities.PackTo | SerializerCapabilities.UnpackFrom )
 		{
-			this._itemSerializer = ownerContext.GetSerializer<TItem>( itemsSchema );
+			this.ItemSerializer = ownerContext.GetSerializer<TItem>( itemsSchema );
+			this.Factory = FindFactory();
 		}
 
-		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "By design" )]
+		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "Validated by caller in base class" )]
 		protected internal override void PackToCore( Packer packer, T objectTree )
 		{
 			packer.PackArrayHeader( objectTree.Count() );
 
 			foreach ( var item in objectTree )
 			{
-				this._itemSerializer.PackTo( packer, item );
+				this.ItemSerializer.PackTo( packer, item );
 			}
 		}
 
-		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "By design" )]
+		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "Validated by caller in base class" )]
 		protected internal override T UnpackFromCore( Unpacker unpacker )
 		{
 			if ( !unpacker.IsArrayHeader )
 			{
-				throw SerializationExceptions.NewIsNotArrayHeader();
+				SerializationExceptions.ThrowIsNotArrayHeader( unpacker );
 			}
 
 			var buffer = new TItem[ UnpackHelpers.GetItemsCount( unpacker ) ];
@@ -128,14 +134,14 @@ namespace MsgPack.Serialization.DefaultSerializers
 				{
 					if ( !subTreeUnpacker.Read() )
 					{
-						throw SerializationExceptions.NewUnexpectedEndOfStream();
+						SerializationExceptions.ThrowUnexpectedEndOfStream( unpacker );
 					}
 
-					buffer[ i ] = this._itemSerializer.UnpackFrom( subTreeUnpacker );
+					buffer[ i ] = this.ItemSerializer.UnpackFrom( subTreeUnpacker );
 				}
 			}
 
-			return factory( buffer );
+			return this.Factory( buffer );
 		}
 
 		protected internal override void UnpackToCore( Unpacker unpacker, T collection )
@@ -148,5 +154,56 @@ namespace MsgPack.Serialization.DefaultSerializers
 				)
 			);
 		}
+
+#if FEATURE_TAP
+
+		protected internal override async Task PackToAsyncCore( Packer packer, T objectTree, CancellationToken cancellationToken )
+		{
+			await packer.PackArrayHeaderAsync( objectTree.Count(), cancellationToken ).ConfigureAwait( false );
+
+			foreach ( var item in objectTree )
+			{
+				await this.ItemSerializer.PackToAsync( packer, item, cancellationToken ).ConfigureAwait( false );
+			}
+		}
+
+		protected internal override async Task<T> UnpackFromAsyncCore( Unpacker unpacker, CancellationToken cancellationToken )
+		{
+			if ( !unpacker.IsArrayHeader )
+			{
+				SerializationExceptions.ThrowIsNotArrayHeader( unpacker );
+			}
+
+			var buffer = new TItem[ UnpackHelpers.GetItemsCount( unpacker ) ];
+
+			using ( var subTreeUnpacker = unpacker.ReadSubtree() )
+			{
+				for ( int i = 0; i < buffer.Length; i++ )
+				{
+					if ( !await subTreeUnpacker.ReadAsync( cancellationToken ).ConfigureAwait( false ) )
+					{
+						SerializationExceptions.ThrowUnexpectedEndOfStream( unpacker );
+					}
+
+					buffer[ i ] = await this.ItemSerializer.UnpackFromAsync( subTreeUnpacker, cancellationToken ).ConfigureAwait( false );
+				}
+			}
+
+			return this.Factory( buffer );
+		}
+
+		protected internal override Task UnpackToAsyncCore( Unpacker unpacker, T collection, CancellationToken cancellationToken )
+		{
+			throw new NotSupportedException(
+				String.Format(
+					CultureInfo.CurrentCulture,
+					"Unable to unpack items to existing immutable collection '{0}'.",
+					typeof( T )
+				)
+			);
+		}
+
+#endif // FEATURE_TAP
+
 	}
 }

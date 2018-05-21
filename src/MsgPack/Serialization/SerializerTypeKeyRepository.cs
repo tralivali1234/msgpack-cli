@@ -24,25 +24,23 @@
 
 using System;
 using System.Collections.Generic;
-#if !NETFX_35 && !UNITY
-using System.Security;
-#endif // !NETFX_35 && !UNITY
-#if !UNITY
-#if XAMIOS || XAMDROID
+#if FEATURE_MPCONTRACT
 using Contract = MsgPack.MPContract;
 #else
 using System.Diagnostics.Contracts;
-#endif // XAMIOS || XAMDROID
-#endif // !UNITY
+#endif // FEATURE_MPCONTRACT
+#if !NET35 && !UNITY
+using System.Security;
+#endif // !NET35 && !UNITY
 
 namespace MsgPack.Serialization
 {
 	/// <summary>
 	///		Specialized <see cref="TypeKeyRepository"/> for serializers.
 	/// </summary>
-#if !NETFX_35 && !UNITY
+#if !NET35 && !UNITY
 	[SecuritySafeCritical]
-#endif // !NETFX_35
+#endif // !NET35
 	internal sealed class SerializerTypeKeyRepository : TypeKeyRepository
 	{
 #if UNITY
@@ -84,15 +82,15 @@ namespace MsgPack.Serialization
 			}
 			else
 			{
-#if !UNITY && DEBUG
+#if DEBUG
 				Contract.Assert( keyType.GetIsGenericType(), "keyType.GetIsGenericType()" );
 				Contract.Assert( !keyType.GetIsGenericTypeDefinition(), "!keyType.GetIsGenericTypeDefinition()" );
-#endif // !UNITY && DEBUG
+#endif // DEBUG
 				var type = genericDefinitionMatched as Type;
-#if !UNITY && DEBUG
+#if DEBUG
 				Contract.Assert( type != null, "type != null" );
 				Contract.Assert( type.GetIsGenericTypeDefinition(), "type.GetIsGenericTypeDefinition()" );
-#endif // !UNITY && DEBUG
+#endif // DEBUG
 #if !UNITY
 				var result =
 					ReflectionExtensions.CreateInstancePreservingExceptionType( 
@@ -102,14 +100,22 @@ namespace MsgPack.Serialization
 #else
 				var resultType = type.IsGenericTypeDefinition ? type.MakeGenericType( keyType.GetGenericArguments() ) : type;
 				var constructor2 = resultType.GetConstructor( NonGenericSerializerConstructorParameterTypes );
-				var result =
-					constructor2 == null 
-					? ReflectionExtensions.CreateInstancePreservingExceptionType( resultType, context )
-					: ReflectionExtensions.CreateInstancePreservingExceptionType( resultType, context, keyType );
+				object result;
+				try
+				{
+					result =
+						constructor2 == null
+						? ReflectionExtensions.CreateInstancePreservingExceptionType( resultType, context )
+						: ReflectionExtensions.CreateInstancePreservingExceptionType( resultType, context, keyType );
+				}
+				catch ( Exception ex )
+				{
+					AotHelper.HandleAotError( keyType, ex );
+					throw;
+				}
 #endif // !UNITY
-#if !UNITY && DEBUG
 				Contract.Assert( result != null, "result != null" );
-#endif // !UNITY && DEBUG
+
 				return result;
 			}
 		}

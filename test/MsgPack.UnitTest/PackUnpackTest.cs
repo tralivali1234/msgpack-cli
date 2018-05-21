@@ -133,8 +133,12 @@ namespace MsgPack
 		[Test]
 		[Timeout( 3000000 )]
 #if !HEAVY_TEST
+#if MSTEST
 		[Ignore]
-#endif
+#else
+		[Ignore( "Too heavy to run continuously" )]
+#endif // MSTEST
+#endif // !HEAVY_TEST
 		public void TestStringMedium()
 		{
 			var sw = Stopwatch.StartNew();
@@ -157,12 +161,16 @@ namespace MsgPack
 			Console.WriteLine( "Medium String ({1:#,###.0} chars): {0:0.###} msec/object", sw.ElapsedMilliseconds / 100.0, avg );
 		}
 
-#if !NETFX_35
+#if !NET35
 		[Test]
 		[Timeout( 3000000 )]
 #if !HEAVY_TEST
+#if MSTEST
 		[Ignore]
-#endif
+#else
+		[Ignore( "Too heavy to run continuously" )]
+#endif // MSTEST
+#endif // !HEAVY_TEST
 		public void TestStringLarge()
 		{
 			var sw = Stopwatch.StartNew();
@@ -227,7 +235,15 @@ namespace MsgPack
 						cp /= 2;
 					}
 
+#if !SILVERLIGHT
 					sb.Append( Char.ConvertFromUtf32( cp ) );
+#else
+					cp -= 0x10000;
+					var address = new char[ 2 ];
+					address[ 0 ] = ( char )( ( cp / 0x400 ) + 0xd800 );
+					address[ 1 ] = ( char )( ( cp % 0x400 ) + 0xdc00 );
+					sb.Append( address );
+#endif // !SILVERLIGHT
 				}
 				avg = ( avg + sb.Length ) / 2.0;
 				TestString( sb.ToString() );
@@ -279,12 +295,15 @@ namespace MsgPack
 					2, // minimum multiple
 					0xf, // max fix array size
 					0x10, // min array16 size
+#if !AOT // Too heavy for mobile envs.
 					0xffff, // max array16 size
 					0x10000, // min array32 size
+#endif // !AOT
 				}
 			)
 			{
-				sw.Restart();
+				sw.Reset();
+				sw.Start();
 				var output = new MemoryStream();
 				Packer.Create( output ).PackCollection( Enumerable.Range( 0, count ).ToArray() );
 				Assert.That(
@@ -294,7 +313,7 @@ namespace MsgPack
 				sw.Stop();
 			}
 
-			Console.WriteLine( "Array: {0:0.###} msec/item", sw.Elapsed.TotalMilliseconds / 0x10000 );
+			Console.WriteLine( "Array: {0:0.###} msec/item", sw.ElapsedMilliseconds / 0x10000 );
 		}
 
 		[Test]
@@ -310,9 +329,11 @@ namespace MsgPack
 						2, // minimum multiple
 						0xf, // max fix array size
 						0x10, // min array16 size
+#if !AOT // Too heavy for mobile envs.
 						0xffff, // max array16 size
 						0x10000, // min array32 size
-					}
+#endif // !AOT
+                   }
 			)
 			{
 				using ( var output = new MemoryStream() )
@@ -491,12 +512,15 @@ namespace MsgPack
 					2, // minimum multiple
 					0xf, // max fix map size
 					0x10, // min map16 size
+#if !AOT // Too heavy for mobile envs.
 					0xffff, // max map16 size
 					0x10000, // min map32 size
+#endif // !AOT
 				}
 			)
 			{
-				sw.Restart();
+				sw.Reset();
+				sw.Start();
 				var output = new MemoryStream();
 				Packer.Create( output ).PackDictionary( Enumerable.Range( 0, count ).ToDictionary( item => item.ToString(), item => item ) );
 				Assert.That(
@@ -506,7 +530,7 @@ namespace MsgPack
 				sw.Stop();
 			}
 
-			Console.WriteLine( "Map: {0:0.###} msec/item", sw.Elapsed.TotalMilliseconds / 0x10000 );
+			Console.WriteLine( "Map: {0:0.###} msec/item", sw.ElapsedMilliseconds / 0x10000 );
 		}
 
 		[Test]
@@ -522,8 +546,10 @@ namespace MsgPack
 						2, // minimum multiple
 						0xf, // max fix map size
 						0x10, // min map16 size
+#if !AOT // Too heavy for mobile envs.
 						0xffff, // max map16 size
 						0x10000, // min map32 size
+#endif // !AOT
 					}
 			)
 			{
@@ -561,7 +587,8 @@ namespace MsgPack
 				}
 			)
 			{
-				sw.Restart();
+				sw.Reset();
+				sw.Start();
 				var output = new MemoryStream();
 				Packer.Create( output ).PackBinary( Enumerable.Range( 0, count ).Select( i => ( byte )( i % Byte.MaxValue ) ).ToArray() );
 				Assert.That(
@@ -571,7 +598,7 @@ namespace MsgPack
 				sw.Stop();
 			}
 
-			Console.WriteLine( "Bytes: {0:0.###} msec/byte", sw.Elapsed.TotalMilliseconds / 0x10000 );
+			Console.WriteLine( "Bytes: {0:0.###} msec/byte", sw.ElapsedMilliseconds / 0x10000 );
 		}
 
 		[Test]
@@ -628,7 +655,8 @@ namespace MsgPack
 					}
 			)
 			{
-				sw.Restart();
+				sw.Reset();
+				sw.Start();
 				var output = new MemoryStream();
 				Packer.Create( output ).PackString( String.Concat( Enumerable.Range( 0, count ).Select( i => ( i % 10 ).ToString() ).ToArray() ) );
 				Assert.AreEqual(
@@ -638,7 +666,7 @@ namespace MsgPack
 				sw.Stop();
 			}
 
-			Console.WriteLine( "String: {0:0.###} msec/char", sw.Elapsed.TotalMilliseconds / 0x10000 );
+			Console.WriteLine( "String: {0:0.###} msec/char", sw.ElapsedMilliseconds / 0x10000 );
 		}
 
 		[Test]
@@ -699,7 +727,8 @@ namespace MsgPack
 					}
 			)
 			{
-				sw.Restart();
+				sw.Reset();
+				sw.Start();
 				var output = new MemoryStream();
 				var value = new MessagePackExtendedTypeObject(
 					1, Enumerable.Range( 0, count ).Select( i => ( byte ) ( i % 0x100 ) ).ToArray() );
@@ -711,7 +740,7 @@ namespace MsgPack
 				sw.Stop();
 			}
 
-			Console.WriteLine( "Ext: {0:0.###} msec/byte", sw.Elapsed.TotalMilliseconds / 0x10000 );
+			Console.WriteLine( "Ext: {0:0.###} msec/byte", sw.ElapsedMilliseconds / 0x10000 );
 		}
 
 		[Test]
@@ -765,9 +794,7 @@ namespace MsgPack
 				var item = Unpacking.UnpackObject( stream );
 				Assert.That( item, Is.Not.Null );
 				Assert.That( item.IsTypeOf<int>().Value );
-#if !NETFX_CORE
-				Assert.That( item.UnderlyingType.IsPrimitive, Is.True );
-#endif
+				Assert.That( item.UnderlyingType.GetIsPrimitive(), Is.True );
 				Assert.That( item.AsInt32(), Is.EqualTo( 1 ) );
 				item = Unpacking.UnpackObject( stream );
 				Assert.That( item, Is.Not.Null );

@@ -1,0 +1,807 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{46C5B3D9-45E8-46B6-89F7-837D52C6187A}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>MsgPack</RootNamespace>
+    <AssemblyName>MsgPack.UnitTest</AssemblyName>
+    <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>TRACE;DEBUG;AOT;NET35;UNITY_WORKAROUND;UNITY</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE;AOT;NET35;UNITY_WORKAROUND;UNITY2</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Runtime.Serialization" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\MsgPack.Unity.Full\MsgPack.Unity.Full.csproj">
+      <Project>{30581b4a-bca5-4446-b5e7-4f890a3e9514}</Project>
+      <Name>MsgPack.Unity.Full</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\NUnitLite\NUnitFramework\framework\nunit.framework-3.5.csproj">
+      <Project>{7fa125b4-e377-4d4c-aecb-17b934e3a4b3}</Project>
+      <Name>nunit.framework-3.5</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\NUnitLite\NUnitFramework\nunitlite\nunitlite-3.5.csproj">
+      <Project>{82f93f6e-5c10-4cc7-bc65-ac0b9ca6d39a}</Project>
+      <Name>nunitlite-3.5</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\..\src\MsgPack\Tuple`n.cs">
+      <Link>src\MsgPack\Tuple`n.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest.Xamarin.iOS\Serialization\AotTest.cs">
+      <Link>Serialization\AotTest.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Augments.cs">
+      <Link>Augments.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\BigEndianBinaryTest.cs">
+      <Link>BigEndianBinaryTest.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\ByteArrayPackerTest.Allocation.cs">
+      <Link>ByteArrayPackerTest.Allocation.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\ByteArrayPackerTest.cs">
+      <Link>ByteArrayPackerTest.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\ByteArrayUnpackerTest.cs">
+      <Link>ByteArrayUnpackerTest.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\ByteArrayUnpackerTest.Ext.cs">
+      <Link>ByteArrayUnpackerTest.Ext.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\ByteArrayUnpackerTest.Raw.cs">
+      <Link>ByteArrayUnpackerTest.Raw.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\ByteArrayUnpackerTest.Scalar.cs">
+      <Link>ByteArrayUnpackerTest.Scalar.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\CollectionAssertEx.cs">
+      <Link>CollectionAssertEx.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\CollectionValidatingByteArrayUnpackerTest.cs">
+      <Link>CollectionValidatingByteArrayUnpackerTest.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\CollectionValidatingStreamUnpackerTest.cs">
+      <Link>CollectionValidatingStreamUnpackerTest.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\DirectConversionTest.cs">
+      <Link>DirectConversionTest.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\DirectConversionTest.Scalar.cs">
+      <Link>DirectConversionTest.Scalar.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Dummies\System.Threading.Tasks\Task.cs">
+      <Link>Dummies\System.Threading.Tasks\Task.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Dummies\System.Threading.Tasks\TaskFactory.cs">
+      <Link>Dummies\System.Threading.Tasks\TaskFactory.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\EqualsTest.cs">
+      <Link>EqualsTest.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\FastByteArrayUnpackerTest.cs">
+      <Link>FastByteArrayUnpackerTest.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\FastStreamUnpackerTest.cs">
+      <Link>FastStreamUnpackerTest.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_ImageSerializer.cs">
+      <Link>gen35\MsgPack_ImageSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_AbstractClassCollectionKnownTypeSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_AbstractClassCollectionKnownTypeSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_AbstractClassCollectionNoAttributeSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_AbstractClassCollectionNoAttributeSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_AbstractClassCollectionRuntimeTypeSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_AbstractClassCollectionRuntimeTypeSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_AbstractClassDictKeyKnownTypeSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_AbstractClassDictKeyKnownTypeSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_AbstractClassDictKeyRuntimeTypeSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_AbstractClassDictKeyRuntimeTypeSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_AbstractClassListItemKnownTypeSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_AbstractClassListItemKnownTypeSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_AbstractClassListItemRuntimeTypeSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_AbstractClassListItemRuntimeTypeSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_AbstractClassMemberKnownTypeSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_AbstractClassMemberKnownTypeSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_AbstractClassMemberRuntimeTypeSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_AbstractClassMemberRuntimeTypeSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_AddOnlyCollection_1_MsgPack_MessagePackObject_Serializer.cs">
+      <Link>gen35\MsgPack_Serialization_AddOnlyCollection_1_MsgPack_MessagePackObject_Serializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_AddOnlyCollection_1_MsgPack_MessagePackObjectArray_Serializer.cs">
+      <Link>gen35\MsgPack_Serialization_AddOnlyCollection_1_MsgPack_MessagePackObjectArray_Serializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_AddOnlyCollection_1_System_DateTime_Serializer.cs">
+      <Link>gen35\MsgPack_Serialization_AddOnlyCollection_1_System_DateTime_Serializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_AddOnlyCollection_1_System_DateTimeArray_Serializer.cs">
+      <Link>gen35\MsgPack_Serialization_AddOnlyCollection_1_System_DateTimeArray_Serializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_AddOnlyCollection_1_System_Int32_Serializer.cs">
+      <Link>gen35\MsgPack_Serialization_AddOnlyCollection_1_System_Int32_Serializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_AddOnlyCollection_1_System_Int32Array_Serializer.cs">
+      <Link>gen35\MsgPack_Serialization_AddOnlyCollection_1_System_Int32Array_Serializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_AddOnlyCollection_1_System_Object_Serializer.cs">
+      <Link>gen35\MsgPack_Serialization_AddOnlyCollection_1_System_Object_Serializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_AddOnlyCollection_1_System_ObjectArray_Serializer.cs">
+      <Link>gen35\MsgPack_Serialization_AddOnlyCollection_1_System_ObjectArray_Serializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_AnnotatedClassSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_AnnotatedClassSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_ComplexTypeGeneratedEnclosureSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_ComplexTypeGeneratedEnclosureSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_ComplexTypeGeneratedSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_ComplexTypeGeneratedSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_ComplexTypeSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_ComplexTypeSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_ComplexTypeWithDataContractSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_ComplexTypeWithDataContractSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_ComplexTypeWithDataContractWithOrderSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_ComplexTypeWithDataContractWithOrderSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_ComplexTypeWithNonSerializedSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_ComplexTypeWithNonSerializedSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_ComplexTypeWithOneBaseOrderSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_ComplexTypeWithOneBaseOrderSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_ComplexTypeWithoutAnyAttributeSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_ComplexTypeWithoutAnyAttributeSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_ComplexTypeWithTwoMemberSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_ComplexTypeWithTwoMemberSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_DataMamberClassSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_DataMamberClassSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_DataMemberAttributeNamedPropertyTestTargetSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_DataMemberAttributeNamedPropertyTestTargetSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_DictionaryValueType_2_System_Int32_System_Int32_Serializer.cs">
+      <Link>gen35\MsgPack_Serialization_DictionaryValueType_2_System_Int32_System_Int32_Serializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_EnumByNameSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_EnumByNameSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_EnumByteFlagsSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_EnumByteFlagsSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_EnumByteSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_EnumByteSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_EnumByUnderlyingValueSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_EnumByUnderlyingValueSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_EnumDefaultSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_EnumDefaultSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_EnumInt16FlagsSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_EnumInt16FlagsSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_EnumInt16Serializer.cs">
+      <Link>gen35\MsgPack_Serialization_EnumInt16Serializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_EnumInt32FlagsSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_EnumInt32FlagsSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_EnumInt32Serializer.cs">
+      <Link>gen35\MsgPack_Serialization_EnumInt32Serializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_EnumInt64FlagsSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_EnumInt64FlagsSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_EnumInt64Serializer.cs">
+      <Link>gen35\MsgPack_Serialization_EnumInt64Serializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_EnumMemberObjectSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_EnumMemberObjectSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_EnumSByteFlagsSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_EnumSByteFlagsSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_EnumSByteSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_EnumSByteSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_EnumUInt16FlagsSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_EnumUInt16FlagsSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_EnumUInt16Serializer.cs">
+      <Link>gen35\MsgPack_Serialization_EnumUInt16Serializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_EnumUInt32FlagsSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_EnumUInt32FlagsSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_EnumUInt32Serializer.cs">
+      <Link>gen35\MsgPack_Serialization_EnumUInt32Serializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_EnumUInt64FlagsSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_EnumUInt64FlagsSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_EnumUInt64Serializer.cs">
+      <Link>gen35\MsgPack_Serialization_EnumUInt64Serializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_GenericNonCollectionTypeSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_GenericNonCollectionTypeSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_HasEnumerableSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_HasEnumerableSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_InnerSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_InnerSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_InterfaceCollectionKnownTypeSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_InterfaceCollectionKnownTypeSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_InterfaceCollectionNoAttributeSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_InterfaceCollectionNoAttributeSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_InterfaceCollectionRuntimeTypeSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_InterfaceCollectionRuntimeTypeSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_InterfaceDictKeyKnownTypeSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_InterfaceDictKeyKnownTypeSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_InterfaceDictKeyRuntimeTypeSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_InterfaceDictKeyRuntimeTypeSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_InterfaceListItemKnownTypeSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_InterfaceListItemKnownTypeSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_InterfaceListItemRuntimeTypeSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_InterfaceListItemRuntimeTypeSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_InterfaceMemberKnownTypeSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_InterfaceMemberKnownTypeSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_InterfaceMemberRuntimeTypeSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_InterfaceMemberRuntimeTypeSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_ListValueType_1_System_Int32_Serializer.cs">
+      <Link>gen35\MsgPack_Serialization_ListValueType_1_System_Int32_Serializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_NonGenericNonCollectionTypeSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_NonGenericNonCollectionTypeSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_OuterSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_OuterSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_PlainClassSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_PlainClassSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_PolymorphicMemberTypeMixedSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_PolymorphicMemberTypeMixedSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_SimpleCollection_1_MsgPack_MessagePackObject_Serializer.cs">
+      <Link>gen35\MsgPack_Serialization_SimpleCollection_1_MsgPack_MessagePackObject_Serializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_SimpleCollection_1_MsgPack_MessagePackObjectArray_Serializer.cs">
+      <Link>gen35\MsgPack_Serialization_SimpleCollection_1_MsgPack_MessagePackObjectArray_Serializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_SimpleCollection_1_System_DateTime_Serializer.cs">
+      <Link>gen35\MsgPack_Serialization_SimpleCollection_1_System_DateTime_Serializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_SimpleCollection_1_System_DateTimeArray_Serializer.cs">
+      <Link>gen35\MsgPack_Serialization_SimpleCollection_1_System_DateTimeArray_Serializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_SimpleCollection_1_System_Int32_Serializer.cs">
+      <Link>gen35\MsgPack_Serialization_SimpleCollection_1_System_Int32_Serializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_SimpleCollection_1_System_Int32Array_Serializer.cs">
+      <Link>gen35\MsgPack_Serialization_SimpleCollection_1_System_Int32Array_Serializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_SimpleCollection_1_System_Object_Serializer.cs">
+      <Link>gen35\MsgPack_Serialization_SimpleCollection_1_System_Object_Serializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_SimpleCollection_1_System_ObjectArray_Serializer.cs">
+      <Link>gen35\MsgPack_Serialization_SimpleCollection_1_System_ObjectArray_Serializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_StringKeyedCollection_1_MsgPack_MessagePackObject_Serializer.cs">
+      <Link>gen35\MsgPack_Serialization_StringKeyedCollection_1_MsgPack_MessagePackObject_Serializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_StringKeyedCollection_1_MsgPack_MessagePackObjectArray_Serializer.cs">
+      <Link>gen35\MsgPack_Serialization_StringKeyedCollection_1_MsgPack_MessagePackObjectArray_Serializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_StringKeyedCollection_1_System_DateTime_Serializer.cs">
+      <Link>gen35\MsgPack_Serialization_StringKeyedCollection_1_System_DateTime_Serializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_StringKeyedCollection_1_System_DateTimeArray_Serializer.cs">
+      <Link>gen35\MsgPack_Serialization_StringKeyedCollection_1_System_DateTimeArray_Serializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_StringKeyedCollection_1_System_Int32_Serializer.cs">
+      <Link>gen35\MsgPack_Serialization_StringKeyedCollection_1_System_Int32_Serializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_StringKeyedCollection_1_System_Int32Array_Serializer.cs">
+      <Link>gen35\MsgPack_Serialization_StringKeyedCollection_1_System_Int32Array_Serializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_StringKeyedCollection_1_System_Object_Serializer.cs">
+      <Link>gen35\MsgPack_Serialization_StringKeyedCollection_1_System_Object_Serializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_StringKeyedCollection_1_System_ObjectArray_Serializer.cs">
+      <Link>gen35\MsgPack_Serialization_StringKeyedCollection_1_System_ObjectArray_Serializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_TestValueTypeSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_TestValueTypeSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_VersioningTestTargetSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_VersioningTestTargetSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_WithAbstractInt32CollectionSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_WithAbstractInt32CollectionSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_WithAbstractNonCollectionSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_WithAbstractNonCollectionSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\MsgPack_Serialization_WithAbstractStringCollectionSerializer.cs">
+      <Link>gen35\MsgPack_Serialization_WithAbstractStringCollectionSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\System_Collections_Generic_HashSet_1_MsgPack_MessagePackObject_Serializer.cs">
+      <Link>gen35\System_Collections_Generic_HashSet_1_MsgPack_MessagePackObject_Serializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\System_Collections_Generic_HashSet_1_MsgPack_MessagePackObjectArray_Serializer.cs">
+      <Link>gen35\System_Collections_Generic_HashSet_1_MsgPack_MessagePackObjectArray_Serializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\System_Collections_Generic_HashSet_1_System_DateTime_Serializer.cs">
+      <Link>gen35\System_Collections_Generic_HashSet_1_System_DateTime_Serializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\System_Collections_Generic_HashSet_1_System_DateTimeArray_Serializer.cs">
+      <Link>gen35\System_Collections_Generic_HashSet_1_System_DateTimeArray_Serializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\System_Collections_Generic_HashSet_1_System_Int32_Serializer.cs">
+      <Link>gen35\System_Collections_Generic_HashSet_1_System_Int32_Serializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\System_Collections_Generic_HashSet_1_System_Int32Array_Serializer.cs">
+      <Link>gen35\System_Collections_Generic_HashSet_1_System_Int32Array_Serializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\System_Collections_Generic_HashSet_1_System_Object_Serializer.cs">
+      <Link>gen35\System_Collections_Generic_HashSet_1_System_Object_Serializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\System_Collections_Generic_HashSet_1_System_ObjectArray_Serializer.cs">
+      <Link>gen35\System_Collections_Generic_HashSet_1_System_ObjectArray_Serializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\System_Collections_ObjectModel_Collection_1_MsgPack_MessagePackObject_Serializer.cs">
+      <Link>gen35\System_Collections_ObjectModel_Collection_1_MsgPack_MessagePackObject_Serializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\System_Collections_ObjectModel_Collection_1_MsgPack_MessagePackObjectArray_Serializer.cs">
+      <Link>gen35\System_Collections_ObjectModel_Collection_1_MsgPack_MessagePackObjectArray_Serializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\System_Collections_ObjectModel_Collection_1_System_DateTime_Serializer.cs">
+      <Link>gen35\System_Collections_ObjectModel_Collection_1_System_DateTime_Serializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\System_Collections_ObjectModel_Collection_1_System_DateTimeArray_Serializer.cs">
+      <Link>gen35\System_Collections_ObjectModel_Collection_1_System_DateTimeArray_Serializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\System_Collections_ObjectModel_Collection_1_System_Int32_Serializer.cs">
+      <Link>gen35\System_Collections_ObjectModel_Collection_1_System_Int32_Serializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\System_Collections_ObjectModel_Collection_1_System_Int32Array_Serializer.cs">
+      <Link>gen35\System_Collections_ObjectModel_Collection_1_System_Int32Array_Serializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\System_Collections_ObjectModel_Collection_1_System_Object_Serializer.cs">
+      <Link>gen35\System_Collections_ObjectModel_Collection_1_System_Object_Serializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\System_Collections_ObjectModel_Collection_1_System_ObjectArray_Serializer.cs">
+      <Link>gen35\System_Collections_ObjectModel_Collection_1_System_ObjectArray_Serializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\gen35\System_DayOfWeekSerializer.cs">
+      <Link>gen35\System_DayOfWeekSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\GenericExceptionTester.cs">
+      <Link>GenericExceptionTester.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Image.cs">
+      <Link>Image.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\LegacyJapaneseCultureInfo.cs">
+      <Link>LegacyJapaneseCultureInfo.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\MessagePackConvertTest.cs">
+      <Link>MessagePackConvertTest.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\MessagePackExtendedTypeObjectTest.cs">
+      <Link>MessagePackExtendedTypeObjectTest.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\MessagePackObjectDictionaryTest.cs">
+      <Link>MessagePackObjectDictionaryTest.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\MessagePackObjectTest.Conversion.cs">
+      <Link>MessagePackObjectTest.Conversion.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\MessagePackObjectTest.Equals.cs">
+      <Link>MessagePackObjectTest.Equals.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\MessagePackObjectTest.Equals.Integer.cs">
+      <Link>MessagePackObjectTest.Equals.Integer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\MessagePackObjectTest.Equals.Real.cs">
+      <Link>MessagePackObjectTest.Equals.Real.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\MessagePackObjectTest.Exceptionals.Conversion.cs">
+      <Link>MessagePackObjectTest.Exceptionals.Conversion.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\MessagePackObjectTest.Exceptionals.cs">
+      <Link>MessagePackObjectTest.Exceptionals.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\MessagePackObjectTest.IPackable.cs">
+      <Link>MessagePackObjectTest.IPackable.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\MessagePackObjectTest.IsTypeOf.Array.cs">
+      <Link>MessagePackObjectTest.IsTypeOf.Array.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\MessagePackObjectTest.IsTypeOf.cs">
+      <Link>MessagePackObjectTest.IsTypeOf.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\MessagePackObjectTest.IsTypeOf.Integer.cs">
+      <Link>MessagePackObjectTest.IsTypeOf.Integer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\MessagePackObjectTest.IsTypeOf.Map.cs">
+      <Link>MessagePackObjectTest.IsTypeOf.Map.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\MessagePackObjectTest.IsTypeOf.Raw.cs">
+      <Link>MessagePackObjectTest.IsTypeOf.Raw.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\MessagePackObjectTest.Miscs.cs">
+      <Link>MessagePackObjectTest.Miscs.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\MessagePackObjectTest.Objects.cs">
+      <Link>MessagePackObjectTest.Objects.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\MessagePackObjectTest.Strings.cs">
+      <Link>MessagePackObjectTest.Strings.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\MessagePackStringTest.cs">
+      <Link>MessagePackStringTest.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\MessageUnpackableTest.cs">
+      <Link>MessageUnpackableTest.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Mono\System\AggregateException.cs">
+      <Link>Mono\System\AggregateException.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Mono\System\Threading\AtomicBoolean.cs">
+      <Link>Mono\System\Threading\AtomicBoolean.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Mono\System\Threading\Barrier.cs">
+      <Link>Mono\System\Threading\Barrier.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Mono\System\Threading\BarrierPostPhaseException.cs">
+      <Link>Mono\System\Threading\BarrierPostPhaseException.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Mono\System\Threading\CountdownEvent.cs">
+      <Link>Mono\System\Threading\CountdownEvent.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Mono\System\Threading\ManualResetEventSlim.cs">
+      <Link>Mono\System\Threading\ManualResetEventSlim.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Mono\System\Threading\SpinWait.cs">
+      <Link>Mono\System\Threading\SpinWait.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\PackerFactoryTest.cs">
+      <Link>PackerFactoryTest.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\PackerTest.cs">
+      <Link>PackerTest.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\PackerTest.Pack.cs">
+      <Link>PackerTest.Pack.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\PackerTest.PackBinary.cs">
+      <Link>PackerTest.PackBinary.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\PackerTest.PackExtendedType.cs">
+      <Link>PackerTest.PackExtendedType.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\PackerTest.PackObject.cs">
+      <Link>PackerTest.PackObject.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\PackerTest.PackT.cs">
+      <Link>PackerTest.PackT.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\PackUnpackTest.cs">
+      <Link>PackUnpackTest.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\PackUnpackTest.Scalar.cs">
+      <Link>PackUnpackTest.Scalar.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\AddOnlyCollection`1.cs">
+      <Link>Serialization\AddOnlyCollection`1.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\ArrayGenerationBasedAutoMessagePackSerializerTest.cs">
+      <Link>Serialization\ArrayGenerationBasedAutoMessagePackSerializerTest.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\ArrayGenerationBasedEnumSerializationTest.cs">
+      <Link>Serialization\ArrayGenerationBasedEnumSerializationTest.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\ArrayReflectionBasedAutoMessagePackSerializerTest.cs">
+      <Link>Serialization\ArrayReflectionBasedAutoMessagePackSerializerTest.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\ArrayReflectionBasedEnumSerializationTest.cs">
+      <Link>Serialization\ArrayReflectionBasedEnumSerializationTest.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\ArraySegmentEqualityComparer`1.cs">
+      <Link>Serialization\ArraySegmentEqualityComparer`1.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\AutoMessagePackSerializerTest.Types.cs">
+      <Link>Serialization\AutoMessagePackSerializerTest.Types.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\BaseCollections.cs">
+      <Link>Serialization\BaseCollections.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\ComplexType.cs">
+      <Link>Serialization\ComplexType.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\ComplexTypeWithDataContract.cs">
+      <Link>Serialization\ComplexTypeWithDataContract.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\ComplexTypeWithDataContractWithOrder.cs">
+      <Link>Serialization\ComplexTypeWithDataContractWithOrder.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\ComplexTypeWithNonSerialized.cs">
+      <Link>Serialization\ComplexTypeWithNonSerialized.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\ComplexTypeWithOneBaseOrder.cs">
+      <Link>Serialization\ComplexTypeWithOneBaseOrder.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\ComplexTypeWithoutAnyAttribute.cs">
+      <Link>Serialization\ComplexTypeWithoutAnyAttribute.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\ComplexTypeWithTwoMember.cs">
+      <Link>Serialization\ComplexTypeWithTwoMember.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\DataContractAndNonSerializedMixedTarget.cs">
+      <Link>Serialization\DataContractAndNonSerializedMixedTarget.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\DataMemberAttributeNamedPropertyTestTarget.cs">
+      <Link>Serialization\DataMemberAttributeNamedPropertyTestTarget.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\EchoKeyedCollection_2MessagePackSerializer`2.cs">
+      <Link>Serialization\EchoKeyedCollection_2MessagePackSerializer`2.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\EnumSerializationTest.EnumDefinitions.cs">
+      <Link>Serialization\EnumSerializationTest.EnumDefinitions.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\GenerationBasedNilImplicationTest.cs">
+      <Link>Serialization\GenerationBasedNilImplicationTest.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\InheritanceTest.cs">
+      <Link>Serialization\InheritanceTest.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\IVerifiable.cs">
+      <Link>Serialization\IVerifiable.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\IVerifiable`1.cs">
+      <Link>Serialization\IVerifiable`1.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\KeyNameTransformersTest.cs">
+      <Link>Serialization\KeyNameTransformersTest.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\MapGenerationBasedAutoMessagePackSerializerTest.cs">
+      <Link>Serialization\MapGenerationBasedAutoMessagePackSerializerTest.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\MapGenerationBasedEnumSerializationTest.cs">
+      <Link>Serialization\MapGenerationBasedEnumSerializationTest.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\MapReflectionBasedAutoMessagePackSerializerTest.cs">
+      <Link>Serialization\MapReflectionBasedAutoMessagePackSerializerTest.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\MapReflectionBasedEnumSerializationTest.cs">
+      <Link>Serialization\MapReflectionBasedEnumSerializationTest.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\MessagePackSerializerTest.cs">
+      <Link>Serialization\MessagePackSerializerTest.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\MessagePackSerializerTTest.cs">
+      <Link>Serialization\MessagePackSerializerTTest.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\MillisecondsDateTimeComparer.cs">
+      <Link>Serialization\MillisecondsDateTimeComparer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\MillisecondsDateTimeOffsetComparer.cs">
+      <Link>Serialization\MillisecondsDateTimeOffsetComparer.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\NilImplicationTestTarget.cs">
+      <Link>Serialization\NilImplicationTestTarget.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\PerformanceTest.cs">
+      <Link>Serialization\PerformanceTest.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\PreGeneratedSerializerActivator.cs">
+      <Link>Serialization\PreGeneratedSerializerActivator.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\PreGeneratedSerializerActivator.Types.cs">
+      <Link>Serialization\PreGeneratedSerializerActivator.Types.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\ReflectionBasedNilImplicationTest.cs">
+      <Link>Serialization\ReflectionBasedNilImplicationTest.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\RegressionTests.cs">
+      <Link>Serialization\RegressionTests.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\SerializationContextTest.cs">
+      <Link>Serialization\SerializationContextTest.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\SerializationTargets.cs">
+      <Link>Serialization\SerializationTargets.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\SerializationTargetTest.cs">
+      <Link>Serialization\SerializationTargetTest.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\SimpleCollection`1.cs">
+      <Link>Serialization\SimpleCollection`1.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\StringKeyedCollection.cs">
+      <Link>Serialization\StringKeyedCollection.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\StructWithDataContractTest.cs">
+      <Link>Serialization\StructWithDataContractTest.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\TestValueType.cs">
+      <Link>Serialization\TestValueType.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\TimestampSerializationTest.cs">
+      <Link>Serialization\TimestampSerializationTest.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\TypeWithDuplicatedMessagePackMemberAttributeMember.cs">
+      <Link>Serialization\TypeWithDuplicatedMessagePackMemberAttributeMember.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\TypeWithInvalidMessagePackMemberAttributeMember.cs">
+      <Link>Serialization\TypeWithInvalidMessagePackMemberAttributeMember.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\TypeWithMissingMessagePackMemberAttributeMember.cs">
+      <Link>Serialization\TypeWithMissingMessagePackMemberAttributeMember.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\VersioningTest.Cases.cs">
+      <Link>Serialization\VersioningTest.Cases.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\VersioningTest.cs">
+      <Link>Serialization\VersioningTest.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\SplittingStream.cs">
+      <Link>SplittingStream.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\StreamExtensions.cs">
+      <Link>StreamExtensions.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\StreamPackerTest.cs">
+      <Link>StreamPackerTest.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\StreamUnpackerTest.cs">
+      <Link>StreamUnpackerTest.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\StreamUnpackerTest.Ext.cs">
+      <Link>StreamUnpackerTest.Ext.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\StreamUnpackerTest.Raw.cs">
+      <Link>StreamUnpackerTest.Raw.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\StreamUnpackerTest.Scalar.cs">
+      <Link>StreamUnpackerTest.Scalar.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\TestRandom.cs">
+      <Link>TestRandom.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\TimestampTest.Calculation.cs">
+      <Link>TimestampTest.Calculation.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\TimestampTest.Comparison.cs">
+      <Link>TimestampTest.Comparison.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\TimestampTest.Conversion.cs">
+      <Link>TimestampTest.Conversion.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\TimestampTest.cs">
+      <Link>TimestampTest.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\TimestampTest.EncodeDecode.cs">
+      <Link>TimestampTest.EncodeDecode.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\TimestampTest.Parse.cs">
+      <Link>TimestampTest.Parse.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\TimestampTest.Properties.cs">
+      <Link>TimestampTest.Properties.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\TimestampTest.ToString.cs">
+      <Link>TimestampTest.ToString.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\UnpackerFactoryTest.cs">
+      <Link>UnpackerFactoryTest.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\UnpackerTest.cs">
+      <Link>UnpackerTest.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\UnpackerTest.Ext.cs">
+      <Link>UnpackerTest.Ext.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\UnpackerTest.Object.cs">
+      <Link>UnpackerTest.Object.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\UnpackerTest.Raw.cs">
+      <Link>UnpackerTest.Raw.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\UnpackerTest.Scalar.cs">
+      <Link>UnpackerTest.Scalar.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\UnpackerTest.Skip.cs">
+      <Link>UnpackerTest.Skip.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\UnpackerTest.Skip.Variations.cs">
+      <Link>UnpackerTest.Skip.Variations.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\UnpackerTest.Subtree.cs">
+      <Link>UnpackerTest.Subtree.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\UnpackingTest.cs">
+      <Link>UnpackingTest.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\UnpackingTest.Ext.cs">
+      <Link>UnpackingTest.Ext.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\UnpackingTest.Raw.cs">
+      <Link>UnpackingTest.Raw.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\UnpackingTest.Scalar.cs">
+      <Link>UnpackingTest.Scalar.cs</Link>
+    </Compile>
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="UnityTestHelper.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <PropertyGroup>
+    <PostBuildEvent Condition="'$(OS)' == 'Windows_NT'">RoboCopy $(ProjectDir)$(OutDir) $(ProjectDir)\..\MsgPack.UnitTest.Unity.Il2cpp.Full\Assets\Plugins\Dlls\ *.dll /MIR
+if %25ERRORLEVEL%25 geq 8 exit 1
+exit 0</PostBuildEvent>
+    <PostBuildEvent Condition="'$(OS)' != 'Windows_NT'">rsync -a -r --delete $(ProjectDir)$(OutDir)/*.dll $(ProjectDir)/../MsgPack.UnitTest.Unity.Il2cpp.Full/Assets/Plugins/Dlls/</PostBuildEvent>
+  </PropertyGroup>
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>

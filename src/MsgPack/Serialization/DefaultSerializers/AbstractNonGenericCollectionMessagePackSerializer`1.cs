@@ -26,6 +26,10 @@ using System;
 #if !UNITY
 using System.Collections;
 #endif // !UNITY
+#if FEATURE_TAP
+using System.Threading;
+using System.Threading.Tasks;
+#endif // FEATURE_TAP
 
 using MsgPack.Serialization.CollectionSerializers;
 using MsgPack.Serialization.Polymorphic;
@@ -36,11 +40,17 @@ namespace MsgPack.Serialization.DefaultSerializers
 	internal sealed class AbstractNonGenericCollectionMessagePackSerializer<TCollection> : NonGenericCollectionMessagePackSerializer<TCollection>
 		where TCollection : ICollection
 #else
+#warning TODO: Use generic collection if possible for maintenancibility.
 	internal sealed class AbstractNonGenericCollectionMessagePackSerializer : UnityNonGenericCollectionMessagePackSerializer
 #endif // !UNITY
 	{
 		private readonly ICollectionInstanceFactory _concreteCollectionInstanceFactory;
-		private readonly IMessagePackSingleObjectSerializer _concreteSerializer;
+		private readonly MessagePackSerializer _concreteSerializer;
+
+		internal override SerializerCapabilities InternalGetCapabilities()
+		{
+			return this._concreteSerializer.Capabilities;
+		}
 
 		public AbstractNonGenericCollectionMessagePackSerializer(
 			SerializationContext ownerContext,
@@ -55,7 +65,7 @@ namespace MsgPack.Serialization.DefaultSerializers
 #if !UNITY
 			: base( ownerContext, schema )
 #else
-			: base( ownerContext, abstractType, schema )
+			: base( ownerContext, abstractType, schema, SerializerCapabilities.PackTo | SerializerCapabilities.UnpackFrom | SerializerCapabilities.UnpackTo )
 #endif // !UNITY
 		{
 			AbstractCollectionSerializerHelper.GetConcreteSerializer(
@@ -99,6 +109,27 @@ namespace MsgPack.Serialization.DefaultSerializers
 					this._concreteSerializer.UnpackFrom( unpacker );
 			}
 		}
+
+#if FEATURE_TAP
+
+		protected internal override async Task<TCollection> UnpackFromAsyncCore( Unpacker unpacker, CancellationToken cancellationToken )
+		{
+			var polymorPhicSerializer = this._concreteSerializer as IPolymorphicDeserializer;
+			if ( polymorPhicSerializer != null )
+			{
+				return
+					( TCollection )
+						( await polymorPhicSerializer.PolymorphicUnpackFromAsync( unpacker, cancellationToken ).ConfigureAwait( false ) );
+			}
+			else
+			{
+				return
+					( TCollection )
+						( await this._concreteSerializer.UnpackFromAsync( unpacker, cancellationToken ).ConfigureAwait( false ) );
+			}
+		}
+
+#endif // FEATURE_TAP
 
 #if !UNITY
 		protected override TCollection CreateInstance( int initialCapacity )

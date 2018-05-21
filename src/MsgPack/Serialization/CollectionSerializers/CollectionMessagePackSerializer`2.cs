@@ -2,7 +2,7 @@
 // 
 // MessagePack for CLI
 // 
-// Copyright (C) 2015 FUJIWARA, Yusuke
+// Copyright (C) 2015-2016 FUJIWARA, Yusuke
 // 
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -55,19 +55,34 @@ namespace MsgPack.Serialization.CollectionSerializers
 			: base( ownerContext, schema ) { }
 
 		/// <summary>
+		///		Initializes a new instance of the <see cref="CollectionMessagePackSerializer{TCollection, TItem}"/> class.
+		/// </summary>
+		/// <param name="ownerContext">A <see cref="SerializationContext"/> which owns this serializer.</param>
+		/// <param name="schema">
+		///		The schema for collection itself or its items for the member this instance will be used to. 
+		///		<c>null</c> will be considered as <see cref="PolymorphismSchema.Default"/>.
+		/// </param>
+		/// <param name="capabilities">A serializer calability flags represents capabilities of this instance.</param>
+		/// <exception cref="ArgumentNullException">
+		///		<paramref name="ownerContext"/> is <c>null</c>.
+		/// </exception>
+		protected CollectionMessagePackSerializer( SerializationContext ownerContext, PolymorphismSchema schema, SerializerCapabilities capabilities )
+			: base( ownerContext, schema, capabilities ) { }
+
+		/// <summary>
 		///		Returns count of the collection.
 		/// </summary>
 		/// <param name="collection">A collection. This value will not be <c>null</c>.</param>
 		/// <returns>The count of the <paramref name="collection"/>.</returns>
 		protected override int GetCount( TCollection collection )
 		{
-#if ( !UNITY && !XAMIOS ) || AOT_CHECK
+#if ( !UNITY ) || AOT_CHECK
 			return collection.Count;
 #else
 			// .constraind call for TCollection.get_Count/TCollection.GetEnumerator() causes AOT error.
 			// So use cast and invoke as normal call (it might cause boxing, but most collection should be reference type).
 			return ( collection as ICollection<TItem> ).Count;
-#endif // ( !UNITY && !XAMIOS ) || AOT_CHECK
+#endif // ( !UNITY ) || AOT_CHECK
 		}
 
 		/// <summary>
@@ -76,20 +91,21 @@ namespace MsgPack.Serialization.CollectionSerializers
 		/// </summary>
 		/// <param name="collection">The collection to be added.</param>
 		/// <param name="item">The item to be added.</param>
-		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "By design" )]
+		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "Validated by caller in base class" )]
 		protected override void AddItem( TCollection collection, TItem item )
 		{
-#if ( !UNITY && !XAMIOS ) || AOT_CHECK
+#if ( !UNITY ) || AOT_CHECK
 			collection.Add( item );
 #else
 			// .constraind call for TCollection.Add causes AOT error.
 			// So use cast and invoke as normal call (it might cause boxing, but most collection should be reference type).
 			( collection as ICollection<TItem> ).Add( item );
-#endif // ( !UNITY && !XAMIOS ) || AOT_CHECK
+#endif // ( !UNITY ) || AOT_CHECK
 		}
 	}
 
 #if UNITY
+#warning TODO: Remove if possible for maintenancibility.
 	internal abstract class UnityCollectionMessagePackSerializer : UnityEnumerableMessagePackSerializerBase
 	{
 		private readonly MethodInfo _getCount;
@@ -99,15 +115,16 @@ namespace MsgPack.Serialization.CollectionSerializers
 			SerializationContext ownerContext,
 			Type targetType,
 			CollectionTraits traits,
-			PolymorphismSchema schema 
+			PolymorphismSchema schema,
+			SerializerCapabilities capabilities
 		)
-			: base( ownerContext, targetType, traits.ElementType, schema )
+			: base( ownerContext, targetType, traits.ElementType, schema, capabilities )
 		{
 			this._getCount = traits.CountPropertyGetter;
 			this._add = traits.AddMethod;
 		}
 
-		protected internal sealed override void PackToCore( Packer packer, object objectTree )
+		protected internal override void PackToCore( Packer packer, object objectTree )
 		{
 			packer.PackArrayHeader( ( int )this._getCount.InvokePreservingExceptionType( objectTree ) );
 			var itemSerializer = this.ItemSerializer;
@@ -119,11 +136,11 @@ namespace MsgPack.Serialization.CollectionSerializers
 			}
 		}
 
-		protected internal sealed override object UnpackFromCore( Unpacker unpacker )
+		protected internal override object UnpackFromCore( Unpacker unpacker )
 		{
 			if ( !unpacker.IsArrayHeader )
 			{
-				throw SerializationExceptions.NewIsNotArrayHeader();
+				SerializationExceptions.ThrowIsNotArrayHeader( unpacker );
 			}
 
 			return this.InternalUnpackFromCore( unpacker );

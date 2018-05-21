@@ -46,27 +46,42 @@ namespace MsgPack.Serialization
 		private const string PublicReadOnlyPropertyPlain = "PublicReadOnlyPropertyPlain";
 		private const string NonPublicPropertyPlain = "NonPublicPropertyPlain";
 		private const string CollectionReadOnlyProperty = "CollectionReadOnlyProperty";
+		private const string NonPublicCollectionProperty = "NonPublicCollectionProperty";
+		private const string NonPublicCollectionField = "NonPublicCollectionField";
+		private const string NonPublicCollectionReadOnlyProperty = "NonPublicCollectionReadOnlyProperty";
+		private const string NonPublicCollectionReadOnlyField = "NonPublicCollectionReadOnlyField";
+		private const string NonPublicDictionaryProperty = "NonPublicDictionaryProperty";
+		private const string NonPublicDictionaryField = "NonPublicDictionaryField";
+		private const string NonPublicDictionaryReadOnlyProperty = "NonPublicDictionaryReadOnlyProperty";
+		private const string NonPublicDictionaryReadOnlyField = "NonPublicDictionaryReadOnlyField";
+		private const string NonPublicIDictionaryProperty = "NonPublicIDictionaryProperty";
+		private const string NonPublicIDictionaryField = "NonPublicIDictionaryField";
+		private const string NonPublicIDictionaryReadOnlyProperty = "NonPublicIDictionaryReadOnlyProperty";
+		private const string NonPublicIDictionaryReadOnlyField = "NonPublicIDictionaryReadOnlyField";
 		private const string PublicField = "PublicField";
 		private const string PublicReadOnlyField = "PublicReadOnlyField";
 		private const string NonPublicField = "NonPublicField";
 		private const string PublicFieldPlain = "PublicFieldPlain";
 		private const string PublicReadOnlyFieldPlain = "PublicReadOnlyFieldPlain";
 		private const string NonPublicFieldPlain = "NonPublicFieldPlain";
-#if !NETFX_CORE && !WINDOWS_PHONE
 		private const string NonSerializedPublicField = "NonSerializedPublicField";
 		private const string NonSerializedPublicReadOnlyField = "NonSerializedPublicReadOnlyField";
 		private const string NonSerializedNonPublicField = "NonSerializedNonPublicField";
 		private const string NonSerializedPublicFieldPlain = "NonSerializedPublicFieldPlain";
 		private const string NonSerializedPublicReadOnlyFieldPlain = "NonSerializedPublicReadOnlyFieldPlain";
 		private const string NonSerializedNonPublicFieldPlain = "NonSerializedNonPublicFieldPlain";
-#endif
 		// ReSharper restore UnusedMember.Local
 
 		[Test]
 		public void TestPlain()
 		{
 			// includes issue28
+#if XAMARIN
+#warning TODO: Xamain Workaround
+			TestCore<PlainClass>( PublicProperty, NonSerializedPublicField, PublicField, CollectionReadOnlyProperty );
+#else
 			TestCore<PlainClass>( PublicProperty, PublicField, CollectionReadOnlyProperty );
+#endif // XAMARIN
 		}
 
 		[Test]
@@ -74,10 +89,11 @@ namespace MsgPack.Serialization
 		{
 			TestCore<AnnotatedClass>(
 				PublicProperty, NonPublicProperty, PublicField, NonPublicField,
-#if !NETFX_CORE && !WINDOWS_PHONE
 				NonSerializedPublicField, NonSerializedNonPublicField,
-#endif
-				CollectionReadOnlyProperty
+				CollectionReadOnlyProperty, 
+				NonPublicCollectionProperty, NonPublicCollectionField, NonPublicCollectionReadOnlyProperty, NonPublicCollectionReadOnlyField,
+				NonPublicDictionaryProperty, NonPublicDictionaryField, NonPublicDictionaryReadOnlyProperty, NonPublicDictionaryReadOnlyField,
+				NonPublicIDictionaryProperty, NonPublicIDictionaryField, NonPublicIDictionaryReadOnlyProperty, NonPublicIDictionaryReadOnlyField
 			);
 		}
 
@@ -87,10 +103,11 @@ namespace MsgPack.Serialization
 			// includes issue33
 			TestCore<DataMamberClass>(
 				PublicProperty, NonPublicProperty, PublicField, NonPublicField,
-#if !NETFX_CORE && !WINDOWS_PHONE
 				NonSerializedPublicField, NonSerializedNonPublicField,
-#endif
-				CollectionReadOnlyProperty
+				CollectionReadOnlyProperty,
+				NonPublicCollectionProperty, NonPublicCollectionField, NonPublicCollectionReadOnlyProperty, NonPublicCollectionReadOnlyField,
+				NonPublicDictionaryProperty, NonPublicDictionaryField, NonPublicDictionaryReadOnlyProperty, NonPublicDictionaryReadOnlyField,
+				NonPublicIDictionaryProperty, NonPublicIDictionaryField, NonPublicIDictionaryReadOnlyProperty, NonPublicIDictionaryReadOnlyField
 			);
 		}
 
@@ -125,6 +142,21 @@ namespace MsgPack.Serialization
 			var expected = expectedMemberNames.OrderBy( n => n ).ToArray();
 			var actual = SerializationTarget.Prepare( new SerializationContext(), typeof( T ) ).Members.Where( m => m.Member != null ).OrderBy( m => m.Member.Name ).Select( m => m.Member.Name ).ToArray();
 			Assert.That( actual, Is.EqualTo( expected ), String.Join( ", ", actual ) );
+		}
+
+		[Test]
+		public void TestIgnoreKinds()
+		{
+			var result = SerializationTarget.Prepare( new SerializationContext(), typeof( IgnoreAttributesTester ) );
+#if XAMARIN
+#warning TODO: Xamain Workaround
+			Assert.That( result.Members.Count, Is.EqualTo( 2 ), String.Join( ",", result.Members.Select( m => m.Contract.Name ).ToArray() ) ); ;
+			Assert.That( result.Members[ 0 ].Contract.Name, Is.EqualTo( "NonSerialized" ), String.Join( ",", result.Members.Select( m => m.Contract.Name ).ToArray() ) );
+			Assert.That( result.Members[ 1 ].Contract.Name, Is.EqualTo( "Vanilla" ), String.Join( ",", result.Members.Select( m => m.Contract.Name ).ToArray() ) );
+#else
+			Assert.That( result.Members.Count, Is.EqualTo( 1 ), String.Join( ",", result.Members.Select( m => m.Contract.Name ).ToArray() ) ); ;
+			Assert.That( result.Members[ 0 ].Contract.Name, Is.EqualTo( "Vanilla" ), String.Join( ",", result.Members.Select( m => m.Contract.Name ).ToArray() ) );
+#endif // XAMARIN
 		}
 	}
 }

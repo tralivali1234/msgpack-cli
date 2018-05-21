@@ -3,7 +3,7 @@
 //
 // MessagePack for CLI
 //
-// Copyright (C) 2010-2015 FUJIWARA, Yusuke
+// Copyright (C) 2010-2017 FUJIWARA, Yusuke
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -24,14 +24,19 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.Serialization;
-#if !NETFX_CORE && !WINDOWS_PHONE && !XAMIOS && !XAMDROID && !UNITY_IPHONE && !UNITY_ANDROID
+#if !SILVERLIGHT && !AOT && !NETSTANDARD1_1 && !NETSTANDARD1_3 && !XAMARIN
+using MsgPack.Serialization.CodeDomSerializers;
+#endif // !SILVERLIGHT && !AOT && !NETSTANDARD1_1 && !NETSTANDARD1_3
+#if !SILVERLIGHT && !AOT && !NETSTANDARD1_1
 using MsgPack.Serialization.EmittingSerializers;
-#endif // !NETFX_CORE && !WINDOWS_PHONE && !XAMIOS && !XAMDROID && !UNITY_IPHONE && !UNITY_ANDROID
+#endif // !SILVERLIGHT && !AOT && !NETSTANDARD1_1
 #if !MSTEST
 using NUnit.Framework;
 #else
 using TestFixtureAttribute = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestClassAttribute;
 using TestAttribute = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestMethodAttribute;
+using SetUpAttribute = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestInitializeAttribute;
+using TearDownAttribute = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestCleanupAttribute;
 using TimeoutAttribute = NUnit.Framework.TimeoutAttribute;
 using Assert = NUnit.Framework.Assert;
 using Is = NUnit.Framework.Is;
@@ -44,63 +49,82 @@ namespace MsgPack.Serialization
 	{
 		private SerializationContext CreateSerializationContext()
 		{
-			return new SerializationContext { EmitterFlavor = EmitterFlavor.ReflectionBased };
+			var context = new SerializationContext();
+			context.SerializerOptions.EmitterFlavor = EmitterFlavor.ReflectionBased;
+			return context;
 		}
 
 		private MessagePackSerializer<T> CreateTarget<T>( SerializationContext context )
 		{
 			return MessagePackSerializer.CreateInternal<T>( context, PolymorphismSchema.Default );
 		}
-#if !NETFX_CORE && !WINDOWS_PHONE && !XAMIOS && !XAMDROID && !UNITY_IPHONE && !UNITY_ANDROID
+#if !SILVERLIGHT && !AOT && !UNITY && !XAMARIN
 
-#if MSTEST
-		[Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestInitialize]
-		public void Initialize( Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestContext c )
-		{
-			this.SetUp();
-		}
-#else
 		[SetUp]
-#endif
 		public void SetUp()
 		{
-			SerializerDebugging.DeletePastTemporaries();
+#if !NETSTANDARD1_1 && !NETSTANDARD1_3
 			//SerializerDebugging.TraceEnabled = true;
 			//SerializerDebugging.DumpEnabled = true;
 			if ( SerializerDebugging.TraceEnabled )
 			{
 				Tracer.Emit.Listeners.Clear();
 				Tracer.Emit.Switch.Level = SourceLevels.All;
+#if NETSTANDARD2_0
+				Tracer.Emit.Listeners.Add( new TextWriterTraceListener( Console.Out ) );
+#else // NETSTANDRD2_0
 				Tracer.Emit.Listeners.Add( new ConsoleTraceListener() );
+#endif // NETSTANDRD2_0
 			}
 
-			SerializerDebugging.OnTheFlyCodeDomEnabled = true;
+			SerializerDebugging.DependentAssemblyManager = new TempFileDependentAssemblyManager( TestContext.CurrentContext.TestDirectory );
+			SerializerDebugging.DeletePastTemporaries();
+			SerializerDebugging.OnTheFlyCodeGenerationEnabled = true;
+
+#if NET35
+			SerializerDebugging.SetCodeCompiler( CodeDomCodeGeneration.Compile );
+#else
+			SerializerDebugging.SetCodeCompiler( RoslynCodeGeneration.Compile );
+#endif // NET35
+
+			SerializerDebugging.DumpDirectory = TestContext.CurrentContext.TestDirectory;
 			SerializerDebugging.AddRuntimeAssembly( this.GetType().Assembly.Location );
 			if ( this.GetType().Assembly != typeof( NilImplicationTestTargetForValueTypeMemberDefault ).Assembly )
 			{
 				SerializerDebugging.AddRuntimeAssembly( typeof( NilImplicationTestTargetForValueTypeMemberDefault ).Assembly.Location );
 			}
+#endif // !NETSTANDARD1_1 && !NETSTANDARD1_3
 		}
 
 		[TearDown]
 		public void TearDown()
 		{
+#if !NETSTANDARD1_1 && !NETSTANDARD1_3
 			if ( SerializerDebugging.DumpEnabled )
 			{
+#if !NETSTANDARD2_0
 				try
 				{
 					SerializerDebugging.Dump();
 				}
+				catch ( NotSupportedException ex )
+				{
+					Console.Error.WriteLine( ex );
+				}
 				finally
 				{
-					DefaultSerializationMethodGeneratorManager.Refresh();
+					SerializationMethodGeneratorManager.Refresh();
 				}
+#else // !NETSTANDARD2_0
+				SerializationMethodGeneratorManager.Refresh();
+#endif // !NETSTANDARD2_0
 			}
 
 			SerializerDebugging.Reset();
-			SerializerDebugging.OnTheFlyCodeDomEnabled = false;
+			SerializerDebugging.OnTheFlyCodeGenerationEnabled = false;
+#endif // !NETSTANDARD1_1 && !NETSTANDARD1_3
 		}
-#endif // !NETFX_CORE && !WINDOWS_PHONE && !XAMIOS && !XAMDROID && !UNITY_IPHONE && !UNITY_ANDROID
+#endif // !SILVERLIGHT && !AOT && !UNITY && !NETSTANDARD1_1 && !NETSTANDARD1_3 && !XAMARIN
 
 		// ------ Creation ------
 

@@ -2,7 +2,7 @@
 //
 // MessagePack for CLI
 //
-// Copyright (C) 2014-2015 FUJIWARA, Yusuke
+// Copyright (C) 2014-2016 FUJIWARA, Yusuke
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -26,9 +26,9 @@ using System;
 #if !UNITY || MSGPACK_UNITY_FULL
 using System.ComponentModel;
 #endif // !UNITY || MSGPACK_UNITY_FULL
-#if NETFX_CORE
+#if NETSTANDARD1_1 || NETSTANDARD1_3
 using System.Reflection;
-#endif
+#endif // NETSTANDARD1_1 || NETSTANDARD1_3
 
 namespace MsgPack.Serialization
 {
@@ -69,7 +69,7 @@ namespace MsgPack.Serialization
 				throw new ArgumentNullException( "enumType" );
 			}
 
-			EnumSerializationMethod method = context.EnumSerializationMethod;
+			EnumSerializationMethod method = context.EnumSerializationOptions.SerializationMethod;
 			switch ( enumMemberSerializationMethod )
 			{
 				case EnumMemberSerializationMethod.ByName:
@@ -84,7 +84,7 @@ namespace MsgPack.Serialization
 				}
 				default:
 				{
-#if NETFX_CORE
+#if NETSTANDARD1_1 || NETSTANDARD1_3
 					var messagePackEnumAttribute = 
 						enumType.GetTypeInfo().GetCustomAttribute<MessagePackEnumAttribute>();
 					if ( messagePackEnumAttribute != null)
@@ -97,7 +97,7 @@ namespace MsgPack.Serialization
 					{
 						// ReSharper disable once PossibleNullReferenceException
 						method = ( messagePackEnumAttributes[ 0 ] as MessagePackEnumAttribute ).SerializationMethod;
-#endif // NETFX_CORE
+#endif // NETSTANDARD1_1 || NETSTANDARD1_3
 					}
 
 					break;

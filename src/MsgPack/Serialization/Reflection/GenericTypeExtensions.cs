@@ -24,14 +24,11 @@
 
 using System;
 using System.Collections.Generic;
-#if !UNITY
-#if XAMIOS || XAMDROID
+#if FEATURE_MPCONTRACT
 using Contract = MsgPack.MPContract;
-using PureAttribute = System.Diagnostics.Contracts.PureAttribute;
 #else
 using System.Diagnostics.Contracts;
-#endif // XAMIOS || XAMDROID
-#endif // !UNITY
+#endif // FEATURE_MPCONTRACT
 using System.Linq;
 #if NETFX_CORE
 using System.Reflection;
@@ -54,16 +51,14 @@ namespace MsgPack.Serialization.Reflection
 		///		or built closed generic interface type;
 		///		otherwise <c>false</c>.
 		/// </returns>
-#if !UNITY
 		[Pure]
-#endif // !UNITY
 		public static bool Implements( this Type source, Type genericType )
 		{
-#if !UNITY
+#if DEBUG
 			Contract.Assert( source != null, "source != null" );
 			Contract.Assert( genericType != null, "genericType != null" );
 			Contract.Assert( genericType.GetIsInterface(), "genericType.GetIsInterface()" );
-#endif // !UNITY
+#endif // DEBUG
 
 			return EnumerateGenericIntefaces( source, genericType, false ).Any();
 		}
@@ -88,14 +83,11 @@ namespace MsgPack.Serialization.Reflection
 		/// </summary>
 		/// <param name="source">Target type.</param>
 		/// <returns>Simple name of type.</returns>
-#if !UNITY
 		[Pure]
-#endif // !UNITY
 		public static string GetName( this Type source )
 		{
-#if !UNITY
 			Contract.Assert( source != null, "source != null" );
-#endif // !UNITY
+
 			if ( !source.GetIsGenericType() )
 			{
 				return source.Name;
@@ -105,11 +97,11 @@ namespace MsgPack.Serialization.Reflection
 				String.Concat(
 					source.Name,
 					'[',
-#if !NETFX_35 && !UNITY
+#if !NET35 && !UNITY
 					String.Join( ", ", source.GetGenericArguments().Select( t => t.GetName() ) ),
 #else
 					String.Join( ", ", source.GetGenericArguments().Select( t => t.GetName() ).ToArray() ),
-#endif // !NETFX_35 && !UNITY
+#endif // !NET35 && !UNITY
 					']'
 				);
 		}
@@ -119,14 +111,10 @@ namespace MsgPack.Serialization.Reflection
 		/// </summary>
 		/// <param name="source">Target type.</param>
 		/// <returns>Full name of type.</returns>
-#if !UNITY
 		[Pure]
-#endif // !UNITY
 		public static string GetFullName( this Type source )
 		{
-#if !UNITY
 			Contract.Assert( source != null, "source != null" );
-#endif // !UNITY
 
 			if ( source.IsArray )
 			{
@@ -146,6 +134,11 @@ namespace MsgPack.Serialization.Reflection
 				}
 			}
 
+			if ( source.IsByRef )
+			{
+				return source.GetElementType().GetFullName() + "&";
+			}
+
 			if ( !source.GetIsGenericType() )
 			{
 				return source.FullName;
@@ -157,11 +150,11 @@ namespace MsgPack.Serialization.Reflection
 					ReflectionAbstractions.TypeDelimiter,
 					source.Name,
 					'[',
-#if !NETFX_35 && !UNITY
+#if !NET35 && !UNITY
 					String.Join( ", ", source.GetGenericArguments().Select( t => t.GetFullName() ) ),
 #else
 					String.Join( ", ", source.GetGenericArguments().Select( t => t.GetFullName() ).ToArray() ),
-#endif // !NETFX_35 && !UNITY
+#endif // !NET35 && !UNITY
 					']'
 				);
 		}

@@ -343,8 +343,9 @@ Release 0.6.2 - 2015/08/30
 Release 0.6.3 - 2015/10/12
 
   BUG FIXES
+  * Add new custom serializer registration option which registers nullable serializer together (this API is NOT available in Unity3D yet because of AOT issue). Issue #116.
   * Fix reflection based serialization for non-public member fails for members which use generic type parameter(s). Issue #119
-  * Fix DateTimeOffset? serializer act different from DateTime? serializer for DateTimeSerializationMethod setting change. A part of issue #118
+  * Fix DateTimeOffset? serializer act different from DateTime? serializer for DateTimeSerializationMethod setting change. A part of issue #117
   * Fix array element type is not processed recursively even if the IsRecursive option of serializer generator is true. Issue #120
 
   IMPROVEMENTS
@@ -385,4 +386,362 @@ Release 0.6.7 - 2015/12/23
   BUG FIXES
   * Fix Unpacker.ReadXxx returns 0 when try to read integral value from floating point stream or vice versa. Issue #139.
 
+Release 0.6.8 - 2016/1/31
 
+  BUG FIXES
+  * Fix Unpacker.ReadXxx from uint64 encoded value returns invalid(nagative) value.
+  * Fix Unpacker.ReadObject does not handle collection. #143
+  * Fix intentionally "empty" member causes ArgumentNullException in serializer generation. Issue #145
+
+Release 0.7.0-alpha1 - 2015/11/22
+
+  NEW FEATURES
+  * Add .NET Core support. Note that .NET Core does NOT support CodeDOM or persistance of AsemblyBuilder, so MsgPack for CLI .NET Core build cannot support code generation. To generate source code or assembly of serializers in non-Windows environment, you must use Mono with .NET 4.5 build. #Issue 128
+  * Add buffering option for Packer/Unpacker which can be enabled by PackerUnpackerStreamOptions.WithBuffering = true. It should improve performance for non-buffered stream like NetworkStream.
+
+  IMPROVEMENTS
+  * Exceptions now includes stream position for seekable stream or "offset from Unpacker construction" for non-seekable stream.
+  * Generated code now well structured which improves debuggability, it also remove some redundant expressions.
+  * Move throw statements from hot-path to improve performance a bit.
+
+  BREAKING CHANGES
+  * Generated serializers code has different structure, it might break your custom toolset which depends generated code structure.
+
+  BUG FIXES
+  * Fix Unpacker.Skip failes when the stream is fragmented such as raw NetworkStream.
+
+Release 0.7.0-alpha2 2016/03/10
+
+  This release includes 0.6.8 fixes.
+
+  BREAKING CHANGES
+  * Generated serializer now always check SerializationContext.SerializationMethod when they serialize objects. Changing SerializationContext.SerializationMethod in use causes unexpected behavior even it is extremely rare to do it.
+  * Generated serializers code has different structure, it might break your custom toolset which depends generated code structure.
+  * .NET 4.0, 4.5.0, 4.5.1, 4.6.0 are no longer supported.
+
+  IMPROVEMENTS
+  * Generated serializer now always check SerializationContext.SerializationMethod when they serialize objects. No longer need to re-generate serializer codes/assemblies to switch serialization method between array and map.
+  * Generated code now more structured which improves debuggability, it also remove some redundant expressions.
+
+  NEW FEATURES
+  * Async support. Issue #49.
+
+  KNOWN ISSUES
+  * CoreCLR(.NET Core) is not supported because of corefx #5381.
+
+Release 0.7.0-alpha3 2016/05/22
+
+  BREAKING CHANGES
+  * Internal structure for Silverlight builds are changed. They now use only reflection based serializers and pre-generated serializers instead of Expression Tree based serializers.
+  * IPackable/IUnpackable is respected for collections now. Issue #153.
+
+  IMPROVEMENTS
+  * Improve .NET Core support with work around for corefx GetInterfaceMap() limitation. .NET Core build requires RC2 or above.
+  * Improve Unity support. Unity DLLs now support IL2CPP with various AOT issue workarounds. Unity build requires 5.3.5f1 or above.
+  * DateMemberAttribute matching is now name based instead of type based.
+
+  NEW FEATURES
+  * SerializerGenerator.GenerateSerializerCodeAssembly now supports custom namespace. Issue #138.
+  * Add IgnoreDataMemberAttribute to ignoring member indicators. Issue #146.
+
+  BUG FIXES
+  * Fix explicit IPackable/IUnpackable interface implementation causes serializer generator error. Issue #150.
+  * Fix non-public collection typed members with attributes causes serialization generation error. Issue #152.
+  * Fix generated serializer codes are not available in WinRT/UWP because of reflection API incompatibility when the type has non-public and explicitly marked fields/properties.
+  * Fix collection only implements IEnumerable may cause NotSupportedException.
+  * Fix hidden by signature members ("new" in C#) causes invalid serializer code generation. Issue/PR #147, #161, #162.
+  * IPackable/IUnpackable is respected for collections now. Issue #153.
+    This behavior can be disabled by setting SerializationCompatibilityOptions.IgnorePackabilityForCollection to true.
+
+  KNOWN ISSUES
+  * Reflection based serializers in Unity build is not stable even if you specify [Preserve] and/or link.xml.
+  * .NET Core packaging is under testing.
+
+Release 0.7-Beta1 - 2016/06/18
+
+  This release cleans up API surface and internal code for 0.7 stable release.
+
+  MAJOR BREAKING CHANGES
+  * PackerCompatibilityOptions.None is now default. This means that msgpack bin or str8 formats are used by default.
+    You can still turn off them by PackerCompatibilityOptions.Classic.
+
+  MINOR BREAKING CHANGES
+  * UnpackHelpers.UnpackValueTypeValue signature is changed (note that this API has not been published in stable release yet).
+  * UnpackHelpers.UnpackComplexObject[Async] with currentKey parameter are removed(note that this API has not been published in stable release yet).
+  * Rename SerializerCapabilities>Unknown to SerializerCapabilities.None (note that this API has not been published in stable release yet).
+  * Remove ISupportMessagePackSerializerCapability(note that this API has not been published in stable release yet).
+  * Reflection based serializers now do not use IPackable/IUnpacabke members when the type does not implement IAsyncPackable/IAsyncUnpackable(note that this API has not been published in stable release yet).
+
+  BUG FIXES
+  * Fix the Unpacker always returns 0 when the underlying stream has double typed value.
+  * Fix MessagePackObject.PackToMessage does not look PackerCompatibilityOptions. Issue #168.
+
+Release 0.7-beta2 - 2016/06/26
+
+  NEW FEATURES
+  * Add Xamarin iOS linker support.
+
+  BUG FIXES
+  * Fix type initializer causes InvalidOperatiionException of serializer generation on WinRT projects. #170.
+  * Fix package dependency issue prevents *-aot runtime cannot install MsgPack.Cli packages (affects 0.7.0-beta1 only).
+  * Fix Xamarin iOS AOT releated bugs (affects 0.7.0-beta1 only).
+
+  BREAKING CHANGES
+  * netstandard1.1 and 1.3 now do NOT support code generation (Reflection.Emit) based serializer (affects 0.7.0-alpha/beta only).
+
+Release 0.7-RC1 2016/06/29
+
+  This release supports .NET Core 1.0 final.
+
+  BREAKING CHANGES
+  * netstandard 1.1 now do NOT support System.DBNull because System.Data.Common final package supports only >=1.2 (affects 0.7.0-alpha/beta only).
+  * mpu.exe now works on .NET 4.6.1.
+
+  IMPROVEMENTS 
+  * The type which implement IEnumerable but does not implement Add now supported. Issue #169.
+    This behavior can be disabled with setting SerializationContext.CompatibilityOptions.AllowNonCollectionEnumerableTypes to false.
+  * mpu.exe and SerializerGenerator now supports compatibility switches.
+
+  BUG FIX
+  * Fix batch serializer code generation may report invalid error message due to context reset leaking.
+  * Fix reflection based serializer possibly throws NotSupportedException instead of SerializationException.
+
+Release 0.7 2016/07/03
+
+  This release includes 0.6.8 fixes. Here are cumulative changelogs from 0.6.8.
+  (There are no changes from 0.7.0-rc1)
+
+  MAJOR BREAKING CHANGES
+  * PackerCompatibilityOptions.None is now default. This means that msgpack bin or str8 formats are used by default.
+    You can still turn off them by PackerCompatibilityOptions.Classic.
+
+  MINOR BREAKING CHANGES
+  * .NET 4.0, 4.5.0, 4.5.1, 4.6.0 are no longer supported.
+  * Unity without IL2CPP (a.k.a. AOT) is no longer supported.
+  * IPackable/IUnpackable is respected for collections now. Issue #153.
+    This behavior can be disabled by setting SerializationCompatibilityOptions.IgnorePackabilityForCollection to true.
+  * mpu.exe now works on .NET 4.6.1.
+
+  TRIVIAL BREAKING CHANGES
+  * Generated serializers code has different structure, it might break your custom toolset which depends generated code structure.
+  * Generated serializer now always check SerializationContext.SerializationMethod when they serialize objects. Changing SerializationContext.SerializationMethod in use causes unexpected behavior even it is extremely rare to do it.
+  * Generated serializers code has different structure, it might break your custom toolset which depends generated code structure.
+  * Internal structure for Silverlight builds are changed. They now use only reflection based serializers and pre-generated serializers instead of Expression Tree based serializers.
+
+  NEW FEATURES
+  * Add .NET Core support. Note that .NET Core does NOT support CodeDOM or persistance of AsemblyBuilder, so MsgPack for CLI .NET Core build cannot support code generation. To generate source code or assembly of serializers in non-Windows environment, you must use Mono with .NET 4.5 build. #Issue 128
+  * Add buffering option for Packer/Unpacker which can be enabled by PackerUnpackerStreamOptions.WithBuffering = true. It should improve performance for non-buffered stream like NetworkStream.
+  * Async support. Issue #49. Note that it is highly recommended to use buffering feature of Packer or Unpacker factory methods to avoid too chutty asynchronous I/O call. In addition, async API may avoid unnecessary blocking but it is not so efficienty in most cases.
+  * SerializerGenerator.GenerateSerializerCodeAssembly now supports custom namespace. Issue #138.
+  * Add IgnoreDataMemberAttribute to ignoring member indicators. Issue #146.
+  * Unity IL2CPP support. Unity DLLs now support IL2CPP with various AOT issue workarounds. Unity build requires 5.3.5f1 or above.
+  * Xamarin iOS linker support.
+
+  IMPROVEMENTS
+  * Exceptions now includes stream position for seekable stream or "offset from Unpacker construction" for non-seekable stream.
+  * Generated code now well structured which improves debuggability, it also remove some redundant expressions.
+  * Move throw statements from hot-path to improve performance a bit.
+  * Generated serializer now always check SerializationContext.SerializationMethod when they serialize objects. No longer need to re-generate serializer codes/assemblies to switch serialization method between array and map.
+  * Generated code now more structured which improves debuggability, it also remove some redundant expressions.
+  * DateMemberAttribute matching is now name based instead of type based.
+  * The type which implement IEnumerable but does not implement Add now supported. Issue #169.
+    This behavior can be disabled with setting SerializationContext.CompatibilityOptions.AllowNonCollectionEnumerableTypes to false.
+  * mpu.exe and SerializerGenerator now supports compatibility switches.
+
+  BUG FIXES
+  * Fix Unpacker.Skip failes when the stream is fragmented such as raw NetworkStream.
+  * Fix generated serializer codes are not available in WinRT/UWP because of reflection API incompatibility when the type has non-public and explicitly marked fields/properties.
+  * Fix explicit IPackable/IUnpackable interface implementation causes serializer generator error. Issue #150.
+  * Fix non-public collection typed members with attributes causes serialization generation error. Issue #152.
+  * Fix collection only implements IEnumerable may cause NotSupportedException.
+  * Fix hidden by signature members ("new" in C#) causes invalid serializer code generation. Issue/PR #147, #161, #162.
+  * IPackable/IUnpackable is respected for collections now. Issue #153.
+  * Fix the Unpacker always returns 0 when the underlying stream has double typed value.
+  * Fix MessagePackObject.PackToMessage does not look PackerCompatibilityOptions. Issue #168.
+  * Fix type initializer causes InvalidOperatiionException of serializer generation on WinRT projects. #170.
+  * Fix batch serializer code generation may report invalid error message due to context reset leaking.
+  * Fix reflection based serializer possibly throws NotSupportedException instead of SerializationException.
+
+  KNOWN ISSUES
+  * Reflection based serializers in Unity build is not stable even if you specify [Preserve] and/or link.xml.
+
+Release 0.7.1  2016/7/10
+
+  BUG FIXES
+  * Relaxes .NET Framework version. .NET 4.5.0, 4.5.1, 4.6.0 are resupported. Issue #176.
+  * Reduce memory allocation. Issue #179.
+
+Release 0.8.0 beta 2016/07/24
+
+  BREAKING CHANGES
+  * `MessagePackDeserializationConstructorAttribute` now always used when the type has default constructor.
+    The previous behavior was bug as XML documentatino said.
+
+  NEW FEATURES
+  * Null member skipping in map based serialization. 
+    This behabvior must be enabled via `SerializationContext.DictionarySerializationOptions.OmitNullEntry`.
+    Issue #136.
+  * Dictionary key transformation via `SerializationContext.DictionarySerializationOptions.KeyTransformer`.
+    Built in transformer is placed in `DictionaryKeyTransoformers`.
+    Issue #175.
+  * Add F# collections support. Related to issue #178.
+
+  BUG FIXES
+  * Fix `MessagePackDeserializationConstructorAttribute` is ignored when the type has default constructor.
+  * Make Xamarin.iOS unified API compliant. Issue #181.
+  * Fix `mpu.exe -l`.
+
+  IMPROVEMENTS
+  * Relax constructor based deserialization condition. It will be used even if there are any settable members(including private property setters). Part of issue #178 and fixes issue #135.
+  * PackHelpers and UnpackHelpers APIs are now backward compatible.
+
+Release 0.8.0
+
+  Nothing from 0.8.0 beta.
+
+Release 0.8.1 2017/02/02
+
+  BUG FIXES
+  * Fix null items of complex type in List<T> or Dictionary<TKey, TValue> will not be deserialized as null. Issue #211.
+
+Release 0.9.0 beta1 2016/09/24
+
+  NEW FEATURES
+  * Enum name transformation via `SerializationContext.EnumSerializationOptions.NameTransformer`.
+    Built in transformer is placed in `EnumTransoformers`.
+    Issue #184.
+  * Polymorphic attributes now supports type qualification. Issue #171.
+  * Runtime type polymorphism now supports name based type verification. This feature allows to prevent loading malicious or unknown types ibefore assembly loading.
+  * Asymmetric serializers. You can generate "pack only" serializer when you set SerializationContext.CompabilityOptions.AllowAsymmetricSerializer to true. #68.
+  * Built in serializer for System.Text.StringBuilder now supports UnpackTo.
+  * Add serialization to/from MessagePackObject as extension methods of MessagePackSerializer and MessagePackSerializer<T>. Issue #90
+
+  BUG FIXES
+  * Fix nuspec to prevent old NuGet clients which do not support .NET Standard TFMs. Issue #177.
+
+Release 0.9.0 beta2 2017/2/12
+
+  NEW FEATURES
+  * Users of serializer code generator API can specify TextWriter to output. This may improve tooling chain.
+  * Users of serializer code generator API can suppress [DebuggerNonUserCode] attribute to enable debugger step in.
+  * SerializerRepository API now expose ContainsFor and GetRegisteredSerializers methods to investigate registered serializers.
+  * SerializationContext.DisablePrivilegedAccess for restricted environment like Silverlight to select between granting permission or relinquish non-public access.
+  * UWP build is now included.
+
+  BUG FIXES
+  * The generated code for the type which has Tuple typed member uses old PackHelper API.
+  * Fix struct deserialization. Issue #189. Thank you @samcragg!
+  * Fix asynchronous packing is not be emitted correctly. Issue #201
+  * Fix SerializerCodeGenerator does not handle collections correctly for IsRecursive = true. Issue #203
+  * Fix extra field causes IndexOutOfBoundException when reflection based serializers are used. Issue #199
+  * Fix some built-in serializers throws InvalidOperationException instead of SerializationException for type errors. Issue #204
+  * Fix a combination of readonly members and collection members incorrect code generation when the type also have deserialization constructor. Issue #207.
+  * Fix built-in collection serializers such as List<T> serializer causes SecurityException when the program run in restricted environment like Silverlight. Issue #205.
+  * Fix null items of complex type in List<T> or Dictionary<TKey, TValue> will not be deserialized as null. Issue #211. (from 0.8.1)
+  * Fix types which implement IPackable and IUnpackable but do not have any members cannot be serialized. Issue #202
+  * Fix Windows Native build error. Issue #206.
+
+Release 0.9.0 RC1 2017-08-13
+
+  NEW FEATURES
+  * ByteArrayPacker/ByteArrayUnpacker. They are suitable for fixed pattern serialization/deserialization.
+  * Fast mode of unpacker which omits nested collection management. This option can be disabled with setting UnpackerOptions.ValidationLevel to ValidationLevel.Collection.
+
+  IMPROVEMENTS
+  * Byte array based serialization API now uses ByteArrayPacker/ByteArrayUnpacker, improves about 40% faster than Stream based.
+  * Deserialization now uses ValidationLevel.None, improves about 30% faster than validating one.
+  * Packer/Unpacker performance improvements about 10-20%. As a result, new byte array "fast" unpacker is about 3x faster than previous unpacker.
+
+  BUG FIXES
+  * Fix constructor deserialization fails if the constructor parameters order is not lexical. Issue #233
+  * Fix asynchronous multi dimensional array deserialization corruption.
+  * Fix enum serialization throws NullReferenceException in Unity. Issue #215.
+  * Fix MessagePackSerializer.Capability does not work correctly in Unity.
+  * Fix polymorphic serializer error in Unity.
+
+Release 0.9.0 2017-8-26
+
+  NEW FEATURES
+  * Enum name transformation via `SerializationContext.EnumSerializationOptions.NameTransformer`.
+    Built in transformer is placed in `EnumTransoformers`.
+    Issue #184.
+  * Polymorphic attributes now supports type qualification. Issue #171.
+  * Runtime type polymorphism now supports name based type verification. This feature allows to prevent loading malicious or unknown types ibefore assembly loading.
+  * Asymmetric serializers. You can generate "pack only" serializer when you set SerializationContext.CompabilityOptions.AllowAsymmetricSerializer to true. #68.
+  * Built in serializer for System.Text.StringBuilder now supports UnpackTo.
+  * Add serialization to/from MessagePackObject as extension methods of MessagePackSerializer and MessagePackSerializer<T>. Issue #90
+  * Users of serializer code generator API can specify TextWriter to output. This may improve tooling chain.
+  * Users of serializer code generator API can suppress [DebuggerNonUserCode] attribute to enable debugger step in.
+  * SerializerRepository API now expose ContainsFor and GetRegisteredSerializers methods to investigate registered serializers.
+  * SerializationContext.DisablePrivilegedAccess for restricted environment like Silverlight to select between granting permission or relinquish non-public access.
+  * UWP build is now included.
+  * ByteArrayPacker/ByteArrayUnpacker. They are suitable for fixed pattern serialization/deserialization.
+  * Fast mode of unpacker which omits nested collection management. This option can be disabled with setting UnpackerOptions.ValidationLevel to ValidationLevel.Collection.
+
+  IMPROVEMENTS
+  * Byte array based serialization API now uses ByteArrayPacker/ByteArrayUnpacker, improves about 40% faster than Stream based.
+  * Deserialization now uses ValidationLevel.None, improves about 30% faster than validating one.
+  * Packer/Unpacker performance improvements about 10-20%. As a result, new byte array "fast" unpacker is about 3x faster than previous unpacker.
+
+  BUG FIXES
+  * Fix nuspec to prevent old NuGet clients which do not support .NET Standard TFMs. Issue #177.
+  * The generated code for the type which has Tuple typed member uses old PackHelper API.
+  * Fix struct deserialization. Issue #189. Thank you @samcragg!
+  * Fix asynchronous packing is not be emitted correctly. Issue #201
+  * Fix SerializerCodeGenerator does not handle collections correctly for IsRecursive = true. Issue #203
+  * Fix extra field causes IndexOutOfBoundException when reflection based serializers are used. Issue #199
+  * Fix some built-in serializers throws InvalidOperationException instead of SerializationException for type errors. Issue #204
+  * Fix a combination of readonly members and collection members incorrect code generation when the type also have deserialization constructor. Issue #207.
+  * Fix built-in collection serializers such as List<T> serializer causes SecurityException when the program run in restricted environment like Silverlight. Issue #205.
+  * Fix null items of complex type in List<T> or Dictionary<TKey, TValue> will not be deserialized as null. Issue #211. (from 0.8.1)
+  * Fix types which implement IPackable and IUnpackable but do not have any members cannot be serialized. Issue #202
+  * Fix Windows Native build error. Issue #206.
+  * Fix constructor deserialization fails if the constructor parameters order is not lexical. Issue #233
+  * Fix asynchronous multi dimensional array deserialization corruption.
+  * Fix enum serialization throws NullReferenceException in Unity. Issue #215.
+  * Fix MessagePackSerializer.Capability does not work correctly in Unity.
+  * Fix polymorphic serializer error in Unity.
+
+Release 0.9.1 2017-8-30
+
+  BUG FIXES
+  * Fix ByteArrayPacker throws IndexOutOfBoundException when the buffer remaining bytes is equal to packed scalar size. #252
+
+Release 0.9.2 2017-09-26
+
+  BUG FIXES
+  * Fix UAP build drop does not exists in nupkg. #186
+
+Release 1.0.0-beta1 2017-10-01
+
+  NEW FEATURES
+  * .NET Standard 2.0 which supports serializer source code generation on .NET Core. Note that serializer assembly generation is not supported.
+  * MessagePackSerializer.UnpackMessagePackObject(byte[]) utility method.
+  * MessagePack timestamp type support. This includes interoperability with DateTime/DateTimeOffset as well as MsgPack.Timespan type with basic arithmatics, properties, and conversions.
+
+  BUG FIXES
+  * Fix ByteArrayPacker throws IndexOutOfBoundException when the buffer remaining bytes is equal to packed scalar size. #252
+  * Fix UAP build drop does not exists in nupkg. #186
+  * Fix new unpacker cannot unpack reserved ext types.
+
+Relase 1.0.0-beta2 2017-10-29
+
+  CHANGES
+  * Xamarin builds are now integrated to .NET Standard 2.0.
+
+  NEW FEATURES
+  * ValueTuple support. #277
+
+  IMPROVEMENTS
+  * System.Tuple<T> detection now ignores their declaring assemblies.
+  * Improve exception message in AOT error of Unity.
+  * .NET Standard 1.1/1.3 projects now do not depend on System.Linq.Expressions package.
+
+Release 1.0.0-rc1 2017-12-17
+
+  BUG FIXES
+  * Fix NRE in .NET Standard 1.1/1.3 build (this issue got mixed in beta2).
+  * Fix built-in Guid/BigInteger always output raw type even if PackerCompatibilityOptions.PackBinaryAsRaw is not specified. #270
+  * Fix MessagePackObject.UnderlyingType reports wrong type for ext types. Part of #269.
+    This bug also caused misleading error message for incompatible type conversion.
+  * Fix exceptions thrown by MessagePackObject.AsBinary()/AsString() reports internal type name. Part of #269.

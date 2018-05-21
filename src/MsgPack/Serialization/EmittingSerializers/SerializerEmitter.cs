@@ -2,7 +2,7 @@
 //
 // MessagePack for CLI
 //
-// Copyright (C) 2010-2012 FUJIWARA, Yusuke
+// Copyright (C) 2010-2017 FUJIWARA, Yusuke
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -20,236 +20,268 @@
 
 using System;
 using System.Collections.Generic;
+#if NETSTANDARD1_1
+using Contract = MsgPack.MPContract;
+#else
 using System.Diagnostics.Contracts;
+#endif // NETSTANDARD1_1
+using System.Globalization;
+using System.Linq;
 using System.Reflection;
+using System.Reflection.Emit;
 
+using MsgPack.Serialization.AbstractSerializers;
 using MsgPack.Serialization.Reflection;
 
 namespace MsgPack.Serialization.EmittingSerializers
 {
 	/// <summary>
-	///		Genereates serialization methods which can be save to file.
+	///		Defines common features for emitters.
 	/// </summary>
-	[ContractClass( typeof( SerializerEmitterContract ) )]
-	internal abstract class SerializerEmitter : IDisposable
+	internal sealed partial class SerializerEmitter
 	{
+		private readonly SerializerSpecification _specification;
+		private readonly bool _isDebuggable;
+		private readonly ModuleBuilder _host;
+		private readonly TypeBuilder _typeBuilder;
+		private readonly Dictionary<string, MethodBuilder> _methodTable;
+		private readonly Dictionary<string, FieldBuilder> _fieldTable;
+
 		/// <summary>
 		/// Initializes a new instance of the <see cref="SerializerEmitter"/> class.
 		/// </summary>
-		protected SerializerEmitter() { }
-
-		/// <summary>
-		///		Releases all managed resources.
-		/// </summary>
-		public void Dispose()
+		/// <param name="host">The host <see cref="ModuleBuilder"/>.</param>
+		/// <param name="specification">The specification of the serializer.</param>
+		/// <param name="baseClass">Type of the base class of the serializer.</param>
+		/// <param name="isDebuggable">Set to <c>true</c> when <paramref name="host"/> is debuggable.</param>
+		public SerializerEmitter( ModuleBuilder host, SerializerSpecification specification, Type baseClass, bool isDebuggable )
 		{
-			this.Dispose( true );
-			GC.SuppressFinalize( this );
+			Contract.Requires( host != null );
+			Contract.Requires( specification != null );
+			Contract.Requires( baseClass != null );
+
+			Tracer.Emit.TraceEvent( Tracer.EventType.DefineType, Tracer.EventId.DefineType, "Create {0}", specification.SerializerTypeFullName );
+
+			this._methodTable = new Dictionary<string, MethodBuilder>();
+			this._fieldTable = new Dictionary<string, FieldBuilder>();
+			this._specification = specification;
+			this._host = host;
+			this._typeBuilder =
+				host.DefineType(
+					specification.SerializerTypeFullName,
+					TypeAttributes.Sealed | TypeAttributes.Public | TypeAttributes.UnicodeClass | TypeAttributes.AutoLayout | TypeAttributes.BeforeFieldInit,
+					baseClass
+				);
+
+#if DEBUG
+			Contract.Assert( this._typeBuilder.BaseType != null, "baseType != null" );
+#endif // DEBUG
+			this._isDebuggable = isDebuggable;
+
+#if DEBUG && !NET35 && !NETSTANDARD1_1 && !NETSTANDARD1_3 && !NETSTANDARD2_0
+			if ( isDebuggable && SerializerDebugging.DumpEnabled )
+			{
+				SerializerDebugging.PrepareDump( host.Assembly as AssemblyBuilder );
+			}
+#endif // DEBUG && !NET35 && !NETSTANDARD1_1 && !NETSTANDARD1_3 && !NETSTANDARD2_0
 		}
 
-		/// <summary>
-		///		Releases unmanaged and optionally managed resources.
-		/// </summary>
-		/// <param name="disposing"><c>true</c> to release both managed and unmanaged resources; <c>false</c> to release only unmanaged resources.</param>
-		protected virtual void Dispose( bool disposing )
+		#region -- Field --
+
+		///  <summary>
+		/// 	Regisgters specified field to the current emitting session.
+		///  </summary>
+		/// <param name="name">The name of the field.</param>
+		/// <param name="type">The type of the field.</param>
+		/// <returns><see cref="FieldBuilder"/>.</returns>
+		public FieldBuilder RegisterField( string name, Type type )
 		{
-			// nop
+			FieldBuilder field;
+			if ( !this._fieldTable.TryGetValue( name, out field ) )
+			{
+				field = this.DefineInitonlyField( name, type );
+				this._fieldTable.Add( name, field );
+			}
+
+			return field;
 		}
 
+		private FieldBuilder DefineInitonlyField( string name, Type type )
+		{
+			return
+				this._typeBuilder.DefineField(
+					name,
+					type,
+					FieldAttributes.Private | FieldAttributes.InitOnly
+				);
+		}
+
+#endregion -- Field --
+
+
+#region -- Method --
+
 		/// <summary>
-		///		Gets the IL generator to implement <see cref="MessagePackSerializer{T}.PackToCore"/> overrides.
+		///		Gets the IL generator to implement specified method override.
 		/// </summary>
+		/// <param name="methodName">The name of the method.</param>
 		/// <returns>
-		///		The IL generator to implement <see cref="MessagePackSerializer{T}.PackToCore"/> overrides.
+		///		The IL generator to implement specified method override.
 		///		This value will not be <c>null</c>.
 		/// </returns>
-		public abstract TracingILGenerator GetPackToMethodILGenerator();
+		public ILMethodConctext DefineOverrideMethod( string methodName )
+		{
+			return this.DefineMethod( methodName, true, false, null, ReflectionAbstractions.EmptyTypes );
+		}
 
 		/// <summary>
-		///		Gets the IL generator to implement <see cref="MessagePackSerializer{T}.UnpackFromCore"/> overrides.
+		///		Gets the IL generator to implement specified private instance method.
 		/// </summary>
+		/// <param name="methodName">The name of the method.</param>
+		/// <param name="isStatic"><c>true</c> for static method.</param>
+		/// <param name="returnType">The type of the method return value.</param>
+		/// <param name="parameterTypes">The types of the method parameters.</param>
 		/// <returns>
-		///		The IL generator to implement <see cref="MessagePackSerializer{T}.UnpackFromCore"/> overrides.
+		///		The IL generator to implement specified method override.
 		///		This value will not be <c>null</c>.
 		/// </returns>
-		public abstract TracingILGenerator GetUnpackFromMethodILGenerator();
-
-		/// <summary>
-		///		Gets the IL generator to implement <see cref="MessagePackSerializer{T}.UnpackToCore"/> overrides.
-		/// </summary>
-		/// <returns>
-		///		The IL generator to implement <see cref="MessagePackSerializer{T}.UnpackToCore"/> overrides.
-		/// </returns>
-		/// <remarks>
-		///		When this method is called, <see cref="MessagePackSerializer{T}.UnpackToCore"/> will be overridden.
-		///		This value will not be <c>null</c>.
-		/// </remarks>
-		public abstract TracingILGenerator GetUnpackToMethodILGenerator();
-
-		/// <summary>
-		///		Gets the IL generator to implement AddItem(TCollection, TItem) or AddItem(TCollection, object) overrides.
-		/// </summary>
-		/// <param name="declaration">The virtual method declaration to be overriden.</param>
-		/// <returns>
-		///		The IL generator to implement AddItem(TCollection, TItem) or AddItem(TCollection, object) overrides.
-		///		This value will not be <c>null</c>.
-		/// </returns>
-		public abstract TracingILGenerator GetAddItemMethodILGenerator( MethodInfo declaration );
-
-		/// <summary>
-		///		Gets the IL generator to implement CreateInstance(int) overrides.
-		/// </summary>
-		/// <param name="declaration">The virtual method declaration to be overriden.</param>
-		/// <returns>
-		///		The IL generator to implement CreateInstance(int) overrides.
-		///		This value will not be <c>null</c>.
-		/// </returns>
-		public abstract TracingILGenerator GetCreateInstanceMethodILGenerator( MethodInfo declaration );
-		
-		/// <summary>
-		///		Gets the IL generator to implement private static RestoreSchema() method.
-		/// </summary>
-		/// <returns>
-		///		The IL generator to implement RestoreSchema() static method.
-		///		This value will not be <c>null</c>.
-		/// </returns>
-		public abstract TracingILGenerator GetRestoreSchemaMethodILGenerator();
-
-		/// <summary>
-		///		Creates the serializer type built now and returns its new instance.
-		/// </summary>
-		/// <typeparam name="T">Target type to be serialized/deserialized.</typeparam>
-		/// <param name="context">The <see cref="SerializationContext"/> to holds serializers.</param>
-		/// <param name="schema">The <see cref="PolymorphismSchema"/> for this instance.</param>
-		/// <returns>
-		///		Newly built <see cref="MessagePackSerializer{T}"/> instance.
-		///		This value will not be <c>null</c>.
-		///	</returns>
-		public MessagePackSerializer<T> CreateInstance<T>( SerializationContext context, PolymorphismSchema schema )
+		public ILMethodConctext DefinePrivateMethod( string methodName, bool isStatic, Type returnType, params Type[] parameterTypes )
 		{
-			return this.CreateConstructor<T>()( context, schema );
+			return this.DefineMethod( methodName, false, isStatic, returnType, parameterTypes );
 		}
 
-		/// <summary>
-		///		Creates instance constructor delegates.
-		/// </summary>
-		/// <typeparam name="T">Target type to be serialized/deserialized.</typeparam>
-		/// <returns>A delegate for serializer constructor.</returns>
-		public abstract Func<SerializationContext, PolymorphismSchema, MessagePackSerializer<T>> CreateConstructor<T>();
-
-		/// <summary>
-		///		Regisgters <see cref="MessagePackSerializer{T}"/> of target type usage to the current emitting session.
-		/// </summary>
-		/// <param name="targetType">The type of the member to be serialized/deserialized.</param>
-		/// <param name="enumMemberSerializationMethod">The enum serialization method of the member to be serialized/deserialized.</param>
-		/// <param name="dateTimeConversionMethod">The date time conversion method of the member to be serialized/deserialized.</param>
-		/// <param name="polymorphismSchema">The schema for polymorphism support.</param>
-		/// <param name="schemaRegenerationCodeProvider">The delegate to provide constructs to emit schema regeneration codes.</param>
-		/// <returns>
-		///		<see cref=" Action{T1,T2}"/> to emit serializer retrieval instructions.
-		///		The 1st argument should be <see cref="TracingILGenerator"/> to emit instructions.
-		///		The 2nd argument should be argument index of the serializer holder, normally 0 (this pointer).
-		///		This value will not be <c>null</c>.
-		/// </returns>
-		public abstract Action<TracingILGenerator, int> RegisterSerializer(
-			Type targetType,
-			EnumMemberSerializationMethod enumMemberSerializationMethod,
-			DateTimeMemberConversionMethod dateTimeConversionMethod,
-			PolymorphismSchema polymorphismSchema,
-			Func<IEnumerable<ILConstruct>> schemaRegenerationCodeProvider
-		);
-
-		/// <summary>
-		///		Regisgters <see cref="FieldInfo"/> usage to the current emitting session.
-		/// </summary>
-		/// <param name="field">The <see cref="FieldInfo"/> to be registered.</param>
-		/// <returns>
-		///		<see cref=" Action{T1,T2}"/> to emit serializer retrieval instructions.
-		///		The 1st argument should be <see cref="TracingILGenerator"/> to emit instructions.
-		///		The 2nd argument should be argument index of the serializer holder, normally 0 (this pointer).
-		///		This value will not be <c>null</c>.
-		/// </returns>
-		public virtual Action<TracingILGenerator, int> RegisterField( FieldInfo field )
+		private ILMethodConctext DefineMethod( string methodName, bool isOverride, bool isStatic, Type returnType, Type[] parameterTypes )
 		{
-			throw new NotSupportedException();
+			if ( this._methodTable.ContainsKey( methodName ) )
+			{
+				throw new InvalidOperationException( String.Format( CultureInfo.CurrentCulture, "Method {0} is already defined.", methodName ) );
+			}
+
+#if DEBUG
+			Contract.Assert( this._typeBuilder.BaseType != null, "this._typeBuilder.BaseType != null" );
+#endif // DEBUG
+			MethodBuilder builder;
+			if ( isOverride )
+			{
+				var baseMethod =
+					this._typeBuilder.BaseType.GetRuntimeMethod(
+						methodName
+					);
+				builder =
+					this._typeBuilder.DefineMethod(
+						baseMethod.Name,
+						( baseMethod.Attributes | MethodAttributes.Final ) & ( ~MethodAttributes.Abstract ),
+						baseMethod.CallingConvention,
+						baseMethod.ReturnType,
+						baseMethod.GetParameterTypes()
+					);
+				this._typeBuilder.DefineMethodOverride(
+					builder,
+					baseMethod
+				);
+			}
+			else
+			{
+				builder =
+					this._typeBuilder.DefineMethod(
+						methodName,
+						MethodAttributes.Private | MethodAttributes.HideBySig | ( isStatic ? MethodAttributes.Static : 0 ),
+						isStatic ? CallingConventions.Standard : CallingConventions.HasThis,
+						returnType,
+						parameterTypes
+					);
+			}
+
+			this._methodTable[ methodName ] = builder;
+
+			return
+				new ILMethodConctext(
+					this.GetILGenerator( builder, parameterTypes ),
+					builder,
+					parameterTypes
+				);
 		}
 
-		/// <summary>
-		///		Regisgters <see cref="MethodBase"/> usage to the current emitting session.
-		/// </summary>
-		/// <param name="method">The <see cref="MethodBase"/> to be registered.</param>
-		/// <returns>
-		///		<see cref=" Action{T1,T2}"/> to emit serializer retrieval instructions.
-		///		The 1st argument should be <see cref="TracingILGenerator"/> to emit instructions.
-		///		The 2nd argument should be argument index of the serializer holder, normally 0 (this pointer).
-		///		This value will not be <c>null</c>.
-		/// </returns>
-		public virtual Action<TracingILGenerator, int> RegisterMethod( MethodBase method )
-		{
-			throw new NotSupportedException();
-		}
-	}
+		#endregion -- Method --
 
-	[ContractClassFor( typeof( SerializerEmitter ) )]
-	internal abstract class SerializerEmitterContract : SerializerEmitter
-	{
-		public override TracingILGenerator GetPackToMethodILGenerator()
-		{
-			Contract.Ensures( Contract.Result<TracingILGenerator>() != null );
-			return null;
-		}
+		#region -- IL Generation --
 
-		public override TracingILGenerator GetUnpackFromMethodILGenerator()
+		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Usage", "CA1801:ReviewUnusedParameters", MessageId = "parameterTypes", Justification = "For DEBUG build." )]
+		private TracingILGenerator GetILGenerator( ConstructorBuilder builder, Type[] parameterTypes )
 		{
-			Contract.Ensures( Contract.Result<TracingILGenerator>() != null );
-			return null;
+#if DEBUG
+			if ( SerializerDebugging.TraceEnabled )
+			{
+				SerializerDebugging.ILTraceWriter.WriteLine();
+				SerializerDebugging.ILTraceWriter.WriteLine(
+					"{2} {3} {0}::.ctor({1}) {4}",
+					this._typeBuilder.Name,
+					String.Join( ", ", parameterTypes.Select( t => t.GetFullName() ).ToArray() ),
+					builder.Attributes.ToILString(),
+					builder.CallingConvention.ToILString(),
+#if !NET35 && !NET40
+					builder.MethodImplementationFlags.ToILString()
+#else
+					String.Empty
+#endif // !NET35 && !NET40
+				);
+			}
+#endif // DEBUG
+
+			return new TracingILGenerator( builder, SerializerDebugging.ILTraceWriter, this._isDebuggable );
 		}
 
-		public override TracingILGenerator GetUnpackToMethodILGenerator()
+		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Usage", "CA1801:ReviewUnusedParameters", MessageId = "parameterTypes", Justification = "For DEBUG build." )]
+		private TracingILGenerator GetILGenerator( MethodBuilder builder, Type[] parameterTypes )
 		{
-			Contract.Ensures( Contract.Result<TracingILGenerator>() != null );
-			return null;
+#if DEBUG
+			if ( SerializerDebugging.TraceEnabled )
+			{
+				SerializerDebugging.ILTraceWriter.WriteLine();
+				SerializerDebugging.ILTraceWriter.WriteLine(
+					"{4} {5} {3} {0}::{1}({2}) {6}",
+					this._typeBuilder.Name,
+					builder.Name,
+					String.Join( ", ", parameterTypes.Select( t => t.GetFullName() ).ToArray() ),
+					builder.ReturnType.GetFullName(),
+					builder.Attributes.ToILString(),
+					builder.CallingConvention.ToILString(),
+#if !NET35 && !NET40
+					builder.MethodImplementationFlags.ToILString()
+#else
+					String.Empty
+#endif // !NET35 && !NET40
+				);
+			}
+#endif // DEBUG
+
+			return new TracingILGenerator( builder, SerializerDebugging.ILTraceWriter, this._isDebuggable );
 		}
 
-		public override TracingILGenerator GetAddItemMethodILGenerator( MethodInfo declaration )
+#endregion -- IL Generation --
+
+#region -- Constructor --
+
+		private ConstructorBuilder DefineConstructor( MethodAttributes attributes, params Type[] parameterTypes )
 		{
-			Contract.Requires( declaration != null );
-			Contract.Ensures( Contract.Result<TracingILGenerator>() != null );
-			return null;
+			return this._typeBuilder.DefineConstructor( attributes, CallingConventions.Standard, parameterTypes );
 		}
 
-		public override TracingILGenerator GetCreateInstanceMethodILGenerator( MethodInfo declaration )
+		private ConstructorBuilder CreateConstructor( MethodAttributes attributes, Type[] parameterTypes, Action<Type, TracingILGenerator> emitter )
 		{
-			Contract.Requires( declaration != null );
-			Contract.Ensures( Contract.Result<TracingILGenerator>() != null );
-			return null;
+			var builder = this.DefineConstructor( attributes, parameterTypes );
+			emitter( this._typeBuilder.BaseType, this.GetILGenerator( builder, parameterTypes ) );
+
+#if DEBUG
+			if ( SerializerDebugging.TraceEnabled )
+			{
+				SerializerDebugging.FlushTraceData();
+			}
+#endif // DEBUG
+
+			return builder;
 		}
 
-		public override TracingILGenerator GetRestoreSchemaMethodILGenerator()
-		{
-			Contract.Ensures( Contract.Result<TracingILGenerator>() != null );
-			return null;
-		}
-
-		public override Func<SerializationContext, PolymorphismSchema, MessagePackSerializer<T>> CreateConstructor<T>()
-		{
-			Contract.Ensures( Contract.Result<Func<SerializationContext, PolymorphismSchema, MessagePackSerializer<T>>>() != null );
-			return null;
-		}
-
-		public override Action<TracingILGenerator, int> RegisterSerializer(
-			Type targetType,
-			EnumMemberSerializationMethod enumMemberSerializationMethod,
-			DateTimeMemberConversionMethod dateTimeConversionMethod,
-			PolymorphismSchema polymorphismSchema,
-			Func<IEnumerable<ILConstruct>> schemaRegenerationCodeProvider
-		)
-		{
-			Contract.Requires( targetType != null );
-			Contract.Requires( Enum.IsDefined( typeof( EnumMemberSerializationMethod ), enumMemberSerializationMethod ) );
-			Contract.Requires( Enum.IsDefined( typeof( DateTimeMemberConversionMethod ), dateTimeConversionMethod ) );
-			Contract.Ensures( Contract.Result<Action<TracingILGenerator, int>>() != null );
-			return null;
-		}
+#endregion -- Constructor --
 	}
 }

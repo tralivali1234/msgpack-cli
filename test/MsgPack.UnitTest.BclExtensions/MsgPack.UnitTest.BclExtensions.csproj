@@ -1,161 +1,104 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProjectGuid>{DB3ED6D2-D27F-4E8F-AFE2-5503113216AC}</ProjectGuid>
     <OutputType>Library</OutputType>
-    <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>MsgPack</RootNamespace>
     <AssemblyName>MsgPack.UnitTest.BclExtensions</AssemblyName>
-    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
-    <FileAlignment>512</FileAlignment>
-    <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\..\</SolutionDir>
-    <RestorePackages>true</RestorePackages>
+    <TargetFrameworks>net46;netcoreapp1.0;netcoreapp2.0</TargetFrameworks>
   </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <DebugSymbols>true</DebugSymbols>
-    <DebugType>full</DebugType>
-    <Optimize>false</Optimize>
-    <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>pdbonly</DebugType>
-    <Optimize>true</Optimize>
-    <OutputPath>bin\Release\</OutputPath>
-    <DefineConstants>TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-  </PropertyGroup>
+  <Import Project="..\..\MsgPack.Common.props" />
   <PropertyGroup>
-    <SignAssembly>true</SignAssembly>
+    <DocumentationFile></DocumentationFile>
   </PropertyGroup>
-  <PropertyGroup>
-    <AssemblyOriginatorKeyFile>..\..\src\MsgPack.snk</AssemblyOriginatorKeyFile>
+  <PropertyGroup Condition="'$(TargetFramework)' == 'netcoreapp1.0'">
+    <!-- Run netcoreapp1.0 as .NET Standard 1.3 -->
+    <DefineConstants>$(DefineConstants);NETSTANDARD1_3</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(TargetFramework)' == 'netcoreapp2.0'">
+    <!-- Run netcoreapp2.0 as .NET Standard 2.0 -->
+    <DefineConstants>$(DefineConstants);NETSTANDARD2_0</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="nunit.core">
-      <HintPath>..\..\packages\NUnitTestAdapter.WithFramework.1.2\lib\nunit.core.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="nunit.core.interfaces">
-      <HintPath>..\..\packages\NUnitTestAdapter.WithFramework.1.2\lib\nunit.core.interfaces.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="nunit.framework">
-      <HintPath>..\..\packages\NUnitTestAdapter.WithFramework.1.2\lib\nunit.framework.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="nunit.util">
-      <HintPath>..\..\packages\NUnitTestAdapter.WithFramework.1.2\lib\nunit.util.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="NUnit.VisualStudio.TestAdapter">
-      <HintPath>..\..\packages\NUnitTestAdapter.WithFramework.1.2\lib\NUnit.VisualStudio.TestAdapter.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="System" />
-    <Reference Include="System.Collections.Immutable, Version=1.1.37.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\System.Collections.Immutable.1.1.37\lib\portable-net45+win8+wp8+wpa81\System.Collections.Immutable.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="System.Core" />
-    <Reference Include="System.Xml.Linq" />
-    <Reference Include="System.Data.DataSetExtensions" />
-    <Reference Include="Microsoft.CSharp" />
-    <Reference Include="System.Data" />
-    <Reference Include="System.Xml" />
+    <PackageReference Include="NUnit" Version="3.8.1" />
+    <PackageReference Include="NUnit3TestAdapter" Version="3.8.0" />
+    <PackageReference Include="System.Collections.Immutable" Version="1.4.0" />
+    <PackageReference Include="FSharp.Core" Version="4.2.3" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="2.4.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="15.3.0" />
+    <!-- To avoid PDB Reader error -->
+    <PackageReference Include="Mono.Cecil" Version="0.10.0-beta6" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(TargetFramework)' == 'netcoreapp1.0'">
+    <PackageReference Include="Microsoft.NETCore.App" Version="1.0.5" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(TargetFramework)' == 'netcoreapp2.0'">
+    <PackageReference Include="Microsoft.NETCore.App" Version="2.0.0" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(TargetFramework)' != 'netcoreapp1.0'">
+    <Compile Include="..\MsgPack.UnitTest\Serialization\RoslynCodeGeneration.cs">
+      <Link>Serialization\RoslynCodeGeneration.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\TempFileDependentAssemblyManager.cs">
+      <Link>Serialization\TempFileDependentAssemblyManager.cs</Link>
+    </Compile>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Serialization\ArrayContextBasedCustomCollectionSerializersTest.cs">
-      <DependentUpon>ArrayContextBasedCustomCollectionSerializersTest.tt</DependentUpon>
-      <AutoGen>True</AutoGen>
-      <DesignTime>True</DesignTime>
-    </Compile>
-    <Compile Include="Serialization\ArrayCodeDomBasedCustomCollectionSerializersTest.cs">
+    <Compile Update="Serialization\ArrayCodeDomBasedCustomCollectionSerializersTest.cs">
       <DependentUpon>ArrayCodeDomBasedCustomCollectionSerializersTest.tt</DependentUpon>
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>
     </Compile>
-    <Compile Include="Serialization\ArrayFieldBasedCustomCollectionSerializersTest.cs">
+    <Compile Update="Serialization\ArrayFieldBasedCustomCollectionSerializersTest.cs">
       <DependentUpon>ArrayFieldBasedCustomCollectionSerializersTest.tt</DependentUpon>
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>
     </Compile>
-    <Compile Include="Serialization\ArrayExpressionBasedCustomCollectionSerializersTest.cs">
-      <DependentUpon>ArrayExpressionBasedCustomCollectionSerializersTest.tt</DependentUpon>
+    <Compile Update="Serialization\ArrayReflectionBaedCustomCollectionSerializersTest.cs">
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>
+      <DependentUpon>ArrayReflectionBaedCustomCollectionSerializersTest.tt</DependentUpon>
     </Compile>
-    <Compile Include="Serialization\MapCodeDomBasedCustomCollectionSerializersTest.cs">
+    <Compile Update="Serialization\MapCodeDomBasedCustomCollectionSerializersTest.cs">
       <DependentUpon>MapCodeDomBasedCustomCollectionSerializersTest.tt</DependentUpon>
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>
     </Compile>
-    <Compile Include="Serialization\MapContextBasedCustomCollectionSerializersTest.cs">
-      <DependentUpon>MapContextBasedCustomCollectionSerializersTest.tt</DependentUpon>
-      <AutoGen>True</AutoGen>
-      <DesignTime>True</DesignTime>
-    </Compile>
-    <Compile Include="Serialization\MapExpressionBasedCustomCollectionSerializersTest.cs">
-      <DependentUpon>MapExpressionBasedCustomCollectionSerializersTest.tt</DependentUpon>
-      <AutoGen>True</AutoGen>
-      <DesignTime>True</DesignTime>
-    </Compile>
-    <Compile Include="Serialization\MapFieldBasedCustomCollectionSerializersTest.cs">
+    <Compile Update="Serialization\MapFieldBasedCustomCollectionSerializersTest.cs">
       <DependentUpon>MapFieldBasedCustomCollectionSerializersTest.tt</DependentUpon>
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>
     </Compile>
+    <Compile Update="Serialization\MapReflectionBasedCustomCollectionSerializersTest.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>MapReflectionBasedCustomCollectionSerializersTest.tt</DependentUpon>
+    </Compile>
+  </ItemGroup>
+  <ItemGroup Condition="'$(TargetFramework)' == 'nectoreapp1.0'">
+    <Compile Remove="Serialization\*CodeDom*.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\MsgPack\MsgPack.csproj">
-      <Project>{5bcec32e-990e-4de5-945f-bd27326a7418}</Project>
-      <Name>MsgPack</Name>
-    </ProjectReference>
+    <ProjectReference Include="..\..\src\MsgPack\MsgPack.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\src\MsgPack.snk">
       <Link>MsgPack.snk</Link>
     </None>
-    <None Include="packages.config" />
-    <None Include="Serialization\ArrayContextBasedCustomCollectionSerializersTest.tt">
-      <Generator>TextTemplatingFileGenerator</Generator>
-      <LastGenOutput>ArrayContextBasedCustomCollectionSerializersTest.cs</LastGenOutput>
-    </None>
-    <None Include="Serialization\CustomCollectionSerializersTest.ttinclude">
-      <LastGenOutput>ImmutableCollectionsTest1.cs</LastGenOutput>
-    </None>
-    <None Include="Serialization\ArrayCodeDomBasedCustomCollectionSerializersTest.tt">
+    <None Include="app.config" />
+    <None Include="Serialization\CustomCollectionSerializersTest.ttinclude" />
+    <None Update="Serialization\ArrayCodeDomBasedCustomCollectionSerializersTest.tt">
       <Generator>TextTemplatingFileGenerator</Generator>
       <LastGenOutput>ArrayCodeDomBasedCustomCollectionSerializersTest.cs</LastGenOutput>
     </None>
-    <None Include="Serialization\ArrayFieldBasedCustomCollectionSerializersTest.tt">
+    <None Update="Serialization\ArrayFieldBasedCustomCollectionSerializersTest.tt">
       <Generator>TextTemplatingFileGenerator</Generator>
       <LastGenOutput>ArrayFieldBasedCustomCollectionSerializersTest.cs</LastGenOutput>
     </None>
-    <None Include="Serialization\ArrayExpressionBasedCustomCollectionSerializersTest.tt">
-      <Generator>TextTemplatingFileGenerator</Generator>
-      <LastGenOutput>ArrayExpressionBasedCustomCollectionSerializersTest.cs</LastGenOutput>
-    </None>
-    <None Include="Serialization\MapCodeDomBasedCustomCollectionSerializersTest.tt">
+    <None Update="Serialization\MapCodeDomBasedCustomCollectionSerializersTest.tt">
       <Generator>TextTemplatingFileGenerator</Generator>
       <LastGenOutput>MapCodeDomBasedCustomCollectionSerializersTest.cs</LastGenOutput>
     </None>
-    <None Include="Serialization\MapContextBasedCustomCollectionSerializersTest.tt">
-      <Generator>TextTemplatingFileGenerator</Generator>
-      <LastGenOutput>MapContextBasedCustomCollectionSerializersTest.cs</LastGenOutput>
-    </None>
-    <None Include="Serialization\MapExpressionBasedCustomCollectionSerializersTest.tt">
-      <Generator>TextTemplatingFileGenerator</Generator>
-      <LastGenOutput>MapExpressionBasedCustomCollectionSerializersTest.cs</LastGenOutput>
-    </None>
-    <None Include="Serialization\MapFieldBasedCustomCollectionSerializersTest.tt">
+    <None Update="Serialization\MapFieldBasedCustomCollectionSerializersTest.tt">
       <Generator>TextTemplatingFileGenerator</Generator>
       <LastGenOutput>MapFieldBasedCustomCollectionSerializersTest.cs</LastGenOutput>
     </None>
@@ -164,8 +107,19 @@
     <Service Include="{508349B6-6B84-4DF5-91F0-309BEEBAD82D}" />
     <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
   </ItemGroup>
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <Import Project="$(SolutionDir)\.nuget\NuGet.targets" Condition="Exists('$(SolutionDir)\.nuget\NuGet.targets')" />
+  <ItemGroup>
+    <None Update="Serialization\ArrayReflectionBaedCustomCollectionSerializersTest.tt">
+      <Generator>TextTemplatingFileGenerator</Generator>
+      <LastGenOutput>ArrayReflectionBaedCustomCollectionSerializersTest.cs</LastGenOutput>
+    </None>
+    <None Update="Serialization\MapReflectionBasedCustomCollectionSerializersTest.tt">
+      <Generator>TextTemplatingFileGenerator</Generator>
+      <LastGenOutput>MapReflectionBasedCustomCollectionSerializersTest.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup Condition="'$(TargetFramework)' == 'netcoreapp1.0'">
+    <Compile Remove="**\*CodeDom*.cs" />
+  </ItemGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
   <Target Name="BeforeBuild">

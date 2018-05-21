@@ -2,7 +2,7 @@
 //
 // MessagePack for CLI
 //
-// Copyright (C) 2014 FUJIWARA, Yusuke
+// Copyright (C) 2014-2016 FUJIWARA, Yusuke
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ using System.Runtime.InteropServices;
 
 using Mono.Options;
 
+using MsgPack;
 using MsgPack.Serialization;
 
 namespace mpu
@@ -82,6 +83,7 @@ namespace mpu
 			var excludingPattern = default( string );
 			var treatWarningsAsErrors = false;
 			var warningLevel = 4;
+			var admitNonPublicTypes = false;
 			var configuration =
 				new SerializerCodeGenerationConfiguration
 				{
@@ -138,12 +140,32 @@ namespace mpu
 					},
 					{
 						"singular", "[serializer, optional] Specify avoid recursive serializer generation for target type(s).",
-						_ => configuration.PreferReflectionBasedSerializer = false
+						_ => configuration.IsRecursive = false
 					},
 					{
 						"avoid-reflection-based", "[serializer, optional] Specify avoid built-in reflection based serializer and generates alternative serializers.",
 						_ => configuration.PreferReflectionBasedSerializer = false
 					},
+					{
+						"prohibit-non-collection-enumerable-types", "[serializer, optional] Specify prevent serializer generation for types which implemnent IEnumerable but do not have add for backward compatibility.",
+						_ => configuration.CompatibilityOptions.AllowNonCollectionEnumerableTypes = false
+					},
+					{
+						"ignore-packability-for-collection", "[serializer, optional] Specify generate normal collection serializer logic for types which implemnent IEnumerable and IPackable/IUnpackble/IAsyncPackable/IAsyncUnpackable for backward compatiblity.",
+						_ => configuration.CompatibilityOptions.IgnorePackabilityForCollection = false
+					},
+					{
+						"one-bound-data-member-order", "[serializer, optional] Specify generating serializers use 1-based DataMemberAttribute.order instead of 0-based for compatibility of some other serialization libraries.",
+						_ => configuration.CompatibilityOptions.OneBoundDataMemberOrder = false
+					},
+					{
+						"classic-packer", "[serializer, optional] Specify that packer does not emit new bin, str8, and ext types.",
+						_ => configuration.CompatibilityOptions.PackerCompatibilityOptions = PackerCompatibilityOptions.Classic
+					},
+					{
+						"with-async", "[serializer, optional] Specify generating async methods on serializers. This option causes compilation error for legacy environments including Unity.",
+						_ => configuration.WithAsync = true
+					}, 
 					{
 						"indent=", "[serializer, optional] Specify indent string for generated serializers. Default is a horizontal tab charactor (U+0009).",
 						value => configuration.CodeIndentString = value
@@ -161,12 +183,20 @@ namespace mpu
 						value => excludingPattern = value
 					},
 					{
-						"treatWarningsAsErrors", "[serializer, optional] Specify to generate error for compiler warnings for serialization target types.",
+						"admit-non-public-types", "[serializer, optional] Specify to enable code generation for non-public types.",
+						_ => admitNonPublicTypes = true
+					},
+					{
+						"treat-warning-as-errors|treatWarningsAsErrors", "[serializer, optional] Specify to generate error for compiler warnings for serialization target types.",
 						_ => treatWarningsAsErrors = true
 					},
 					{
-						"warningLevel=", "[serializer, optional] Specify compiler warning level for serialization target types. Default is '4'.",
-						(int value) => warningLevel = value
+						"warning-level|warningLevel=", "[serializer, optional] Specify compiler warning level for serialization target types. Default is '4'.",
+						( int value ) => warningLevel = value
+					},
+					{
+						"suppress-debugger-non-user-code-attr", "[serializer, optional] Specify supressing DebuggerNonUserCodeAttribute in the output code to enable debugger stepping.",
+						_ => configuration.SuppressDebuggerNonUserCodeAttribute = true
 					}
 				};
 
@@ -195,6 +225,7 @@ namespace mpu
 						excludingPattern,
 						treatWarningsAsErrors,
 						warningLevel,
+						admitNonPublicTypes,
 						configuration
 					);
 					return 0;
@@ -263,6 +294,7 @@ namespace mpu
 			string excludingPattern,
 			bool treatWarningsAsErrors,
 			int warningLevel,
+			bool admitNonPublicTypes,
 			SerializerCodeGenerationConfiguration configuration
 		)
 		{
@@ -286,8 +318,9 @@ namespace mpu
 							referenceAssemblies ?? new string[ 0 ]
 							),
 						includingPattern,
-						excludingPattern
-						);
+						excludingPattern,
+						admitNonPublicTypes
+					);
 			}
 			else
 			{
@@ -295,8 +328,9 @@ namespace mpu
 					generator.GenerateSerializers(
 						sourceFilePathes[ 0 ],
 						includingPattern,
-						excludingPattern
-						);
+						excludingPattern,
+						admitNonPublicTypes
+					);
 			}
 
 			foreach ( var outputFilePath in result )

@@ -2,7 +2,7 @@
 //
 // MessagePack for CLI
 //
-// Copyright (C) 2010-2014 FUJIWARA, Yusuke
+// Copyright (C) 2010-2016 FUJIWARA, Yusuke
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -20,6 +20,10 @@
 
 using System;
 using System.Runtime.InteropServices.ComTypes;
+#if FEATURE_TAP
+using System.Threading;
+using System.Threading.Tasks;
+#endif // FEATURE_TAP
 
 namespace MsgPack.Serialization.DefaultSerializers
 {
@@ -28,7 +32,7 @@ namespace MsgPack.Serialization.DefaultSerializers
 	/// </summary>
 	internal sealed class NativeFileTimeMessagePackSerializer : MessagePackSerializer<FILETIME>
 	{
-		public NativeFileTimeMessagePackSerializer( SerializationContext ownerContext ) : base( ownerContext ) { }
+		public NativeFileTimeMessagePackSerializer( SerializationContext ownerContext ) : base( ownerContext, SerializerCapabilities.PackTo | SerializerCapabilities.UnpackFrom ) { }
 
 		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "Validated by caller in base class" )]
 		protected internal override void PackToCore( Packer packer, FILETIME objectTree )
@@ -39,7 +43,33 @@ namespace MsgPack.Serialization.DefaultSerializers
 		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "Validated by caller in base class" )]
 		protected internal override FILETIME UnpackFromCore( Unpacker unpacker )
 		{
-			return DateTime.FromBinary( unpacker.LastReadData.AsInt64() ).ToWin32FileTimeUtc();
+			return DateTime.FromBinary( unpacker.LastReadData.DeserializeAsInt64() ).ToWin32FileTimeUtc();
 		}
+
+#if FEATURE_TAP
+
+		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "Validated by caller in base class" )]
+		protected internal override Task PackToAsyncCore( Packer packer, FILETIME objectTree, CancellationToken cancellationToken )
+		{
+			return packer.PackAsync( objectTree.ToDateTime().ToBinary(), cancellationToken );
+		}
+
+		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes", Justification = "Transfers all catched exceptions." )]
+		protected internal override Task<FILETIME> UnpackFromAsyncCore( Unpacker unpacker, CancellationToken cancellationToken )
+		{
+			var tcs = new TaskCompletionSource<FILETIME>();
+			try
+			{
+				tcs.SetResult( this.UnpackFromCore( unpacker ) );
+			}
+			catch ( Exception ex )
+			{
+				tcs.SetException( ex );
+			}
+
+			return tcs.Task;
+		}
+
+#endif // FEATURE_TAP
 	}
 }

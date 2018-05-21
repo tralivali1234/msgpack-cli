@@ -1,18 +1,18 @@
-﻿<#@include file="AutoMessagePackSerializerTest.Polymorphism.ttinclude" #>
+<#@include file="AutoMessagePackSerializerTest.Polymorphism.ttinclude" #>
 <#+ 
-void Geneate( string serializationMethod, string emitterFlavor, string builderTypeName, bool canDump )
+void Geneate( string serializationMethod, string emitterFlavor, string builderTypeName, bool canDump, string language = "" )
 {
-	GenerateCore( serializationMethod, emitterFlavor, builderTypeName, canDump, false );
+	GenerateCore( serializationMethod, emitterFlavor, builderTypeName, language, canDump, false );
 }
 
 void GeneateForIos( string serializationMethod )
 {
-	GenerateCore( serializationMethod, "GenerationBased", null, false, true );
+	GenerateCore( serializationMethod, "GenerationBased", null, String.Empty, false, true );
 }
 
-private void GenerateCore( string serializationMethod, string emitterFlavor, string builderTypeName, bool canDump, bool forIos )
+private void GenerateCore( string serializationMethod, string emitterFlavor, string builderTypeName, string language, bool canDump, bool forIos )
 {
-	var testClassName = serializationMethod + emitterFlavor + ( String.IsNullOrWhiteSpace( builderTypeName ) ? "Reflection" : "Auto" ) + "MessagePackSerializerTest";
+	var testClassName = serializationMethod + language + emitterFlavor + ( String.IsNullOrWhiteSpace( builderTypeName ) ? "Reflection" : "Auto" ) + "MessagePackSerializerTest";
 
 	var constructorParamterSpecs =
 		new []
@@ -37,7 +37,7 @@ private void GenerateCore( string serializationMethod, string emitterFlavor, str
 //
 // MessagePack for CLI
 //
-// Copyright (C) 2010-2015 FUJIWARA, Yusuke
+// Copyright (C) 2010-2017 FUJIWARA, Yusuke and contributors
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -50,6 +50,9 @@ private void GenerateCore( string serializationMethod, string emitterFlavor, str
 //    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
+//
+// Contributors:
+//    Samuel Cragg
 //
 #endregion -- License Terms --
 
@@ -66,29 +69,49 @@ using System.Collections.Specialized;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-#if !NETFX_35 && !WINDOWS_PHONE
+#if !NET35 && !WINDOWS_PHONE
 using System.Numerics;
-#endif // !NETFX_35 && !WINDOWS_PHONE
+#endif // !NET35 && !WINDOWS_PHONE
 using System.Reflection;
+#if !SILVERLIGHT
 using System.Runtime.InteropServices.ComTypes;
+#endif // !SILVERLIGHT
 using System.Runtime.Serialization;
 using System.Text;
-#if !NETFX_CORE && !WINDOWS_PHONE && !UNITY_IPHONE && !UNITY_ANDROID && !XAMIOS && !XAMDROID
+<#+
+if ( serializationMethod == "Map" && !forIos )
+{
+#>
+using System.Text.RegularExpressions;
+<#+
+}
+#>
+#if FEATURE_TAP
+using System.Threading;
+using System.Threading.Tasks;
+#endif // FEATURE_TAP
+#if !SILVERLIGHT && !AOT && !NETSTANDARD1_1 && !NETSTANDARD1_3 && !XAMARIN
 using MsgPack.Serialization.CodeDomSerializers;
+#endif // !SILVERLIGHT && !AOT && !NETSTANDARD1_1 && !NETSTANDARD1_3 && !XAMARIN
+#if !SILVERLIGHT && !AOT && !NETSTANDARD1_1
 using MsgPack.Serialization.EmittingSerializers;
-#endif // !NETFX_CORE && !WINDOWS_PHONE && !UNITY_IPHONE && !UNITY_ANDROID && !XAMIOS && !XAMDROID
-#if !NETFX_35 && !UNITY_IPHONE && !UNITY_ANDROID && !XAMIOS && !XAMDROID
-using MsgPack.Serialization.ExpressionSerializers;
-#endif // !NETFX_35 && !UNITY_IPHONE && !UNITY_ANDROID && !XAMIOS && !XAMDROID
+#endif // !SILVERLIGHT && !AOT && !NETSTANDARD1_1
+#if SILVERLIGHT
+// For DateTime.ToBinary() extension method
+using MsgPack.Serialization.DefaultSerializers;
+#endif // SILVERLIGHT
 #if !MSTEST
 using NUnit.Framework;
 #else
 using TestFixtureAttribute = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestClassAttribute;
 using TestAttribute = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestMethodAttribute;
+using SetUpAttribute = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestInitializeAttribute;
+using TearDownAttribute = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestCleanupAttribute;
 using TimeoutAttribute = NUnit.Framework.TimeoutAttribute;
 using CategoryAttribute = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestCategoryAttribute;
 using Assert = NUnit.Framework.Assert;
 using Is = NUnit.Framework.Is;
+using Does = NUnit.Framework.Does;
 #endif
 
 namespace MsgPack.Serialization
@@ -103,14 +126,12 @@ namespace MsgPack.Serialization
 	if ( !forIos )
 	{
 #>
-#if !UNITY
-			return new SerializationContext { SerializationMethod = SerializationMethod.<#= serializationMethod #>, EmitterFlavor = EmitterFlavor.<#=  emitterFlavor #> };
-#else
-			var context = new SerializationContext { SerializationMethod = SerializationMethod.<#= serializationMethod #>, EmitterFlavor = EmitterFlavor.<#=  emitterFlavor #> };
-			AotWorkarounds.SetWorkaround( context );
+			var context = new SerializationContext { SerializationMethod = SerializationMethod.<#= serializationMethod #> };
+			context.SerializerOptions.EmitterFlavor = EmitterFlavor.<#=  emitterFlavor #>;
+#if SILVERLIGHT && !SILVERLIGHT_PRIVILEGED
+			context.SerializerOptions.DisablePrivilegedAccess = true;
+#endif // SILVERLIGHT && !SILVERLIGHT_PRIVILEGED
 			return context;
-
-#endif // !UNITY
 <#+
 	}
 	else
@@ -121,22 +142,30 @@ namespace MsgPack.Serialization
 			context.Serializers.Register( 
 				new EchoKeyedCollection_2MessagePackSerializer<string, string>( context, null ) 
 			);
-#if UNITY
-			AotWorkarounds.SetWorkaround( context );
-#endif // UNITY
 			return context;
 <#+
 	}
 #>
 		}
 
-		private static SerializationContext  NewSerializationContext( PackerCompatibilityOptions compatibilityOptions )
+		private static SerializationContext NewSerializationContext()
+		{
+			return NewSerializationContext( PackerCompatibilityOptions.None, DateTimeConversionMethod.Timestamp );
+		}
+
+		private static SerializationContext NewSerializationContext( PackerCompatibilityOptions compatibilityOptions, DateTimeConversionMethod dateTimeConversionMethod )
 		{
 <#+
 	if ( !forIos )
 	{
 #>
-			return new SerializationContext( compatibilityOptions ) { SerializationMethod = SerializationMethod.<#= serializationMethod #>, EmitterFlavor = EmitterFlavor.<#=  emitterFlavor #> };
+			var context = new SerializationContext( compatibilityOptions ) { SerializationMethod = SerializationMethod.<#= serializationMethod #> };
+			context.DefaultDateTimeConversionMethod = dateTimeConversionMethod;
+			context.SerializerOptions.EmitterFlavor = EmitterFlavor.<#= emitterFlavor #>;
+#if SILVERLIGHT && !SILVERLIGHT_PRIVILEGED
+			context.SerializerOptions.DisablePrivilegedAccess = true;
+#endif // SILVERLIGHT && !SILVERLIGHT_PRIVILEGED
+			return context;
 <#+
 	}
 	else
@@ -157,6 +186,25 @@ namespace MsgPack.Serialization
 		{
 			return context.GetSerializer<T>( context );
 		}
+
+#if UNITY
+		[TestFixtureSetUp]
+		public static void SetUpFixture()
+		{
+			MessagePackSerializer.PrepareCollectionType<byte>();
+			MessagePackSerializer.PrepareCollectionType<char>();
+			MessagePackSerializer.PrepareCollectionType<int>();
+			MessagePackSerializer.PrepareCollectionType<decimal>();
+			MessagePackSerializer.PrepareDictionaryType<string, int>();
+			MessagePackSerializer.PrepareDictionaryType<int, int>();
+			MessagePackSerializer.PrepareDictionaryType<string, DateTimeOffset>();
+			MessagePackSerializer.PrepareType<System.Diagnostics.TraceOptions>();
+			new ArraySegmentEqualityComparer<byte>().Equals( default( ArraySegment<byte> ), default( ArraySegment<byte> ) );
+			new ArraySegmentEqualityComparer<char>().Equals( default( ArraySegment<char> ), default( ArraySegment<char> ) );
+			new ArraySegmentEqualityComparer<int>().Equals( default( ArraySegment<int> ), default( ArraySegment<int> ) );
+			new ArraySegmentEqualityComparer<decimal>().Equals( default( ArraySegment<decimal> ), default( ArraySegment<decimal> ) );
+		}
+#endif // UNITY
 		
 <#+
 	if ( !forIos )
@@ -167,33 +215,61 @@ namespace MsgPack.Serialization
 			get { return <#= canDump.ToString().ToLowerInvariant() #>; }
 		}
 
-#if !NETFX_CORE && !WINDOWS_PHONE && !XAMIOS && !XAMDROID && !UNITY_IPHONE && !UNITY_ANDROID
+#if !SILVERLIGHT && !AOT && !XAMARIN
 		[SetUp]
 		public void SetUp()
 		{
-			SerializerDebugging.DeletePastTemporaries();
+<#+
+		if ( emitterFlavor == "ExpressionBased" )
+		{
+#>
+#warning TODO: true async
+			SerializerDebugging.IsNaiveAsyncAllowed = true;
+<#+
+		}
+#>
+
+#if !NETSTANDARD1_1 && !NETSTANDARD1_3
 			//SerializerDebugging.TraceEnabled = true;
 			//SerializerDebugging.DumpEnabled = true;
 			if ( SerializerDebugging.TraceEnabled )
 			{
 				Tracer.Emit.Listeners.Clear();
 				Tracer.Emit.Switch.Level = SourceLevels.All;
+#if NETSTANDARD2_0
+				Tracer.Emit.Listeners.Add( new TextWriterTraceListener( Console.Out ) );
+#else // NETSTANDRD2_0
 				Tracer.Emit.Listeners.Add( new ConsoleTraceListener() );
+#endif // NETSTANDRD2_0
 			}
 
-			SerializerDebugging.OnTheFlyCodeDomEnabled = true;
+			SerializerDebugging.DependentAssemblyManager = new TempFileDependentAssemblyManager( TestContext.CurrentContext.TestDirectory );
+			SerializerDebugging.DeletePastTemporaries();
+			SerializerDebugging.OnTheFlyCodeGenerationEnabled = true;
+
+#if NET35
+			SerializerDebugging.SetCodeCompiler( CodeDomCodeGeneration.Compile );
+#else
+			SerializerDebugging.SetCodeCompiler( RoslynCodeGeneration.Compile );
+#endif // NET35
+
+			SerializerDebugging.DumpDirectory = TestContext.CurrentContext.TestDirectory;
 			SerializerDebugging.AddRuntimeAssembly( typeof( AddOnlyCollection<> ).Assembly.Location );
 			if( typeof( AddOnlyCollection<> ).Assembly != this.GetType().Assembly )
 			{
 				SerializerDebugging.AddRuntimeAssembly( this.GetType().Assembly.Location );
 			}
+#endif // !NETSTANDARD1_1 && !NETSTANDARD1_3
 		}
 
 		[TearDown]
 		public void TearDown()
 		{
+#if !NETSTANDARD1_1 && !NETSTANDARD1_3
+
 			if ( SerializerDebugging.DumpEnabled && this.CanDump )
 			{
+#if !NETSTANDARD2_0
 				try
 				{
 					SerializerDebugging.Dump();
@@ -204,14 +280,18 @@ namespace MsgPack.Serialization
 				}
 				finally
 				{
-					DefaultSerializationMethodGeneratorManager.Refresh();
+					SerializationMethodGeneratorManager.Refresh();
 				}
+#else // !NETSTANDARD2_0
+				SerializationMethodGeneratorManager.Refresh();
+#endif // !NETSTANDARD2_0
 			}
 
 			SerializerDebugging.Reset();
-			SerializerDebugging.OnTheFlyCodeDomEnabled = false;
+			SerializerDebugging.OnTheFlyCodeGenerationEnabled = false;
+#endif // !NETSTANDARD1_1 && !NETSTANDARD1_3
 		}
-#endif // !NETFX_CORE && !WINDOWS_PHONE && !XAMIOS && !XAMDROID && !UNITY_IPHONE && !UNITY_ANDROID
+#endif // !SILVERLIGHT && !AOT && !XAMARIN
 <#+
 	} // if !forIos
 #>
@@ -265,18 +345,46 @@ namespace MsgPack.Serialization
 		public void TestDateTime()
 		{
 			TestCore(
-				DateTime.Now,
-				stream => DateTime.FromBinary( Unpacking.UnpackInt64( stream ) ),
+				DateTime.UtcNow,
+				stream => MessagePackSerializer.UnpackMessagePackObject( stream ).AsTimestamp().ToDateTime(),
 				( x, y ) => x.Equals( y ),
 				context =>
 				{
-					Assert.That( context.DefaultDateTimeConversionMethod, Is.EqualTo( DateTimeConversionMethod.Native ) );
+					Assert.That( context.DefaultDateTimeConversionMethod, Is.EqualTo( DateTimeConversionMethod.Timestamp ) );
 				}
 			);
 		}
 
 		[Test]
 		public void TestDateTimeOffset()
+		{
+			TestCore(
+				DateTimeOffset.UtcNow,
+				stream => MessagePackSerializer.UnpackMessagePackObject( stream ).AsTimestamp().ToDateTimeOffset(),
+				( x, y ) => x.Equals( y ),
+				context =>
+				{
+					Assert.That( context.DefaultDateTimeConversionMethod, Is.EqualTo( DateTimeConversionMethod.Timestamp ) );
+				}
+			);
+		}
+
+		[Test]
+		public void TestDateTimeNative()
+		{
+			TestCore(
+				DateTime.Now,
+				stream => DateTime.FromBinary( Unpacking.UnpackInt64( stream ) ),
+				( x, y ) => x.Equals( y ),
+				context =>
+				{
+					context.DefaultDateTimeConversionMethod = DateTimeConversionMethod.Native;
+				}
+			);
+		}
+
+		[Test]
+		public void TestDateTimeOffsetNative()
 		{
 			TestCore(
 				DateTimeOffset.Now,
@@ -288,7 +396,7 @@ namespace MsgPack.Serialization
 				( x, y ) => x.Equals( y ),
 				context =>
 				{
-					Assert.That( context.DefaultDateTimeConversionMethod, Is.EqualTo( DateTimeConversionMethod.Native ) );
+					context.DefaultDateTimeConversionMethod = DateTimeConversionMethod.Native;
 				}
 			);
 		}
@@ -313,7 +421,7 @@ namespace MsgPack.Serialization
 			TestCore(
 				DateTimeOffset.UtcNow,
 				stream => MessagePackConvert.ToDateTimeOffset( Unpacking.UnpackInt64( stream ) ),
-				( x, y ) => CompareDateTime( x.DateTime.ToUniversalTime(), y.DateTime.ToUniversalTime() ),
+				CompareDateTime,
 				context =>
 				{
 					context.DefaultDateTimeConversionMethod = DateTimeConversionMethod.UnixEpoc;
@@ -342,7 +450,7 @@ namespace MsgPack.Serialization
 			TestCore(
 				( DateTimeOffset? )DateTimeOffset.UtcNow,
 				stream => MessagePackConvert.ToDateTimeOffset( Unpacking.UnpackInt64( stream ) ),
-				( x, y ) => CompareDateTime( x.Value.DateTime.ToUniversalTime(), y.Value.DateTime.ToUniversalTime() ),
+				CompareDateTime,
 				context =>
 				{
 					context.GetSerializer<DateTimeOffset?>();
@@ -357,6 +465,16 @@ namespace MsgPack.Serialization
 		}
 
 		private static bool CompareDateTime( DateTime? x, DateTime? y )
+		{
+			return CompareDateTime( x.Value, y.Value );
+		}
+
+		private static bool CompareDateTime( DateTimeOffset x, DateTimeOffset y )
+		{
+			return CompareDateTime( x.DateTime, y.DateTime ) && x.Offset == y.Offset;
+		}
+
+		private static bool CompareDateTime( DateTimeOffset? x, DateTimeOffset? y )
 		{
 			return CompareDateTime( x.Value, y.Value );
 		}
@@ -421,7 +539,7 @@ namespace MsgPack.Serialization
 				Assert.That( CompareDateTime( result.UnixEpoc<#= suffix #>, input.UnixEpoc<#= suffix #>.ToUniversalTime() ), "{0:O}({0:%K}) == {1:O}({1:%K})", result.UnixEpoc<#= suffix #>, input.UnixEpoc<#= suffix #> );
 
 <#+
-					suffix = String.Format( CultureInfo.InvariantCulture, "DateTimeOffset{0}.DateTime", memberType );
+				suffix = String.Format( CultureInfo.InvariantCulture, "DateTimeOffset{0}", memberType );
 				if ( contextSetting == "Native" )
 				{
 #>
@@ -523,6 +641,44 @@ namespace MsgPack.Serialization
 			TestCoreWithVerify( target, context );
 		}
 
+#if FEATURE_TAP
+		[Test]
+		public async Task TestComplexObjectAsync_WithShortcut()
+		{
+			SerializerDebugging.AvoidsGenericSerializer = false;
+			try 
+			{
+				await this.TestComplexObjectAsyncCore( GetSerializationContext() );
+			}
+			finally
+			{
+				SerializerDebugging.AvoidsGenericSerializer = false;
+			}
+		}
+
+		[Test]
+		public async Task TestComplexObjectAsync_WithoutShortcut()
+		{
+			SerializerDebugging.AvoidsGenericSerializer = true;
+			try 
+			{
+				await this.TestComplexObjectAsyncCore( GetSerializationContext() );
+			}
+			finally
+			{
+				SerializerDebugging.AvoidsGenericSerializer = false;
+			}
+		}
+
+		private async Task TestComplexObjectAsyncCore( SerializationContext context )
+		{
+			var target = new ComplexType() { Source = new Uri( "http://www.exambple.com" ), TimeStamp = DateTime.Now, Data = new byte[] { 0x1, 0x2, 0x3, 0x4 } };
+			target.History.Add( DateTime.Now.Subtract( TimeSpan.FromDays( 1 ) ), "Create New" );
+			target.Points.Add( 123 );
+			await TestCoreWithVerifyAsync( target, context );
+		}
+#endif // FEATURE_TAP
+
 		[Test]
 		public void TestComplexTypeWithoutAnyAttribute_WithShortcut()
 		{
@@ -614,11 +770,11 @@ namespace MsgPack.Serialization
 		{
 			var target = new ComplexTypeWithDataContract() { Source = new Uri( "http://www.exambple.com" ), TimeStamp = DateTime.Now, Data = new byte[] { 0x1, 0x2, 0x3, 0x4 } };
 			target.History.Add( DateTime.Now.Subtract( TimeSpan.FromDays( 1 ) ), "Create New" );
-#if !NETFX_CORE && !SILVERLIGHT
+#if !NETFX_CORE && !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 			target.NonSerialized = new DefaultTraceListener();
 #else
 			target.NonSerialized = new Stopwatch();
-#endif // !NETFX_CORE && !SILVERLIGHT
+#endif // !NETFX_CORE && !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 			TestCoreWithVerify( target, context );
 		}
 
@@ -654,11 +810,11 @@ namespace MsgPack.Serialization
 		{
 			var target = new ComplexTypeWithDataContractWithOrder() { Source = new Uri( "http://www.exambple.com" ), TimeStamp = DateTime.Now, Data = new byte[] { 0x1, 0x2, 0x3, 0x4 } };
 			target.History.Add( DateTime.Now.Subtract( TimeSpan.FromDays( 1 ) ), "Create New" );
-#if !NETFX_CORE && !SILVERLIGHT
+#if !NETFX_CORE && !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 			target.NonSerialized = new DefaultTraceListener();
 #else
 			target.NonSerialized = new Stopwatch();
-#endif
+#endif // !NETFX_CORE && !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 			TestCoreWithVerify( target, context );
 		}
 
@@ -694,9 +850,9 @@ namespace MsgPack.Serialization
 		{
 			var target = new ComplexTypeWithNonSerialized() { Source = new Uri( "http://www.exambple.com" ), TimeStamp = DateTime.Now, Data = new byte[] { 0x1, 0x2, 0x3, 0x4 } };
 			target.History.Add( DateTime.Now.Subtract( TimeSpan.FromDays( 1 ) ), "Create New" );
-#if !NETFX_CORE && !SILVERLIGHT
+#if !NETFX_CORE && !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 			target.NonSerialized = new DefaultTraceListener();
-#endif
+#endif // !NETFX_CORE && !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 			TestCoreWithVerify( target, context );
 		}
 
@@ -716,6 +872,26 @@ namespace MsgPack.Serialization
 			}
 		}
 
+#if FEATURE_TAP
+
+		[Test]
+		public async Task TestDataMemberAttributeOrderWithOneBaseAsync()
+		{
+			var context = GetSerializationContext();
+			var value = new ComplexTypeWithOneBaseOrder();
+			var target = this.CreateTarget<ComplexTypeWithOneBaseOrder>( context );
+			using ( var buffer = new MemoryStream() )
+			{
+				await target.PackAsync( buffer, value ).ConfigureAwait( false );
+				buffer.Position = 0;
+				var unpacked = await target.UnpackAsync( buffer ).ConfigureAwait( false );
+				Assert.That( unpacked.One, Is.EqualTo( value.One ) );
+				Assert.That( unpacked.Two, Is.EqualTo( value.Two ) );
+			}
+		}
+
+#endif // FEATURE_TAP
+
 		[Test]
 		public void TestDataMemberAttributeOrderWithOneBase_ProtoBufCompatible()
 		{
@@ -733,6 +909,27 @@ namespace MsgPack.Serialization
 			}
 		}
 
+#if FEATURE_TAP
+
+		[Test]
+		public async Task TestDataMemberAttributeOrderWithOneBase_ProtoBufCompatibleAsync()
+		{
+			var context = GetSerializationContext();
+			context.CompatibilityOptions.OneBoundDataMemberOrder = true;
+			var value = new ComplexTypeWithOneBaseOrder();
+			var target = this.CreateTarget<ComplexTypeWithOneBaseOrder>( context );
+			using ( var buffer = new MemoryStream() )
+			{
+				await target.PackAsync( buffer, value ).ConfigureAwait( false );
+				buffer.Position = 0;
+				var unpacked = await target.UnpackAsync( buffer ).ConfigureAwait( false );
+				Assert.That( unpacked.One, Is.EqualTo( value.One ) );
+				Assert.That( unpacked.Two, Is.EqualTo( value.Two ) );
+			}
+		}
+
+#endif // FEATURE_TAP
+
 		[Test]
 		public void TestDataMemberAttributeOrderWithOneBaseDeserialize()
 		{
@@ -748,6 +945,26 @@ namespace MsgPack.Serialization
 				Assert.That( unpacked.Two, Is.EqualTo( 20 ) );
 			}
 		}
+
+#if FEATURE_TAP
+
+		[Test]
+		public async Task TestDataMemberAttributeOrderWithOneBaseDeserializeAsync()
+		{
+			var context = GetSerializationContext();
+			context.SerializationMethod = SerializationMethod.Array;
+			var target = this.CreateTarget<ComplexTypeWithOneBaseOrder>( context );
+			using ( var buffer = new MemoryStream() )
+			{
+				buffer.Write( new byte[] { 0x93, 0xff, 10, 20 } );
+				buffer.Position = 0;
+				var unpacked = await target.UnpackAsync( buffer ).ConfigureAwait( false );
+				Assert.That( unpacked.One, Is.EqualTo( 10 ) );
+				Assert.That( unpacked.Two, Is.EqualTo( 20 ) );
+			}
+		}
+
+#endif // FEATURE_TAP
 
 		[Test]
 		public void TestDataMemberAttributeOrderWithOneBaseDeserialize_ProtoBufCompatible()
@@ -765,6 +982,27 @@ namespace MsgPack.Serialization
 				Assert.That( unpacked.Two, Is.EqualTo( 20 ) );
 			}
 		}
+
+#if FEATURE_TAP
+
+		[Test]
+		public async Task TestDataMemberAttributeOrderWithOneBaseDeserialize_ProtoBufCompatibleAsync()
+		{
+			var context = GetSerializationContext();
+			context.SerializationMethod = SerializationMethod.Array;
+			context.CompatibilityOptions.OneBoundDataMemberOrder = true;
+			var target = this.CreateTarget<ComplexTypeWithOneBaseOrder>( context );
+			using ( var buffer = new MemoryStream() )
+			{
+				buffer.Write( new byte[] { 0x92, 10, 20 } );
+				buffer.Position = 0;
+				var unpacked = await target.UnpackAsync( buffer ).ConfigureAwait( false );
+				Assert.That( unpacked.One, Is.EqualTo( 10 ) );
+				Assert.That( unpacked.Two, Is.EqualTo( 20 ) );
+			}
+		}
+
+#endif // FEATURE_TAP
 
 		[Test]
 		public void TestDataMemberAttributeOrderWithZeroBase_ProtoBufCompatible_Fail()
@@ -810,7 +1048,11 @@ namespace MsgPack.Serialization
 		[Test]
 		public void TestEnum()
 		{
+#if !SILVERLIGHT
 			TestCore( DayOfWeek.Sunday, stream => ( DayOfWeek )Enum.Parse( typeof( DayOfWeek ), Unpacking.UnpackString( stream ) ), ( x, y ) => x == y );
+#else
+			TestCore( DayOfWeek.Sunday, stream => ( DayOfWeek )Enum.Parse( typeof( DayOfWeek ), Unpacking.UnpackString( stream ), false ), ( x, y ) => x == y );
+#endif // !SILVERLIGHT
 		}
 
 #if !NETFX_CORE && !SILVERLIGHT
@@ -883,17 +1125,17 @@ namespace MsgPack.Serialization
 	if ( !forIos )
 	{
 #>
-#if !NETFX_35
+#if !NET35
 		[Test]
 		public void TestTuple1()
 		{
-			TestTupleCore( new Tuple<int>( 1 ) );
+			TestTupleCore( new Tuple<int>( 1 ), 1 );
 		}
 
 		[Test]
 		public void TestTuple7()
 		{
-			TestTupleCore( new Tuple<int, string, int, string, int, string, int>( 1, "2", 3, "4", 5, "6", 7 ) );
+			TestTupleCore( new Tuple<int, string, int, string, int, string, int>( 1, "2", 3, "4", 5, "6", 7 ), 7 );
 		}
 
 		[Test]
@@ -901,11 +1143,12 @@ namespace MsgPack.Serialization
 		{
 			TestTupleCore(
 				new Tuple<
-				int, string, int, string, int, string, int,
+					int, string, int, string, int, string, int,
 				Tuple<string>>(
 					1, "2", 3, "4", 5, "6", 7,
 					new Tuple<string>( "8" )
-				)
+				),
+				8
 			);
 		}
 
@@ -913,6 +1156,200 @@ namespace MsgPack.Serialization
 		public void TestTuple14()
 		{
 			TestTupleCore(
+				new Tuple<
+					int, string, int, string, int, string, int,
+					Tuple<
+						string, int, string, int, string, int, string
+					>
+				>(
+					1, "2", 3, "4", 5, "6", 7,
+					new Tuple<string, int, string, int, string, int, string>(
+						"8", 9, "10", 11, "12", 13, "14"
+					)
+				),
+				14
+			);
+		}
+
+		[Test]
+		public void TestTuple15()
+		{
+			TestTupleCore(
+				new Tuple<
+					int, string, int, string, int, string, int,
+					Tuple<
+						string, int, string, int, string, int, string,
+						Tuple<int>
+					>
+				>(
+					1, "2", 3, "4", 5, "6", 7,
+					new Tuple<string, int, string, int, string, int, string, Tuple<int>>(
+						"8", 9, "10", 11, "12", 13, "14",
+						new Tuple<int>( 15 )
+					)
+				),
+				15
+			);
+		}
+
+#if !SILVERLIGHT
+
+		[Test]
+		public void TestValueTuple0()
+		{
+			TestTupleCore( new ValueTuple(), 0 );
+		}
+
+		[Test]
+		public void TestValueTuple1()
+		{
+			TestTupleCore( new ValueTuple<int>( 1 ), 1 );
+		}
+
+		[Test]
+		public void TestValueTuple7()
+		{
+			TestTupleCore( new ValueTuple<int, string, int, string, int, string, int>( 1, "2", 3, "4", 5, "6", 7 ), 7 );
+		}
+
+		[Test]
+		public void TestValueTuple7Plus0()
+		{
+			TestTupleCore(
+				new ValueTuple<
+					int, string, int, string, int, string, int,
+				ValueTuple>(
+					1, "2", 3, "4", 5, "6", 7,
+					new ValueTuple()
+				),
+				7
+			);
+		}
+
+		[Test]
+		public void TestValueTuple8()
+		{
+			TestTupleCore(
+				new ValueTuple<
+					int, string, int, string, int, string, int,
+				ValueTuple<string>>(
+					1, "2", 3, "4", 5, "6", 7,
+					new ValueTuple<string>( "8" )
+				),
+				8
+			);
+		}
+
+		[Test]
+		public void TestValueTuple14()
+		{
+			TestTupleCore(
+				new ValueTuple<
+					int, string, int, string, int, string, int,
+					ValueTuple<
+						string, int, string, int, string, int, string
+					>
+				>(
+					1, "2", 3, "4", 5, "6", 7,
+					new ValueTuple<string, int, string, int, string, int, string>(
+						"8", 9, "10", 11, "12", 13, "14"
+					)
+				),
+				14
+			);
+		}
+
+		[Test]
+		public void TestValueTuple14Plus0()
+		{
+			TestTupleCore(
+				new ValueTuple<
+					int, string, int, string, int, string, int,
+					ValueTuple<
+						string, int, string, int, string, int, string,
+						ValueTuple
+					>
+				>(
+					1, "2", 3, "4", 5, "6", 7,
+					new ValueTuple<string, int, string, int, string, int, string, ValueTuple>(
+						"8", 9, "10", 11, "12", 13, "14",
+						new ValueTuple()
+					)
+				),
+				14
+			);
+		}
+
+		[Test]
+		public void TestValueTuple15()
+		{
+			TestTupleCore(
+				new ValueTuple<
+					int, string, int, string, int, string, int,
+					ValueTuple<
+						string, int, string, int, string, int, string,
+						ValueTuple<int>
+					>
+				>(
+					1, "2", 3, "4", 5, "6", 7,
+					new ValueTuple<string, int, string, int, string, int, string, ValueTuple<int>>(
+						"8", 9, "10", 11, "12", 13, "14",
+						new ValueTuple<int>( 15 )
+					)
+				),
+				15
+			);
+		}
+
+#endif // !SILVERLIGHT
+
+		private void TestTupleCore<T>( T expected, int arity )
+			where T : IStructuralEquatable
+		{
+			var serializer = this.CreateTarget<T>( GetSerializationContext() );
+			using ( var stream = new MemoryStream() )
+			{
+				serializer.Pack( stream, expected );
+				stream.Position = 0;
+				var mpo = MessagePackSerializer.UnpackMessagePackObject( stream );
+				Assert.That( mpo.IsList, Is.True );
+				Assert.That( mpo.AsList().Count, Is.EqualTo( arity ) );
+				stream.Position = 0;
+				Assert.That( serializer.Unpack( stream ), Is.EqualTo( expected ) );
+			}
+		}
+
+#if FEATURE_TAP
+		[Test]
+		public async Task TestTuple1Async()
+		{
+			await TestTupleAsyncCore( new Tuple<int>( 1 ), 1 );
+		}
+
+		[Test]
+		public async Task TestTuple7Async()
+		{
+			await TestTupleAsyncCore( new Tuple<int, string, int, string, int, string, int>( 1, "2", 3, "4", 5, "6", 7 ), 7 );
+		}
+
+		[Test]
+		public async Task TestTuple8Async()
+		{
+			await TestTupleAsyncCore(
+				new Tuple<
+				int, string, int, string, int, string, int,
+				Tuple<string>>(
+					1, "2", 3, "4", 5, "6", 7,
+					new Tuple<string>( "8" )
+				),
+				8
+			);
+		}
+
+		[Test]
+		public async Task TestTuple14Async()
+		{
+			await TestTupleAsyncCore(
 				new Tuple<
 				int, string, int, string, int, string, int,
 				Tuple<
@@ -923,14 +1360,15 @@ namespace MsgPack.Serialization
 					new Tuple<string, int, string, int, string, int, string>(
 						"8", 9, "10", 11, "12", 13, "14"
 					)
-				)
+				),
+				14
 			);
 		}
 
 		[Test]
-		public void TestTuple15()
+		public async Task TestTuple15Async()
 		{
-			TestTupleCore(
+			await TestTupleAsyncCore(
 				new Tuple<
 				int, string, int, string, int, string, int,
 				Tuple<
@@ -943,22 +1381,135 @@ namespace MsgPack.Serialization
 						"8", 9, "10", 11, "12", 13, "14",
 						new Tuple<int>( 15 )
 					)
-				)
+				),
+				15
 			);
 		}
 
-		private void TestTupleCore<T>( T expected )
+		[Test]
+		public async Task TestValueTuple0Async()
+		{
+			await TestTupleAsyncCore( new ValueTuple(), 0 );
+		}
+
+		[Test]
+		public async Task TestValueTuple1Async()
+		{
+			await TestTupleAsyncCore( new ValueTuple<int>( 1 ), 1 );
+		}
+
+		[Test]
+		public async Task TestValueTuple7Async()
+		{
+			await TestTupleAsyncCore( new ValueTuple<int, string, int, string, int, string, int>( 1, "2", 3, "4", 5, "6", 7 ), 7 );
+		}
+
+		[Test]
+		public async Task TestValueTuple7Plus0Async()
+		{
+			await TestTupleAsyncCore(
+				new ValueTuple<
+					int, string, int, string, int, string, int,
+				ValueTuple>(
+					1, "2", 3, "4", 5, "6", 7,
+					new ValueTuple()
+				),
+				7
+			);
+		}
+
+		[Test]
+		public async Task TestValueTuple8Async()
+		{
+			await TestTupleAsyncCore(
+				new ValueTuple<
+					int, string, int, string, int, string, int,
+				ValueTuple<string>>(
+					1, "2", 3, "4", 5, "6", 7,
+					new ValueTuple<string>( "8" )
+				),
+				8
+			);
+		}
+
+		[Test]
+		public async Task TestValueTuple14Async()
+		{
+			await TestTupleAsyncCore(
+				new ValueTuple<
+					int, string, int, string, int, string, int,
+					ValueTuple<
+						string, int, string, int, string, int, string
+					>
+				>(
+					1, "2", 3, "4", 5, "6", 7,
+					new ValueTuple<string, int, string, int, string, int, string>(
+						"8", 9, "10", 11, "12", 13, "14"
+					)
+				),
+				14
+			);
+		}
+
+		[Test]
+		public async Task TestValueTuple14Plus0Async()
+		{
+			await TestTupleAsyncCore(
+				new ValueTuple<
+					int, string, int, string, int, string, int,
+					ValueTuple<
+						string, int, string, int, string, int, string,
+						ValueTuple
+					>
+				>(
+					1, "2", 3, "4", 5, "6", 7,
+					new ValueTuple<string, int, string, int, string, int, string, ValueTuple>(
+						"8", 9, "10", 11, "12", 13, "14",
+						new ValueTuple()
+					)
+				),
+				14
+			);
+		}
+
+		[Test]
+		public async Task TestValueTuple15Async()
+		{
+			await TestTupleAsyncCore(
+				new ValueTuple<
+					int, string, int, string, int, string, int,
+					ValueTuple<
+						string, int, string, int, string, int, string,
+						ValueTuple<int>
+					>
+				>(
+					1, "2", 3, "4", 5, "6", 7,
+					new ValueTuple<string, int, string, int, string, int, string, ValueTuple<int>>(
+						"8", 9, "10", 11, "12", 13, "14",
+						new ValueTuple<int>( 15 )
+					)
+				),
+				15
+			);
+		}
+
+		private async Task TestTupleAsyncCore<T>( T expected, int arity )
 			where T : IStructuralEquatable
 		{
 			var serializer = this.CreateTarget<T>( GetSerializationContext() );
 			using ( var stream = new MemoryStream() )
 			{
-				serializer.Pack( stream, expected );
+				await serializer.PackAsync( stream, expected );
 				stream.Position = 0;
-				Assert.That( serializer.Unpack( stream ), Is.EqualTo( expected ) );
+				var mpo = MessagePackSerializer.UnpackMessagePackObject( stream );
+				Assert.That( mpo.IsList, Is.True );
+				Assert.That( mpo.AsList().Count, Is.EqualTo( arity ) );
+				stream.Position = 0;
+				Assert.That( await serializer.UnpackAsync( stream ), Is.EqualTo( expected ) );
 			}
 		}
-#endif // !NETFX_35
+#endif // FEATURE_TAP
+#endif // !NET35
 <#+
 	}
 #>
@@ -979,7 +1530,7 @@ namespace MsgPack.Serialization
 		[Test]
 		public void TestEmptyBytes_Classic()
 		{
-			var context = NewSerializationContext( PackerCompatibilityOptions.Classic );
+			var context = NewSerializationContext( PackerCompatibilityOptions.Classic, DateTimeConversionMethod.Native );
 			var serializer = this.CreateTarget<byte[]>( context );
 			using ( var stream = new MemoryStream() )
 			{
@@ -1061,6 +1612,27 @@ namespace MsgPack.Serialization
 			}
 		}
 
+#if FEATURE_TAP
+		[Test]
+		public async Task TestNullableAsync()
+		{
+			var serializer = this.CreateTarget<int?>( GetSerializationContext() );
+			using ( var stream = new MemoryStream() )
+			{
+				await serializer.PackAsync( stream, 1 );
+				Assert.That( stream.Length, Is.EqualTo( 1 ) );
+				stream.Position = 0;
+				Assert.That( await serializer.UnpackAsync( stream ), Is.EqualTo( 1 ) );
+
+				stream.Position = 0;
+				await serializer.PackAsync( stream, null );
+				Assert.That( stream.Length, Is.EqualTo( 1 ) );
+				stream.Position = 0;
+				Assert.That( await serializer.UnpackAsync( stream ), Is.EqualTo( null ) );
+			}
+		}
+#endif // FEATURE_TAP
+
 		[Test]
 		public void TestValueType_Success()
 		{
@@ -1089,6 +1661,36 @@ namespace MsgPack.Serialization
 			}
 		}
 
+#if FEATURE_TAP
+		[Test]
+		public async Task TestValueTypeAsync_Success()
+		{
+			var serializer = this.CreateTarget<TestValueType>( GetSerializationContext() );
+			using ( var stream = new MemoryStream() )
+			{
+				var value = 
+					new TestValueType()
+					{ 
+						StringField = "ABC", 
+						Int32ArrayField = new int[] { 1, 2, 3 }, 
+						DictionaryField = 
+#if !UNITY
+							new Dictionary<int, int>() 
+#else
+							new Dictionary<int, int>( AotHelper.GetEqualityComparer<int>() ) 
+#endif // !UNITY
+							{ { 1, 1 } } 
+					};
+				await serializer.PackAsync( stream, value );
+				stream.Position = 0;
+				var result = await serializer.UnpackAsync( stream );
+				Assert.That( result.StringField, Is.EqualTo( value.StringField ) );
+				Assert.That( result.Int32ArrayField, Is.EqualTo( value.Int32ArrayField ) );
+				Assert.That( result.DictionaryField, Is.EqualTo( value.DictionaryField ) );
+			}
+		}
+#endif // FEATURE_TAP
+
 		// Issue81
 		[Test]
 		public void TestMultiDimensionalArray()
@@ -1098,7 +1700,6 @@ namespace MsgPack.Serialization
 			array[ 0, 1 ] = 1;
 			array[ 1, 0 ] = 10;
 			array[ 1, 1 ] = 11;
-
 
 			var serializer = this.CreateTarget<int[,]>( GetSerializationContext() );
 			using ( var stream = new MemoryStream() )
@@ -1118,6 +1719,37 @@ namespace MsgPack.Serialization
 				Assert.That( result[ 1, 1 ], Is.EqualTo( 11 ) );
 			}
 		}
+
+#if FEATURE_TAP
+		// Issue81
+		[Test]
+		public async Task TestMultiDimensionalArrayAsync()
+		{
+			var array = new int [ 2, 2 ];
+			array[ 0, 0 ] = 0;
+			array[ 0, 1 ] = 1;
+			array[ 1, 0 ] = 10;
+			array[ 1, 1 ] = 11;
+
+			var serializer = this.CreateTarget<int[,]>( GetSerializationContext() );
+			using ( var stream = new MemoryStream() )
+			{
+				await serializer.PackAsync( stream, array );
+				stream.Position = 0;
+
+				var result = await serializer.UnpackAsync( stream );
+				Assert.That( result, Is.TypeOf<int[,]>() );
+				Assert.That( result.Rank, Is.EqualTo( 2 ) );
+				Assert.That( result.Length, Is.EqualTo( 4 ) );
+				Assert.That( result.GetLength( 0 ), Is.EqualTo( 2 ) );
+				Assert.That( result.GetLength( 1 ), Is.EqualTo( 2 ) );
+				Assert.That( result[ 0, 0 ], Is.EqualTo( 0 ) );
+				Assert.That( result[ 0, 1 ], Is.EqualTo( 1 ) );
+				Assert.That( result[ 1, 0 ], Is.EqualTo( 10 ) );
+				Assert.That( result[ 1, 1 ], Is.EqualTo( 11 ) );
+			}
+		}
+#endif // FEATURE_TAP
 
 		[Test]
 		public void TestMultiDimensionalArrayComprex()
@@ -1188,7 +1820,12 @@ namespace MsgPack.Serialization
 			}
 		}
 
+#if !SILVERLIGHT
+
 		[Test]
+#if UNITY_WORKAROUND
+		[Ignore( "Unity's Array.SetValue is buggy for non-SZArray" )]
+#endif // UNITY_WORKAROUND
 		public void TestNonZeroBoundArray()
 		{
 			var array = Array.CreateInstance( typeof( int ), new [] { 2 }, new [] { 1 } );
@@ -1257,247 +1894,392 @@ namespace MsgPack.Serialization
 			}
 		}
 
+#endif // !SILVERLIGHT
+
 <#+
 	if ( !forIos )
 	{
 		// Not needed because generation itself has been done.
-#>
-		[Test]
-		public void TestHasInitOnlyField_Fail()
-		{
-			Assert.Throws<SerializationException>( () => this.CreateTarget<HasInitOnlyField>( GetSerializationContext() ) );
-		}
 
-		[Test]
-		public void TestHasInitOnlyFieldWithConstructor_Success()
-		{
-			var serializer = this.CreateTarget<HasInitOnlyFieldWithConstructor>( GetSerializationContext() );
-			using ( var stream = new MemoryStream() )
+		const string testValue = "\"123\"";
+		foreach ( var type in
+			new []
 			{
-				var value = new HasInitOnlyFieldWithConstructor( "123" );
-				serializer.Pack( stream, value );
-				stream.Position = 0;
-				var result = serializer.Unpack( stream );
-				Assert.That( result.Field, Is.EqualTo( "123" ) );
+				new { IsCollection = false,	TestValue = testValue,									DefaultValue = "\"ABC\"" },
+				new { IsCollection = true,	TestValue = "new List<string>{ " + testValue + " }",	DefaultValue = "new List<string>()" }, // test value should be appended to default empty collection.
 			}
-		}
+		)
+		{
+			foreach ( var spec in
+				new []
+				{
+					new { Prefix = "InitOnly",		Suffix = "Field",		Constructor = "Default",	IsPrivilegeRequired = !type.IsCollection,		Exception = ( !type.IsCollection ? "SerializationException" : null ) }, // cannot be deserialized
+					new { Prefix = "InitOnly",		Suffix = "Field",		Constructor = "Record",		IsPrivilegeRequired = false,					Exception = default( string ) },
+					new { Prefix = "InitOnly",		Suffix = "Field",		Constructor = "Both",		IsPrivilegeRequired = false,					Exception = default( string ) },
+					new { Prefix = "InitOnly",		Suffix = "Field",		Constructor = "Annotated",	IsPrivilegeRequired = false,					Exception = default( string ) },
+					new { Prefix = "ReadWrite",		Suffix = "Field",		Constructor = "Default",	IsPrivilegeRequired = false,					Exception = default( string ) },
+					new { Prefix = "ReadWrite",		Suffix = "Field",		Constructor = "Record",		IsPrivilegeRequired = false,					Exception = default( string ) },
+					new { Prefix = "ReadWrite",		Suffix = "Field",		Constructor = "Both",		IsPrivilegeRequired = false,					Exception = default( string ) },
+					new { Prefix = "ReadWrite",		Suffix = "Field",		Constructor = "Annotated",	IsPrivilegeRequired = false,					Exception = default( string ) },
+					new { Prefix = "GetOnly",		Suffix = "Property",	Constructor = "Default",	IsPrivilegeRequired = !type.IsCollection,		Exception = ( !type.IsCollection ? "SerializationException" : null ) }, // cannot be deserialized
+					new { Prefix = "GetOnly",		Suffix = "Property",	Constructor = "Record",		IsPrivilegeRequired = false,					Exception = default( string ) },
+					new { Prefix = "GetOnly",		Suffix = "Property",	Constructor = "Both",		IsPrivilegeRequired = false,					Exception = default( string ) },
+					new { Prefix = "GetOnly",		Suffix = "Property",	Constructor = "Annotated",	IsPrivilegeRequired = false,					Exception = default( string ) },
+					new { Prefix = "PrivateSetter",	Suffix = "Property",	Constructor = "Default",	IsPrivilegeRequired = !type.IsCollection,		Exception = default( string ) }, // via reflection
+					new { Prefix = "PrivateSetter",	Suffix = "Property",	Constructor = "Record",		IsPrivilegeRequired = false,					Exception = default( string ) },
+					new { Prefix = "PrivateSetter",	Suffix = "Property",	Constructor = "Both",		IsPrivilegeRequired = false,					Exception = default( string ) }, // via reflection
+					new { Prefix = "PrivateSetter",	Suffix = "Property",	Constructor = "Annotated",	IsPrivilegeRequired = false,					Exception = default( string ) },
+					new { Prefix = "PublicSetter",	Suffix = "Property",	Constructor = "Default",	IsPrivilegeRequired = false,					Exception = default( string ) },
+					new { Prefix = "PublicSetter",	Suffix = "Property",	Constructor = "Record",		IsPrivilegeRequired = false,					Exception = default( string ) },
+					new { Prefix = "PublicSetter",	Suffix = "Property",	Constructor = "Both",		IsPrivilegeRequired = false,					Exception = default( string ) },
+					new { Prefix = "PublicSetter",	Suffix = "Property",	Constructor = "Annotated",	IsPrivilegeRequired = false,					Exception = default( string ) },
+			}
+			)
+			{
+				var typeName = "Has" + spec.Prefix + ( type.IsCollection ? "AppendableCollection" : String.Empty ) + spec.Suffix + "With" + spec.Constructor + "Constructor";
+#>
 
 		[Test]
-		public void TestHasInitOnlyFieldWithConstructorMissing_Success()
+		public void Test<#= typeName #>_<#= spec.Exception == null ? "Success" : "Fail" #>()
 		{
-			var serializer = this.CreateTarget<HasInitOnlyFieldWithConstructor>( GetSerializationContext() );
+<#+
+				if ( spec.Exception != null )
+				{
+#>
+			Assert.Throws<<#= spec.Exception #>>( () => this.CreateTarget<<#= typeName #>>( GetSerializationContext() ) );
+<#+
+				}
+				else
+				{
+					if ( spec.IsPrivilegeRequired )
+					{
+#>
+#if !SILVERLIGHT || SILVERLIGHT_PRIVILEGED
+<#+
+					}
+#>
+			var serializer = this.CreateTarget<<#= typeName #>>( GetSerializationContext() );
+
 			using ( var stream = new MemoryStream() )
 			{
 <#+
-		if ( serializationMethod == "Array" )
+					switch ( spec.Constructor )
+					{
+						case "Default":
+						{
+#>
+				var value = new <#= typeName #>();
+				value.InitializeMember( <#= type.TestValue #> );
+<#+
+							break;
+						}
+						case "Record":
+						case "Both":
+						{
+#>
+				var value = new <#= typeName #>( <#= type.TestValue #> );
+<#+
+							break;
+						}
+						case "Annotated":
+						{
+#>
+				var value = new <#= typeName #>( -1 /* dummy */ );
+<#+
+							break;
+						}
+					} // switch ( spec.Constructor )
+#>
+				serializer.Pack( stream, value );
+				stream.Position = 0;
+				var result = serializer.Unpack( stream );
+<#+
+					switch ( spec.Constructor )
+					{
+						case "Annotated":
+						{
+#>
+				// dummy annotated constructor does not take the value, so the deserialized value should be "default" of the type.
+				Assert.That( result.Member, Is.EqualTo( <#= type.DefaultValue #> ) );
+<#+
+							break;
+						}
+						default:
+						{
+#>
+				// check the member value deserialized properly.
+				Assert.That( result.Member, Is.EqualTo( <#= type.TestValue #> ) );
+<#+
+							break;
+						}
+					} // switch( spec.Constructor )
+
+					switch ( spec.Constructor )
+					{
+						case "Both":
+						{
+							if ( spec.Prefix != "PrivateSetter" || type.IsCollection )
+							{
+								goto case "Annotated";
+							}
+#>
+#if !SILVERLIGHT || SILVERLIGHT_PRIVILEGED
+				Assert.That( result.WasProperConstructorUsed() );
+#else
+				// Parameterized should be called because private setters are completely ignored in non-priviledged mode.
+				Assert.That( result.WasProperConstructorUsed(), Is.False );
+#endif // !SILVERLIGHT || SILVERLIGHT_PRIVILEGED
+<#+
+							break;
+						}
+						case "Annotated":
+						{
+#>
+				Assert.That( result.WasProperConstructorUsed() );
+<#+
+							break;
+						}
+					} // switch ( spec.Constructor )
+#>
+			}
+<#+
+					if ( spec.IsPrivilegeRequired )
+					{
+#>
+#else
+			Assert.Throws<SerializationException>( () => this.CreateTarget<<#= typeName #>>( GetSerializationContext() ) );
+#endif // !SILVERLIGHT || SILVERLIGHT_PRIVILEGED
+<#+
+					}
+				} // if ( Exception != null )
+#>
+		}
+<#+
+				if ( spec.Exception == null )
+				{
+#>
+
+		[Test]
+		public void Test<#= typeName #>_DeserializeWithMissingMember_Success()
 		{
+<#+
+					if ( spec.IsPrivilegeRequired )
+					{
+#>
+#if !SILVERLIGHT || SILVERLIGHT_PRIVILEGED
+<#+
+					}
+#>
+			var serializer = this.CreateTarget<<#= typeName #>>( GetSerializationContext() );
+
+			using ( var stream = new MemoryStream() )
+			{
+<#+
+					if ( serializationMethod == "Array" )
+					{
 #>
 				stream.Write( new byte[]{ 0x90 } );
 <#+
-		}
-		else
-		{
+					}
+					else
+					{
 #>
 				stream.Write( new byte[]{ 0x80 } );
 <#+
-		}
+					} // if ( serializationMethod == "Array" )
 #>
 				stream.Position = 0;
 				var result = serializer.Unpack( stream );
-				Assert.That( result.Field, Is.Null );
+<#+
+					if ( type.IsCollection )
+					{
+						switch ( spec.Constructor )
+						{
+							case "Default":
+							case "Both":
+							case "Annotated":
+							{
+#>
+				// Default constructor was called and nothing to be set.
+				Assert.That( result.Member, Is.EqualTo( <#= type.DefaultValue #> ) );
+<#+
+								break;
+							}
+							case "Record":
+							{
+#>
+				// Set null via deserialization constructor.
+				Assert.That( result.Member, Is.Null );
+<#+
+								break;
+							}
+						}
+					}
+					else
+					{
+						switch ( spec.Constructor )
+						{
+							case "Default":
+							case "Annotated":
+							{
+#>
+				// Default constructor was called and was nothing to be set.
+				Assert.That( result.Member, Is.EqualTo( <#= type.DefaultValue #> ) );
+<#+
+								break;
+							}
+							case "Record":
+							{
+#>
+				// Set null via deserialization constructor.
+				Assert.That( result.Member, Is.Null );
+<#+
+								break;
+							}
+							case "Both":
+							{
+								switch ( spec.Prefix )
+								{
+									case "PrivateSetter":
+									{
+										if ( type.IsCollection )
+										{
+											goto case "PublicSetter";
+										}
+#>
+#if !SILVERLIGHT || SILVERLIGHT_PRIVILEGED
+				// Default constructor was called and was nothing to be set.
+				Assert.That( result.Member, Is.EqualTo( <#= type.DefaultValue #> ) );
+#else
+				// Set null via deserialization constructor.
+				Assert.That( result.Member, Is.Null );
+#endif // !SILVERLIGHT || SILVERLIGHT_PRIVILEGED
+<#+
+										break;
+									}
+									case "PublicSetter":
+									case "ReadWrite":
+									{
+#>
+				// Default constructor was called and was nothing to be set.
+				Assert.That( result.Member, Is.EqualTo( <#= type.DefaultValue #> ) );
+<#+
+										break;
+									}
+									default:
+									{
+#>
+				// Set null via deserialization constructor.
+				Assert.That( result.Member, Is.Null );
+<#+
+										break;
+									}
+								}
+
+								break;
+							}
+						}
+					}
+#>
 			}
+<#+
+					if ( spec.IsPrivilegeRequired )
+					{
+#>
+#else
+			Assert.Throws<SerializationException>( () => this.CreateTarget<<#= typeName #>>( GetSerializationContext() ) );
+#endif // !SILVERLIGHT || SILVERLIGHT_PRIVILEGED
+<#+
+					}
+#>
 		}
 
 		[Test]
-		public void TestHasInitOnlyFieldWithConstructorWithExtra_Success()
+		public void Test<#= typeName #>_DeseriaizeWithExtraMember_Success()
 		{
-			var serializer = this.CreateTarget<HasInitOnlyFieldWithConstructor>( GetSerializationContext() );
+<#+
+					if ( spec.IsPrivilegeRequired )
+					{
+#>
+#if !SILVERLIGHT || SILVERLIGHT_PRIVILEGED
+<#+
+					}
+#>
+			var serializer = this.CreateTarget<<#= typeName #>>( GetSerializationContext() );
+
 			using ( var stream = new MemoryStream() )
 			{
 				using ( var packer = Packer.Create( stream, false ) )
 				{
 <#+
-		if ( serializationMethod == "Array" )
-		{
+					if ( serializationMethod == "Array" )
+					{
 #>
 					packer.PackArrayHeader( 2 );
 <#+
-		}
-		else
-		{
+					}
+					else
+					{
 #>
 					packer.PackMapHeader( 2 );
-					packer.PackString( "Field" );
+					packer.PackString( "Member" );
 <#+
-		}
+					}
+
+					if ( type.IsCollection )
+					{
 #>
-					packer.PackString( "ABC" );
+					packer.PackArrayHeader( 1 );
 <#+
-		if ( serializationMethod == "Map" )
-		{
+					}
+#>
+					packer.PackString( <#= testValue #> );
+<#+
+					if ( serializationMethod == "Map" )
+					{
 #>
 					packer.PackString( "Extra" );
 <#+
-		}
+					}
 #>
 					packer.PackNull();
 				}
 
 				stream.Position = 0;
 				var result = serializer.Unpack( stream );
-				Assert.That( result.Field, Is.EqualTo( "ABC" ) );
+<#+
+					if ( spec.Constructor == "Annotated" )
+					{
+#>
+				// dummy annotated constructor does not take the value, so the deserialized value should be "default" of the type.
+				Assert.That( result.Member, Is.EqualTo( <#= type.DefaultValue #> ) );
+<#+
+					}
+					else
+					{
+#>
+				// check the member value deserialized properly.
+				Assert.That( result.Member, Is.EqualTo( <#= type.TestValue #> ) );
+<#+
+					} // if spec.Constructor == "Annotated"
+#>
 			}
-		}
-
-		[Test]
-		public void TestHasGetOnlyProperty_Fail()
-		{
-			Assert.Throws<SerializationException>( () => this.CreateTarget<HasGetOnlyProperty>( GetSerializationContext() ) );
-		}
-
-		[Test]
-		public void TestHasGetOnlyPropertyWithConstructor_Success()
-		{
-			var serializer = this.CreateTarget<HasGetOnlyPropertyWithConstructor>( GetSerializationContext() );
-			using ( var stream = new MemoryStream() )
-			{
-				var value = new HasGetOnlyPropertyWithConstructor( "123" );
-				serializer.Pack( stream, value );
-				stream.Position = 0;
-				var result = serializer.Unpack( stream );
-				Assert.That( result.Property, Is.EqualTo( "123" ) );
-			}
-		}
-
-		[Test]
-		public void TestHasGetOnlyPropertyWithConstructorMissing_Success()
-		{
-			var serializer = this.CreateTarget<HasGetOnlyPropertyWithConstructor>( GetSerializationContext() );
-			using ( var stream = new MemoryStream() )
-			{
 <#+
-		if ( serializationMethod == "Array" )
-		{
+					if ( spec.IsPrivilegeRequired )
+					{
 #>
-				stream.Write( new byte[]{ 0x90 } );
+#else
+			Assert.Throws<SerializationException>( () => this.CreateTarget<<#= typeName #>>( GetSerializationContext() ) );
+#endif // !SILVERLIGHT || SILVERLIGHT_PRIVILEGED
 <#+
-		}
-		else
-		{
+					}
 #>
-				stream.Write( new byte[]{ 0x80 } );
+		}
 <#+
-		}
+				} // if spec.Exception == null
+			} // foreach spec
+		} // foreach prefix
 #>
-				stream.Position = 0;
-				var result = serializer.Unpack( stream );
-				Assert.That( result.Property, Is.Null );
-			}
-		}
-
-		[Test]
-		public void TestHasGetOnlyPropertyWithConstructorWithExtra_Success()
-		{
-			var serializer = this.CreateTarget<HasGetOnlyPropertyWithConstructor>( GetSerializationContext() );
-			using ( var stream = new MemoryStream() )
-			{
-				using ( var packer = Packer.Create( stream, false ) )
-				{
-<#+
-		if ( serializationMethod == "Array" )
-		{
-#>
-					packer.PackArrayHeader( 2 );
-<#+
-		}
-		else
-		{
-#>
-					packer.PackMapHeader( 2 );
-					packer.PackString( "Property" );
-<#+
-		}
-#>
-					packer.PackString( "ABC" );
-<#+
-		if ( serializationMethod == "Map" )
-		{
-#>
-					packer.PackString( "Extra" );
-<#+
-		}
-#>
-					packer.PackNull();
-				}
-
-				stream.Position = 0;
-				var result = serializer.Unpack( stream );
-				Assert.That( result.Property, Is.EqualTo( "ABC" ) );
-			}
-		}
-
-		[Test]
-		public void TestHasPrivateSetterPropertyWithConstructor_Success()
-		{
-			var serializer = this.CreateTarget<HasGetOnlyPropertyWithConstructor>( GetSerializationContext() );
-			using ( var stream = new MemoryStream() )
-			{
-				using ( var packer = Packer.Create( stream, false ) )
-				{
-<#+
-		if ( serializationMethod == "Array" )
-		{
-#>
-					packer.PackArrayHeader( 2 );
-<#+
-		}
-		else
-		{
-#>
-					packer.PackMapHeader( 2 );
-					packer.PackString( "Property" );
-<#+
-		}
-#>
-					packer.PackString( "ABC" );
-<#+
-		if ( serializationMethod == "Map" )
-		{
-#>
-					packer.PackString( "Extra" );
-<#+
-		}
-#>
-					packer.PackNull();
-				}
-
-				stream.Position = 0;
-				var result = serializer.Unpack( stream );
-				Assert.That( result.Property, Is.EqualTo( "ABC" ) );
-			}
-		}
-
-		[Test]
-		public void TestOnlyCollection_Success()
-		{
-			var serializer = this.CreateTarget<OnlyCollection>( GetSerializationContext() );
-			using ( var stream = new MemoryStream() )
-			{
-				var value = new OnlyCollection();
-				value.Collection.Add( 1 );
-				value.Collection.Add( 2 );
-				serializer.Pack( stream, value );
-				stream.Position = 0;
-				var result = serializer.Unpack( stream );
-				Assert.That( result.Collection.ToArray(), Is.EqualTo( new [] { 1, 2 } ) );
-			}
-		}
-
-		[Test]
-		public void TestConstrutorDeserializationOnlyCollection_Fail()
-		{
-			Assert.Throws<SerializationException>( () => this.CreateTarget<OnlyCollectionWithConstructor>( GetSerializationContext() ) );
-		}
 
 		[Test]
 		public void TestConstrutorDeserializationWithAnotherNameConstrtor_DifferIsSetDefault()
@@ -1573,6 +2355,31 @@ namespace MsgPack.Serialization
 	}
 #>
 
+		// Issue233
+		[Test]
+		public void TestConstructorDeserializationWithParametersNotInLexicalOrder()
+		{
+			var endpoints =
+				new EndpointList(
+					"Test String One",
+					new Dictionary<string, string[]>
+					{
+						{ "ConfigService", new [] { "ur1", "ur2" } },
+						{ "TestService", new [] { "ur1", "ur2" } }
+					},
+					"Test String Two"
+				);
+
+			var context = new SerializationContext();
+			var ser = context.GetSerializer<EndpointList>();
+			var bytes = ser.PackSingleObject( endpoints );
+			var endpointsDeser = ser.UnpackSingleObject( bytes );
+
+			Assert.That( endpointsDeser.StringOne, Is.EqualTo( endpoints.StringOne ) );
+			Assert.That( endpointsDeser.StringTwo, Is.EqualTo( endpoints.StringTwo ) );
+			Assert.That( endpointsDeser.Endpoints, Is.EqualTo( endpoints.Endpoints ) );
+		}
+
 		[Test]
 		public void TestCollection_Success()
 		{
@@ -1618,6 +2425,7 @@ namespace MsgPack.Serialization
 <#+
 	if ( !forIos )
 	{
+		var header = serializationMethod == "Array" ? "0x91" : ( "0x81, 0xAA, " + String.Join( ", ", "Int32Field".Select( c => ( ushort )c ).Select( x => "0x" + x.ToString( "X2" ) ) ) );
 		// Not needed because generation itself has been done.
 #>
 		[Test]
@@ -1629,9 +2437,18 @@ namespace MsgPack.Serialization
 				var value = new JustPackable();
 				value.Int32Field = 1;
 				serializer.Pack( stream, value );
-				Assert.That( stream.ToArray(), Is.EqualTo( new byte[] { 0x91, 0xA1, ( byte )'A' } ) );
+				Assert.That( stream.ToArray(), Is.EqualTo( new byte[] { 0x91, 0xA1, ( byte )'1' } ) );
 				stream.Position = 0;
 				Assert.Throws<SerializationException>( () => serializer.Unpack( stream ), "Round-trip should not be succeeded." );
+
+#if FEATURE_TAP
+				stream.SetLength( 0 );
+				serializer.PackAsync( stream, value, CancellationToken.None ).GetAwaiter().GetResult();
+				Assert.That( stream.ToArray(), Is.EqualTo( new byte[] { <#= header #>, 0x1 } ) );
+				stream.Position = 0;
+				var result = serializer.UnpackAsync( stream, CancellationToken.None ).GetAwaiter().GetResult();
+				Assert.That( result.Int32Field, Is.EqualTo( value.Int32Field ) );
+#endif // FEATURE_TAP
 			}
 		}
 
@@ -1642,12 +2459,70 @@ namespace MsgPack.Serialization
 			using ( var stream = new MemoryStream() )
 			{
 				var value = new JustUnpackable();
+				value.Int32Field = 1;
 				serializer.Pack( stream, value );
 				stream.Position = 0;
 				var result = serializer.Unpack( stream );
 				Assert.That( result.Int32Field.ToString(), Is.EqualTo( JustUnpackable.Dummy ) );
+
+#if FEATURE_TAP
+				stream.SetLength( 0 );
+				serializer.PackAsync( stream, value, CancellationToken.None ).GetAwaiter().GetResult();
+				Assert.That( stream.ToArray(), Is.EqualTo( new byte[] { <#= header #>, 0x1 } ) );
+				stream.Position = 0;
+				result = serializer.UnpackAsync( stream, CancellationToken.None ).GetAwaiter().GetResult();
+				Assert.That( result.Int32Field, Is.EqualTo( value.Int32Field ) );
+#endif // FEATURE_TAP
 			}
 		}
+		
+#if FEATURE_TAP
+
+		[Test]
+		public void TestAsyncPackable_PackToMessageUsed()
+		{
+			var serializer = this.CreateTarget<JustAsyncPackable>( GetSerializationContext() );
+			using ( var stream = new MemoryStream() )
+			{
+				var value = new JustAsyncPackable();
+				value.Int32Field = 1;
+				serializer.Pack( stream, value );
+				Assert.That( stream.ToArray(), Is.EqualTo( new byte[] { <#= header #>, 0x1 } ) );
+				stream.Position = 0;
+				var result = serializer.Unpack( stream );
+				Assert.That( result.Int32Field, Is.EqualTo( value.Int32Field ) );
+
+				stream.SetLength( 0 );
+				serializer.PackAsync( stream, value, CancellationToken.None ).GetAwaiter().GetResult();
+				Assert.That( stream.ToArray(), Is.EqualTo( new byte[] { 0x91, 0xA1, ( byte )'1' } ) );
+				stream.Position = 0;
+				Assert.Throws<SerializationException>( () => serializer.UnpackAsync( stream, CancellationToken.None ).GetAwaiter().GetResult(), "Round-trip should not be succeeded." );
+			}
+		}
+
+		[Test]
+		public void TestAsyncUnpackable_UnpackFromMessageUsed()
+		{
+			var serializer = this.CreateTarget<JustAsyncUnpackable>( GetSerializationContext() );
+			using ( var stream = new MemoryStream() )
+			{
+				var value = new JustAsyncUnpackable();
+				value.Int32Field = 1;
+				serializer.Pack( stream, value );
+				Assert.That( stream.ToArray(), Is.EqualTo( new byte[] { <#= header #>, 0x1 } ) );
+				stream.Position = 0;
+				var result = serializer.Unpack( stream );
+				Assert.That( result.Int32Field, Is.EqualTo( value.Int32Field ) );
+
+				stream.SetLength( 0 );
+				serializer.PackAsync( stream, value, CancellationToken.None ).GetAwaiter().GetResult();
+				stream.Position = 0;
+				result = serializer.UnpackAsync( stream, CancellationToken.None ).GetAwaiter().GetResult();
+				Assert.That( result.Int32Field.ToString(), Is.EqualTo( JustAsyncUnpackable.Dummy ) );
+			}
+		}
+
+#endif // FEATURE_TAP
 
 		[Test]
 		public void TestPackableUnpackable_PackToMessageAndUnpackFromMessageUsed()
@@ -1658,16 +2533,76 @@ namespace MsgPack.Serialization
 				var value = new PackableUnpackable();
 				value.Int32Field = 1;
 				serializer.Pack( stream, value );
-				Assert.That( stream.ToArray(), Is.EqualTo( new byte[] { 0x91, 0xA1, ( byte )'A' } ) );
+				Assert.That( stream.ToArray(), Is.EqualTo( new byte[] { 0x91, 0xA1, ( byte )'1' } ) );
 				stream.Position = 0;
-				serializer.Unpack( stream );
+				var result = serializer.Unpack( stream );
+				Assert.That( result.Int32Field.ToString(), Is.EqualTo( PackableUnpackable.Dummy ) );
+
+#if FEATURE_TAP
+				stream.SetLength( 0 );
+				serializer.PackAsync( stream, value, CancellationToken.None ).GetAwaiter().GetResult();
+				Assert.That( stream.ToArray(), Is.EqualTo( new byte[] { <#= header #>, 0x1 } ) );
+				stream.Position = 0;
+				result = serializer.UnpackAsync( stream, CancellationToken.None ).GetAwaiter().GetResult();
+				Assert.That( result.Int32Field, Is.EqualTo( value.Int32Field ) );
+#endif // FEATURE_TAP
+			}
+		}
+
+#if FEATURE_TAP
+
+		[Test]
+		public void TestAsyncPackableUnpackable_PackToMessageAndUnpackFromMessageUsed()
+		{
+			var serializer = this.CreateTarget<AsyncPackableUnpackable>( GetSerializationContext() );
+			using ( var stream = new MemoryStream() )
+			{
+				var value = new AsyncPackableUnpackable();
+				value.Int32Field = 1;
+				serializer.Pack( stream, value );
+				Assert.That( stream.ToArray(), Is.EqualTo( new byte[] { <#= header #>, 0x1 } ) );
+				stream.Position = 0;
+				var result = serializer.Unpack( stream );
+				Assert.That( result.Int32Field, Is.EqualTo( value.Int32Field ) );
+
+				stream.SetLength( 0 );
+				serializer.PackAsync( stream, value, CancellationToken.None ).GetAwaiter().GetResult();
+				Assert.That( stream.ToArray(), Is.EqualTo( new byte[] { 0x91, 0xA1, ( byte )'1' } ) );
+				stream.Position = 0;
+				result = serializer.UnpackAsync( stream, CancellationToken.None ).GetAwaiter().GetResult();
+				Assert.That( result.Int32Field.ToString(), Is.EqualTo( AsyncPackableUnpackable.Dummy ) );
 			}
 		}
 
 		[Test]
+		public void TestFullPackableUnpackable_PackToMessageAndUnpackFromMessageUsed()
+		{
+			var serializer = this.CreateTarget<FullPackableUnpackable>( GetSerializationContext() );
+			using ( var stream = new MemoryStream() )
+			{
+				var value = new FullPackableUnpackable();
+				value.Int32Field = 1;
+				serializer.Pack( stream, value );
+				Assert.That( stream.ToArray(), Is.EqualTo( new byte[] { 0x91, 0xA1, ( byte )'1' } ) );
+				stream.Position = 0;
+				var result = serializer.Unpack( stream );
+				Assert.That( result.Int32Field.ToString(), Is.EqualTo( FullPackableUnpackable.Dummy ) );
+
+				stream.SetLength( 0 );
+				serializer.PackAsync( stream, value, CancellationToken.None ).GetAwaiter().GetResult();
+				Assert.That( stream.ToArray(), Is.EqualTo( new byte[] { 0x91, 0xA1, ( byte )'1' } ) );
+				stream.Position = 0;
+				result = serializer.UnpackAsync( stream, CancellationToken.None ).GetAwaiter().GetResult();
+				Assert.That( result.Int32Field.ToString(), Is.EqualTo( FullPackableUnpackable.Dummy ) );
+			}
+		}
+
+#endif // FEATURE_TAP
+
+		[Test]
 		public void TestBinary_ClassicContext()
 		{
-			var context = NewSerializationContext( PackerCompatibilityOptions.Classic );
+			var context = NewSerializationContext( PackerCompatibilityOptions.Classic, DateTimeConversionMethod.Native );
 			var serializer = context.GetSerializer<byte[]>();
 
 			using ( var stream = new MemoryStream() )
@@ -1680,7 +2615,7 @@ namespace MsgPack.Serialization
 		[Test]
 		public void TestBinary_ContextWithPackerCompatilibyOptionsNone()
 		{
-			var context = NewSerializationContext( PackerCompatibilityOptions.None );
+			var context = NewSerializationContext( PackerCompatibilityOptions.None, DateTimeConversionMethod.Timestamp );
 			var serializer = CreateTarget<byte[]>( context );
 
 			using ( var stream = new MemoryStream() )
@@ -1695,8 +2630,8 @@ namespace MsgPack.Serialization
 		[Test]
 		public void TestExt_ClassicContext()
 		{
-			var context = NewSerializationContext( SerializationContext.CreateClassicContext().CompatibilityOptions.PackerCompatibilityOptions );
-			context.Serializers.Register( new CustomDateTimeSerealizer() );
+			var context = NewSerializationContext( SerializationContext.CreateClassicContext().CompatibilityOptions.PackerCompatibilityOptions, SerializationContext.CreateClassicContext().DefaultDateTimeConversionMethod );
+			context.Serializers.RegisterOverride( new CustomDateTimeSerealizer() );
 			var serializer = CreateTarget<DateTime>( context );
 
 			using ( var stream = new MemoryStream() )
@@ -1712,7 +2647,7 @@ namespace MsgPack.Serialization
 		[Test]
 		public void TestExt_DefaultContext()
 		{
-			var context = NewSerializationContext( SerializationContext.Default.CompatibilityOptions.PackerCompatibilityOptions );
+			var context = NewSerializationContext( SerializationContext.Default.CompatibilityOptions.PackerCompatibilityOptions, SerializationContext.Default.DefaultDateTimeConversionMethod );
 			context.Serializers.Register( new CustomDateTimeSerealizer() );
 			var serializer = CreateTarget<DateTime>( context );
 
@@ -1729,7 +2664,7 @@ namespace MsgPack.Serialization
 		[Test]
 		public void TestExt_ContextWithPackerCompatilibyOptionsNone()
 		{
-			var context = NewSerializationContext( PackerCompatibilityOptions.None );
+			var context = NewSerializationContext();
 			context.Serializers.Register( new CustomDateTimeSerealizer() );
 			context.CompatibilityOptions.PackerCompatibilityOptions = PackerCompatibilityOptions.None;
 			var serializer = CreateTarget<DateTime>( context );
@@ -1747,7 +2682,7 @@ namespace MsgPack.Serialization
 		[Test]
 		public void TestAbstractTypes_KnownCollections_Default_Success()
 		{
-			var context = NewSerializationContext( PackerCompatibilityOptions.None );
+			var context = NewSerializationContext();
 			var serializer = CreateTarget<WithAbstractInt32Collection>( context );
 
 			using ( var stream = new MemoryStream() )
@@ -1765,7 +2700,7 @@ namespace MsgPack.Serialization
 		[Test]
 		public void TestAbstractTypes_KnownCollections_WithoutRegistration_Fail()
 		{
-			var context = NewSerializationContext( PackerCompatibilityOptions.None );
+			var context = NewSerializationContext();
 			context.DefaultCollectionTypes.Unregister( typeof( IList<> ) );
 			Assert.Throws<NotSupportedException>( () => DoKnownCollectionTest<WithAbstractInt32Collection>( context ) );
 		}
@@ -1773,7 +2708,7 @@ namespace MsgPack.Serialization
 		[Test]
 		public void TestAbstractTypes_KnownCollections_ExplicitRegistration_Success()
 		{
-			var context = NewSerializationContext( PackerCompatibilityOptions.None );
+			var context = NewSerializationContext();
 			context.DefaultCollectionTypes.Register( typeof( IList<> ), typeof( Collection<> ) );
 			var serializer = CreateTarget<WithAbstractInt32Collection>( context );
 
@@ -1792,7 +2727,7 @@ namespace MsgPack.Serialization
 		[Test]
 		public void TestAbstractTypes_KnownCollections_ExplicitRegistrationForSpecific_Success()
 		{
-			var context = NewSerializationContext( PackerCompatibilityOptions.None );
+			var context = NewSerializationContext();
 			context.DefaultCollectionTypes.Register( typeof( IList<int> ), typeof( Collection<int> ) );
 			var serializer1 = CreateTarget<WithAbstractInt32Collection>( context );
 
@@ -1825,11 +2760,12 @@ namespace MsgPack.Serialization
 		[Test]
 		public void TestAbstractTypes_NotACollection_Fail()
 		{
-			var context = NewSerializationContext( PackerCompatibilityOptions.None );
+			var context = NewSerializationContext();
 			Assert.Throws<NotSupportedException>( () => DoKnownCollectionTest<WithAbstractNonCollection>( context ) );
 		}
 
-#if !NETFX_35 && !UNITY
+#if !NET35 && !UNITY && !SILVERLIGHT
+
 		[Test]
 		public void TestReadOnlyCollectionInterfaceDefault()
 		{
@@ -1916,12 +2852,13 @@ namespace MsgPack.Serialization
 		{
 			using ( var buffer = new MemoryStream(data) )
 			{
-				var serializer = MessagePackSerializer.Get<T>( NewSerializationContext( PackerCompatibilityOptions.None ) );
+				var serializer = MessagePackSerializer.Get<T>( NewSerializationContext() );
 				var result = serializer.Unpack( buffer );
 				assertion( result );
 			}
 		}
-#endif // !NETFX_35 && !UNITY
+
+#endif // !NET35 && !UNITY && !SILVERLIGHT
 
 		private void TestCore<T>( T value, Func<Stream, T> unpacking, Func<T, T, bool> comparer )
 		{
@@ -1964,6 +2901,24 @@ namespace MsgPack.Serialization
 			}
 		}
 
+#if FEATURE_TAP
+
+		private async Task TestCoreWithVerifyAsync<T>( T value, SerializationContext context )
+			where T : IVerifiable
+		{
+			var target = this.CreateTarget<T>( context );
+			using ( var buffer = new MemoryStream() )
+			{
+				await target.PackAsync( buffer, value );
+				buffer.Position = 0;
+				T unpacked = await target.UnpackAsync( buffer );
+				buffer.Position = 0;
+				unpacked.Verify( buffer );
+			}
+		}
+
+#endif // FEATURE_TAP
+
 		[Test]
 		public void TestIssue25_Plain()
 		{
@@ -1981,6 +2936,26 @@ namespace MsgPack.Serialization
 				Assert.That( resultNumbers[ 1 ], Is.EqualTo( 2 ) );
 			}
 		}
+
+#if FEATURE_TAP
+		[Test]
+		public async Task TestIssue25_PlainAsync()
+		{
+			var hasEnumerable = new HasEnumerable { Numbers = new[] { 1, 2 } };
+			var target = CreateTarget<HasEnumerable>( GetSerializationContext() );
+
+			using ( var buffer = new MemoryStream() )
+			{
+				await target.PackAsync( buffer, hasEnumerable );
+				buffer.Position = 0;
+				var result = await target.UnpackAsync( buffer );
+				var resultNumbers = result.Numbers.ToArray();
+				Assert.That( resultNumbers.Length, Is.EqualTo( 2 ) );
+				Assert.That( resultNumbers[ 0 ], Is.EqualTo( 1 ) );
+				Assert.That( resultNumbers[ 1 ], Is.EqualTo( 2 ) );
+			}
+		}
+#endif // FEATURE_TAP
 
 		[Test]
 		public void TestIssue25_SelfComposite()
@@ -2014,6 +2989,7 @@ namespace MsgPack.Serialization
 
 #region -- ReadOnly / Private Members --
 
+#if !SILVERLIGHT || SILVERLIGHT_PRIVILEGED
 		// ReSharper disable UnusedMember.Local
 		// member names
 		private const string PublicProperty = "PublicProperty";
@@ -2023,6 +2999,18 @@ namespace MsgPack.Serialization
 		private const string PublicReadOnlyPropertyPlain = "PublicReadOnlyPropertyPlain";
 		private const string NonPublicPropertyPlain = "NonPublicPropertyPlain";
 		private const string CollectionReadOnlyProperty = "CollectionReadOnlyProperty";
+		private const string NonPublicCollectionProperty = "NonPublicCollectionProperty";
+		private const string NonPublicCollectionField = "NonPublicCollectionField";
+		private const string NonPublicCollectionReadOnlyProperty = "NonPublicCollectionReadOnlyProperty";
+		private const string NonPublicCollectionReadOnlyField = "NonPublicCollectionReadOnlyField";
+		private const string NonPublicDictionaryProperty = "NonPublicDictionaryProperty";
+		private const string NonPublicDictionaryField = "NonPublicDictionaryField";
+		private const string NonPublicDictionaryReadOnlyProperty = "NonPublicDictionaryReadOnlyProperty";
+		private const string NonPublicDictionaryReadOnlyField = "NonPublicDictionaryReadOnlyField";
+		private const string NonPublicIDictionaryProperty = "NonPublicIDictionaryProperty";
+		private const string NonPublicIDictionaryField = "NonPublicIDictionaryField";
+		private const string NonPublicIDictionaryReadOnlyProperty = "NonPublicIDictionaryReadOnlyProperty";
+		private const string NonPublicIDictionaryReadOnlyField = "NonPublicIDictionaryReadOnlyField";
 		private const string PublicField = "PublicField";
 		private const string PublicReadOnlyField = "PublicReadOnlyField";
 		private const string NonPublicField = "NonPublicField";
@@ -2043,7 +3031,7 @@ namespace MsgPack.Serialization
 		public void TestNonPublicWritableMember_PlainOldCliClass()
 		{
 			var target = new PlainClass();
-			target.CollectionReadOnlyProperty.Add( 10 );
+			target.InitializeCollectionMembers();
 			TestNonPublicWritableMemberCore( target, PublicProperty, PublicField, CollectionReadOnlyProperty );
 		}
 
@@ -2051,11 +3039,21 @@ namespace MsgPack.Serialization
 		public void TestNonPublicWritableMember_MessagePackMember()
 		{
 			var target = new AnnotatedClass();
-			target.CollectionReadOnlyProperty.Add( 10 );
+			target.InitializeCollectionMembers();
 #if !NETFX_CORE && !SILVERLIGHT
-			TestNonPublicWritableMemberCore( target, PublicProperty, NonPublicProperty, PublicField, NonPublicField, NonSerializedPublicField, NonSerializedNonPublicField, CollectionReadOnlyProperty );
+			TestNonPublicWritableMemberCore(
+				target, PublicProperty, NonPublicProperty, PublicField, NonPublicField, NonSerializedPublicField, NonSerializedNonPublicField, CollectionReadOnlyProperty, 
+				NonPublicCollectionProperty, NonPublicCollectionField, NonPublicCollectionReadOnlyProperty, NonPublicCollectionReadOnlyField,
+				NonPublicDictionaryProperty, NonPublicDictionaryField, NonPublicDictionaryReadOnlyProperty, NonPublicDictionaryReadOnlyField,
+				NonPublicIDictionaryProperty, NonPublicIDictionaryField, NonPublicIDictionaryReadOnlyProperty, NonPublicIDictionaryReadOnlyField
+			);
 #else
-			TestNonPublicWritableMemberCore( target, PublicProperty, NonPublicProperty, PublicField, NonPublicField, CollectionReadOnlyProperty );
+			TestNonPublicWritableMemberCore(
+				target, PublicProperty, NonPublicProperty, PublicField, NonPublicField, CollectionReadOnlyProperty, 
+				NonPublicCollectionProperty, NonPublicCollectionField, NonPublicCollectionReadOnlyProperty, NonPublicCollectionReadOnlyField,
+				NonPublicDictionaryProperty, NonPublicDictionaryField, NonPublicDictionaryReadOnlyProperty, NonPublicDictionaryReadOnlyField,
+				NonPublicIDictionaryProperty, NonPublicIDictionaryField, NonPublicIDictionaryReadOnlyProperty, NonPublicIDictionaryReadOnlyField
+			);
 #endif // !NETFX_CORE && !SILVERLIGHT
 		}
 
@@ -2064,11 +3062,21 @@ namespace MsgPack.Serialization
 		{
 			// includes issue33
 			var target = new DataMamberClass();
-			target.CollectionReadOnlyProperty.Add( 10 );
+			target.InitializeCollectionMembers();
 #if !NETFX_CORE && !SILVERLIGHT
-			TestNonPublicWritableMemberCore( target, PublicProperty, NonPublicProperty, PublicField, NonPublicField, NonSerializedPublicField, NonSerializedNonPublicField, CollectionReadOnlyProperty );
+			TestNonPublicWritableMemberCore(
+				target, PublicProperty, NonPublicProperty, PublicField, NonPublicField, NonSerializedPublicField, NonSerializedNonPublicField, CollectionReadOnlyProperty, 
+				NonPublicCollectionProperty, NonPublicCollectionField, NonPublicCollectionReadOnlyProperty, NonPublicCollectionReadOnlyField,
+				NonPublicDictionaryProperty, NonPublicDictionaryField, NonPublicDictionaryReadOnlyProperty, NonPublicDictionaryReadOnlyField,
+				NonPublicIDictionaryProperty, NonPublicIDictionaryField, NonPublicIDictionaryReadOnlyProperty, NonPublicIDictionaryReadOnlyField
+			 );
 #else
-			TestNonPublicWritableMemberCore( target, PublicProperty, NonPublicProperty, PublicField, NonPublicField, CollectionReadOnlyProperty );
+			TestNonPublicWritableMemberCore(
+				target, PublicProperty, NonPublicProperty, PublicField, NonPublicField, CollectionReadOnlyProperty, 
+				NonPublicCollectionProperty, NonPublicCollectionField, NonPublicCollectionReadOnlyProperty, NonPublicCollectionReadOnlyField,
+				NonPublicDictionaryProperty, NonPublicDictionaryField, NonPublicDictionaryReadOnlyProperty, NonPublicDictionaryReadOnlyField,
+				NonPublicIDictionaryProperty, NonPublicIDictionaryField, NonPublicIDictionaryReadOnlyProperty, NonPublicIDictionaryReadOnlyField
+			);
 #endif // !NETFX_CORE && !SILVERLIGHT
 		}
 
@@ -2084,40 +3092,296 @@ namespace MsgPack.Serialization
 				foreach ( var memberName in expectedMemberNames )
 				{
 					Func<T, Object> getter = null;
-#if !NETFX_CORE
-					var property = typeof( T ).GetProperty( memberName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic );
-#else
-					var property = typeof( T ).GetRuntimeProperties().SingleOrDefault( p => p.Name == memberName );
-#endif
-					if ( property != null )
+
+					try
 					{
-#if !UNITY
-						getter = obj => property.GetValue( obj, null );
+#if !NETFX_CORE && !NETSTANDARD1_3
+						var property = typeof( T ).GetProperty( memberName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic );
 #else
-						getter = obj => property.GetGetMethod( true ).InvokePreservingExceptionType( obj );
+						var property = typeof( T ).GetRuntimeProperties().SingleOrDefault( p => p.Name == memberName );
+#endif // !NETFX_CORE && !NETSTANDARD1_3
+						if ( property != null )
+						{
+#if !UNITY
+							getter = obj => property.GetValue( obj, null );
+#else
+							getter = obj => property.GetGetMethod( true ).InvokePreservingExceptionType( obj );
 #endif // !UNITY
+						}
+						else
+						{
+#if !NETFX_CORE && !NETSTANDARD1_3
+							var field =  typeof( T ).GetField( memberName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic );
+#else
+							var field = typeof( T ).GetRuntimeFields().SingleOrDefault( f => f.Name == memberName );
+#endif // !NETFX_CORE && !NETSTANDARD1_3
+							if ( field == null )
+							{
+								Assert.Fail( memberName + " is not found." );
+							}
+
+							getter = obj => field.GetValue( obj );
+						}
+					}
+					catch ( MemberAccessException )
+					{
+#if SILVERLIGHT && !SILVERLIGHT_PRIVILEGED
+						Assert.Inconclusive( "Cannot run this test in Silverlight because of CAS" );
+#else
+						throw;
+#endif // SILVERLIGHT && !SILVERLIGHT_PRIVILEGED
+					}
+
+					// Naive, but OK
+					if ( memberName.Contains( "IDictionary" ) )
+					{
+						Func<object, Dictionary<string, int>> toDictionary =
+							hashTable =>
+								( ( System.Collections.IEnumerable )hashTable )
+								.OfType<System.Collections.DictionaryEntry>()
+								.ToDictionary( 
+									de => de.Key.ToString(), 
+									de => 
+										( de.Value is MessagePackObject )
+										? ( int )( MessagePackObject )de.Value
+										: ( int )de.Value
+								 );
+
+						Assert.That( toDictionary( getter( actual ) ), Is.EqualTo( toDictionary( getter( original ) ) ), typeof(T) + "." + memberName );
 					}
 					else
 					{
-#if !NETFX_CORE
-						var field =  typeof( T ).GetField( memberName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic );
-#else
-						var field = typeof( T ).GetRuntimeFields().SingleOrDefault( f => f.Name == memberName );
-#endif
-						if ( field == null )
-						{
-							Assert.Fail( memberName + " is not found." );
-						}
-
-						getter = obj => field.GetValue( obj );
+						Assert.That( getter( actual ), Is.EqualTo( getter( original ) ), typeof(T) + "." + memberName );
 					}
-
-					Assert.That( getter( actual ), Is.EqualTo( getter( original ) ), typeof(T) + "." + memberName );
 				}
 			}
 		}
+#endif // !SILVERLIGHT || SILVERLIGHT_PRIVILEGED
 
 #endregion -- ReadOnly / Private Members --
+
+#region -- IPackabke/IUnpackable --
+
+		// Issue 150
+		[Test]
+		public void TestExplicitlyImplementedPackableUnpackable()
+		{
+			var target = GetSerializationContext().GetSerializer<PackableUnpackableImplementedExplictly>();
+			var obj = new PackableUnpackableImplementedExplictly();
+			obj.Data = "ABC";
+
+			using ( var buffer = new MemoryStream() )
+			{
+				target.Pack( buffer, obj );
+				buffer.Position = 0;
+				var actual = target.Unpack( buffer );
+				Assert.That( actual.Data, Is.EqualTo( PackableUnpackableImplementedExplictly.UnpackingPrefix + PackableUnpackableImplementedExplictly.PackingPrefix + obj.Data ) );
+			}
+		}
+
+		// Issue153
+
+<#+
+	if( emitterFlavor == "ExpressionBased" )
+	{
+							// Should be removed 0.7
+#>
+#warning Issue 153 tests for ET are not executed because expression based serializer should be removed in 0.7.
+<#+
+	}
+
+	foreach ( var isAsync in new [] { false, true } )
+	{
+		foreach ( var kind in new [] 
+			{
+				"Enumerable", 
+				"Collection", 
+				"List", 
+				"Dictionary",
+				"NonGenericEnumerable", 
+				"NonGenericCollection", 
+				"NonGenericList", 
+				"NonGenericDictionary" 
+			}
+		)
+		{
+			foreach ( var isUnpackable in new [] { false, true } )
+			{
+				foreach ( var isPackable in new [] { false, true } )
+				{
+					if ( !isPackable && !isUnpackable )
+					{
+						continue;
+					}
+
+					var combination = 
+						isPackable
+							? ( isUnpackable ? "PackableUnpackable" : "Packable" )
+							: "Unpackable";
+
+					foreach ( var isPackabilitiesAware in new [] { false, true } )
+					{
+						if ( isAsync )
+						{
+#>
+#if FEATURE_TAP
+<#+
+							if( emitterFlavor == "ExpressionBased" )
+							{
+#>
+#pragma restore disable 1998
+<#+
+							}
+						}
+#>
+
+		[Test]
+		public <#= isAsync ? "async Task" : "void" #> Test<#= kind #>_<#= combination #>_<#= isPackabilitiesAware ? "Aware" : "NotAware" #><#= isAsync ? "Async" : String.Empty #>()
+		{
+<#+
+						if( emitterFlavor == "ExpressionBased" )
+						{
+							// Should be removed 0.7
+#>
+			Assert.Inconclusive( "Expression based serializer should be removed in 0.7" );
+		}
+<#+
+							if ( isAsync )
+							{
+#>
+#endif // FEATURE_TAP
+#pragma restore warning 1998
+<#+
+							}
+							continue;
+						}
+#>
+			var context = GetSerializationContext();
+			// Check compatibility
+			Assert.That( context.CompatibilityOptions.IgnorePackabilityForCollection, Is.False );
+<#+
+						if ( !isPackabilitiesAware )
+						{
+#>
+			context.CompatibilityOptions.IgnorePackabilityForCollection = true;
+<#+
+						}
+
+						var getSerializerArguments = String.Empty;
+						if ( kind.StartsWith( "NonGeneric" ) )
+						{
+							getSerializerArguments = 
+								kind.Contains( "Dictionary" )
+								? " PolymorphismSchema.ForContextSpecifiedDictionary( typeof( " + combination + kind + " ), PolymorphismSchema.ForPolymorphicObject( typeof( object ) ), PolymorphismSchema.ForPolymorphicObject( typeof( object ) ) ) "
+								: " PolymorphismSchema.ForContextSpecifiedCollection( typeof( " + combination + kind + " ), PolymorphismSchema.ForPolymorphicObject( typeof( object ) ) ) ";
+						}
+#>
+			var obj = new <#= combination #><#= kind #>();
+			obj.Initialize( 1, 2, 3 );
+			var target = context.GetSerializer<<#= combination #><#= kind #>>(<#= getSerializerArguments #>);
+			using ( var buffer = new MemoryStream() )
+			{
+<#+
+						if ( isAsync )
+						{
+#>
+				await target.PackAsync( buffer, obj ).ConfigureAwait( false );
+<#+
+						}
+						else
+						{
+#>
+				target.Pack( buffer, obj );
+<#+
+						}
+#>
+				buffer.Position = 0;
+				var data = Unpacking.UnpackObject( buffer );
+<#+
+				if ( !kind.Contains( "Dictionary" ) )
+				{
+#>
+				// <#= isPackable ? "Always 1 because of IPackable" : "As-is" #>
+				Assert.That( data.AsList().Count, Is.EqualTo( <#= isPackable ? "1" : "3" #> ) );
+<#+
+				}
+				else
+				{
+#>
+				Assert.That( data.IsDictionary );
+				// <#= isPackable ? "Always 1 because of IPackable" : "As-is" #>
+				Assert.That( data.AsDictionary().Count, Is.EqualTo( <#= isPackable ? "1" : "3" #> ) );
+<#+
+				}
+#>
+
+<#+
+						if ( isPackable )
+						{
+							if( !isUnpackable )
+							{
+#>
+				// Regular UnpackFrom cannot recognize stream generated by our IPackable, so emit standard value here.
+				buffer.SetLength( 0 );
+				buffer.Write( new byte[] { <#= kind.Contains( "Dictionary" ) ? "0x80" : "0x90" #> } );
+<#+
+							}
+						}
+#>
+				buffer.Position = 0;
+
+<#+
+						if ( isAsync )
+						{
+#>
+				var actual = await target.UnpackAsync( buffer ).ConfigureAwait( false );
+<#+
+						}
+						else
+						{
+#>
+				var actual = target.Unpack( buffer );
+<#+
+						}
+#>
+<#+
+						if ( isUnpackable )
+						{
+#>
+				// Capacitized constructor should be called with 0.
+				Assert.That( actual.Capacity, Is.EqualTo( 0 ) );
+
+				// Always two zeros because of IUnpackable
+				Assert.That( actual.GetValues(), Is.EqualTo( new [] { 0, 0 } ) );
+<#+
+						}
+						else
+						{
+#>
+				// Always empty because of our stream rewriting.
+				Assert.That( actual.GetValues(), Is.EqualTo( new int[ 0 ] ) );
+<#+
+						}
+#>
+			}
+
+		}
+
+<#+
+						if ( isAsync )
+						{
+#>
+#endif // FEATURE_TAP
+<#+
+						}
+					} // foreach isPackabilitiesAware
+				} // foreach isPackable
+			} // foreach isUnpackable
+		} // foreach kind
+	} // foreach isAsync
+#>
+
+#endregion -- IPackabke/IUnpackable --
 
 <#+
 	if ( !forIos )
@@ -2254,11 +3518,12 @@ namespace MsgPack.Serialization
 		[Test]
 		public void Test<#= target #>Derived_<#= type #>_Success()
 		{
-			var context = NewSerializationContext( PackerCompatibilityOptions.None );
+			var context = NewSerializationContext();
 			var target =
 <#+
 				var field = type == "Value" ? "1" : "\"1\"";
 				var property = type == "Value" ? "2" : "\"2\"";
+				var defaultValue = type == "Value" ? "0" : "null";
 				var targetType = target + type + "Class";
 
 				if( target == "Generic" )
@@ -2287,7 +3552,24 @@ namespace MsgPack.Serialization
 				var result = serializer.Unpack( buffer );
 				Assert.That( result, Is.Not.Null );
 				Assert.That( result.GenericField, Is.EqualTo( target.GenericField ) );
+<#+
+				if ( target == "Generic" )
+				{
+#>
+#if !SILVERLIGHT || SILVERLIGHT_PRIVILEGED
 				Assert.That( result.GenericProperty, Is.EqualTo( target.GenericProperty ) );
+#else
+				Assert.That( result.GenericProperty, Is.EqualTo( <#= defaultValue #> ) );
+#endif // !SILVERLIGHT || SILVERLIGHT_PRIVILEGED
+<#+
+				}
+				else
+				{
+#>
+				Assert.That( result.GenericProperty, Is.EqualTo( target.GenericProperty ) );
+<#+
+				}
+#>
 			}
 		}
 <#+
@@ -2319,7 +3601,7 @@ namespace MsgPack.Serialization
 		[Test]
 		public void TestNullable_<#= testCase.Label #>_NonNull_Success()
 		{
-			var context = NewSerializationContext( PackerCompatibilityOptions.None );
+			var context = NewSerializationContext();
 			var target = <#= testCase.Value #>;
 			var serializer = MessagePackSerializer.CreateInternal<#= "<" + testCase.Type + "?>" #>( context, null );
 
@@ -2335,7 +3617,7 @@ namespace MsgPack.Serialization
 		[Test]
 		public void TestNullable_<#= testCase.Label #>_Null_Success()
 		{
-			var context = NewSerializationContext( PackerCompatibilityOptions.None );
+			var context = NewSerializationContext();
 			var target = default( <#= testCase.Type #>? );
 			var serializer = MessagePackSerializer.CreateInternal<#= "<" + testCase.Type + "?>" #>( context, null );
 
@@ -2360,343 +3642,6 @@ namespace MsgPack.Serialization
 <#+
 	}
 #>
-		public class HasInitOnlyField
-		{
-			public readonly string Field = "ABC";
-		}
-
-		public class HasInitOnlyFieldWithConstructor
-		{
-			public readonly string Field;
-
-			public HasInitOnlyFieldWithConstructor( string field )
-			{
-				this.Field = field;
-			}
-		}
-
-		public class HasGetOnlyProperty
-		{
-			public string Property { get { return "ABC"; } }
-		}
-
-		public class HasGetOnlyPropertyWithConstructor
-		{
-			private readonly string _property;
-			public string Property { get { return this._property; } }
-
-			public HasGetOnlyPropertyWithConstructor( string property )
-			{
-				this._property = property;
-			}
-		}
-
-		public class HasPrivateSetterPropertyWithConstructor
-		{
-			public string Property { get; private set; }
-
-			public HasPrivateSetterPropertyWithConstructor( string property )
-			{
-				this.Property = property;
-			}
-		}
-
-		public class OnlyCollection
-		{
-			public readonly List<int> Collection = new List<int>();
-		}
-
-		public class OnlyCollectionWithConstructor
-		{
-			public readonly List<int> Collection;
-
-			public OnlyCollectionWithConstructor( List<int> collection )
-			{
-				this.Collection = collection;
-			}
-		}
-
-		public class WithAnotherNameConstructor
-		{
-			public readonly int ReadOnlySame;
-			public readonly int ReadOnlyDiffer;
-
-			public WithAnotherNameConstructor( int readonlysame, int the2 )
-			{
-				this.ReadOnlySame = readonlysame;
-				this.ReadOnlyDiffer = the2;
-			}
-		}
-
-		public class WithAnotherTypeConstructor
-		{
-			public readonly int ReadOnlySame;
-			public readonly string ReadOnlyDiffer;
-
-			public WithAnotherTypeConstructor( int readonlysame, int the2 )
-			{
-				this.ReadOnlySame = readonlysame;
-				this.ReadOnlyDiffer = the2.ToString();
-			}
-		}
-
-		public class WithConstructorAttribute
-		{
-			public readonly int Value;
-			public readonly bool IsAttributePreferred;
-
-			public WithConstructorAttribute( int value, bool isAttributePreferred )
-			{
-				this.Value = value;
-				this.IsAttributePreferred = isAttributePreferred;
-			}
-
-			[MessagePackDeserializationConstructor]
-			public WithConstructorAttribute( int value ) : this( value, true ) {}
-		}
-
-		public class WithMultipleConstructorAttributes
-		{
-			public readonly int Value;
-
-			[MessagePackDeserializationConstructor]
-			public WithMultipleConstructorAttributes( int value, string arg ) { }
-
-			[MessagePackDeserializationConstructor]
-			public WithMultipleConstructorAttributes( int value, bool arg ) { }
-		}
-
-#pragma warning disable 3001
-<#+
-	foreach ( var item in constructorParamterSpecs )
-	{
-#>
-		public class WithOptionalConstructorParameter<#= item.Key #>
-		{
-			public readonly <#= item.Key #> Value;
-
-			public WithOptionalConstructorParameter<#= item.Key #>( <#= item.Key #> value = <#= item.Value #> )
-			{
-				this.Value = value;
-			}
-		}
-<#+
-	}
-#>
-#pragma warning restore 3001
-
-		public class JustPackable : IPackable
-		{
-			public const string Dummy = "A";
-
-			public int Int32Field { get; set; }
-
-			public void PackToMessage( Packer packer, PackingOptions options )
-			{
-				packer.PackArrayHeader( 1 );
-				packer.PackString( Dummy );
-			}
-		}
-
-		public class JustUnpackable : IUnpackable
-		{
-			public const string Dummy = "1";
-
-			public int Int32Field { get; set; }
-
-			public void UnpackFromMessage( Unpacker unpacker )
-			{
-				var value = unpacker.UnpackSubtreeData();
-				if ( value.IsArray )
-				{
-					Assert.That( value.AsList()[ 0 ] == 0, "{0} != \"[{1}]\"", value, 0 );
-				}
-				else if ( value.IsMap )
-				{
-					Assert.That( value.AsDictionary().First().Value == 0, "{0} != \"[{1}]\"", value, 0 );
-				}
-				else
-				{
-					Assert.Fail( "Unknown spec." );
-				}
-
-				this.Int32Field = Int32.Parse( Dummy );
-			}
-		}
-
-		public class PackableUnpackable : IPackable, IUnpackable
-		{
-			public const string Dummy = "A";
-
-			public int Int32Field { get; set; }
-
-			public void PackToMessage( Packer packer, PackingOptions options )
-			{
-				packer.PackArrayHeader( 1 );
-				packer.PackString( Dummy );
-			}
-
-			public void UnpackFromMessage( Unpacker unpacker )
-			{
-				Assert.That( unpacker.IsArrayHeader );
-				var value = unpacker.UnpackSubtreeData();
-				Assert.That( value.AsList()[ 0 ] == Dummy, "{0} != \"[{1}]\"", value, Dummy );
-			}
-		}
-
-		public class CustomDateTimeSerealizer : MessagePackSerializer<DateTime>
-		{
-			private const byte _typeCodeForDateTimeForUs = 1;
-
-			public CustomDateTimeSerealizer()
-				: base( SerializationContext.Default ) {}
-
-			protected internal override void PackToCore( Packer packer, DateTime objectTree )
-			{
-				byte[] data;
-				if ( BitConverter.IsLittleEndian )
-				{
-					data = BitConverter.GetBytes( objectTree.ToUniversalTime().Ticks ).Reverse().ToArray();
-				}
-				else
-				{
-					data = BitConverter.GetBytes( objectTree.ToUniversalTime().Ticks );
-				}
-
-				packer.PackExtendedTypeValue( _typeCodeForDateTimeForUs, data );
-			}
-
-			protected internal override DateTime UnpackFromCore( Unpacker unpacker )
-			{
-				var ext = unpacker.LastReadData.AsMessagePackExtendedTypeObject();
-				Assert.That( ext.TypeCode, Is.EqualTo( 1 ) );
-				return new DateTime( BigEndianBinary.ToInt64( ext.Body, 0 ) ).ToUniversalTime();
-			}
-		}
-
-		// Issue #25
-
-		public class Person : IEnumerable<Person>
-		{
-			public string Name { get; set; }
-
-			internal IEnumerable<Person> Children { get; set; }
-
-			public IEnumerator<Person> GetEnumerator()
-			{
-				return Children.GetEnumerator();
-			}
-
-			IEnumerator IEnumerable.GetEnumerator()
-			{
-				return GetEnumerator();
-			}
-		}
-
-		public class PersonSerializer : MessagePackSerializer<Person>
-		{
-			public PersonSerializer()
-				: base( SerializationContext.Default ) {}
-
-			protected internal override void PackToCore( Packer packer, Person objectTree )
-			{
-				packer.PackMapHeader( 2 );
-				packer.PackString( "Name" );
-				packer.PackString( objectTree.Name );
-				packer.PackString( "Children" );
-				if ( objectTree.Children == null )
-				{
-					packer.PackNull();
-				}
-				else
-				{
-					this.PackPeople( packer, objectTree.Children );
-				}
-			}
-
-			internal void PackPeople( Packer packer, IEnumerable<Person> people )
-			{
-				var children = people.ToArray();
-
-				packer.PackArrayHeader( children.Length );
-				foreach ( var child in children )
-				{
-					this.PackTo( packer, child );
-				}
-			}
-
-			protected internal override Person UnpackFromCore( Unpacker unpacker )
-			{
-				Assert.That( unpacker.IsMapHeader );
-				Assert.That( unpacker.ItemsCount, Is.EqualTo( 2 ) );
-				var person = new Person();
-				for ( int i = 0; i < 2; i++ )
-				{
-					string key;
-					Assert.That( unpacker.ReadString( out key ) );
-					switch ( key )
-					{
-						case "Name":
-						{
-
-							string name;
-							Assert.That( unpacker.ReadString( out name ) );
-							person.Name = name;
-							break;
-						}
-						case "Children":
-						{
-							Assert.That( unpacker.Read() );
-							if ( !unpacker.LastReadData.IsNil )
-							{
-								person.Children = this.UnpackPeople( unpacker );
-							}
-							break;
-						}
-					}
-				}
-
-				return person;
-			}
-
-			internal IEnumerable<Person> UnpackPeople( Unpacker unpacker )
-			{
-				Assert.That( unpacker.IsArrayHeader );
-				var itemsCount = ( int )unpacker.ItemsCount;
-				var people = new List<Person>( itemsCount );
-				for ( int i = 0; i < itemsCount; i++ )
-				{
-					people.Add( this.UnpackFrom( unpacker ) );
-				}
-
-				return people;
-			}
-		}
-
-		public class ChildrenSerializer : MessagePackSerializer<IEnumerable<Person>>
-		{
-			private readonly PersonSerializer _personSerializer = new PersonSerializer();
-
-			public ChildrenSerializer()
-				: base( SerializationContext.Default ) {}
-
-			protected internal override void PackToCore( Packer packer, IEnumerable<Person> objectTree )
-			{
-				if ( objectTree is Person )
-				{
-					this._personSerializer.PackTo( packer, objectTree as Person );
-				}
-				else
-				{
-					this._personSerializer.PackPeople( packer, objectTree );
-				}
-			}
-
-			protected internal override IEnumerable<Person> UnpackFromCore( Unpacker unpacker )
-			{
-				return this._personSerializer.UnpackPeople( unpacker );
-			}
-		}
 
 		// Related to issue #62 -- internal types handling is not consistent at first.
 
@@ -2716,6 +3661,13 @@ namespace MsgPack.Serialization
 		public void TestNonPublicType_DataContract_Failed()
 		{
 			Assert.Throws<SerializationException>( () => this.CreateTarget<NonPublicWithDataContract>( GetSerializationContext() ) );
+		}
+
+		// Issue 170
+		[Test]
+		public void TestStaticMembersDoNotCausePrepareError()
+		{
+			MessagePackSerializer.Get<ClassHasStaticField>().PackSingleObject( new ClassHasStaticField() );
 		}
 
 #pragma warning disable 649
@@ -2784,6 +3736,807 @@ namespace MsgPack.Serialization
 			}
 		}
 #pragma warning restore 659
+
+#region issue #169
+
+		[Test]
+		public void TestImplementsGenericIEnumerableWithNoAdd_Success()
+		{
+			var serializer = this.CreateTarget<GenericNonCollectionType>( GetSerializationContext() );
+			using ( var stream = new MemoryStream() )
+			{
+				var value = new GenericNonCollectionType { Property = 123 };
+				serializer.Pack( stream, value );
+				stream.Position = 0;
+				var result = serializer.Unpack( stream );
+				Assert.That( result.Property, Is.EqualTo( 123 ) );
+			}
+		}
+
+		[Test]
+		public void TestImplementsNonGenericIEnumerableWithNoAdd_Success()
+		{
+			var serializer = this.CreateTarget<NonGenericNonCollectionType>( GetSerializationContext() );
+			using ( var stream = new MemoryStream() )
+			{
+				var value = new NonGenericNonCollectionType { Property = 123 };
+				serializer.Pack( stream, value );
+				stream.Position = 0;
+				var result = serializer.Unpack( stream );
+				Assert.That( result.Property, Is.EqualTo( 123 ) );
+			}
+		}
+
+<#+
+	if ( !forIos )
+	{
+#>
+		[Test]
+		public void TestImplementsGenericIEnumerableWithNoAdd_ProhibitEnumerableNonCollection_Fail()
+		{
+			var context = GetSerializationContext();
+			context.CompatibilityOptions.AllowNonCollectionEnumerableTypes = false;
+			Assert.Throws<SerializationException>( () => this.CreateTarget<GenericNonCollectionType>( context ) );
+		}
+
+		[Test]
+		public void TestImplementsNonGenericIEnumerableWithNoAdd_ProhibitEnumerableNonCollection_Fail()
+		{
+			var context = GetSerializationContext();
+			context.CompatibilityOptions.AllowNonCollectionEnumerableTypes = false;
+			Assert.Throws<SerializationException>( () => this.CreateTarget<GenericNonCollectionType>( context ) );
+		}
+
+<#+
+	} // if !forIos
+
+	if ( serializationMethod == "Map" && !forIos )
+	{
+#>
+		// Issue #136
+		[Test]
+		public void TestOmitNullEntryInDictionary()
+		{
+			var context = GetSerializationContext();
+			Assert.That( context.DictionarySerlaizationOptions.OmitNullEntry, Is.False, "default value" );
+			TestOmitNullEntryInDictionaryCore( context, true, false );
+			context.DictionarySerlaizationOptions.OmitNullEntry = true;
+			TestOmitNullEntryInDictionaryCore( context, false, false );
+		}
+
+#if FEATURE_TAP
+
+		[Test]
+		public void TestOmitNullEntryInDictionary_Async()
+		{
+			var context = GetSerializationContext();
+			Assert.That( context.DictionarySerlaizationOptions.OmitNullEntry, Is.False, "default value" );
+			TestOmitNullEntryInDictionaryCore( context, true, true );
+			context.DictionarySerlaizationOptions.OmitNullEntry = true;
+			TestOmitNullEntryInDictionaryCore( context, false, true );
+		}
+
+#endif // FEATURE_TAP
+
+		[Test]
+		public void TestOmitNullEntryInDictionary_BackwordCompatibility()
+		{
+			SerializerDebugging.UseLegacyNullMapEntryHandling = true;
+			try
+			{
+				var context = GetSerializationContext();
+				context.DictionarySerlaizationOptions.OmitNullEntry = true;
+				TestOmitNullEntryInDictionaryCore( context, true, false );
+			}
+			finally
+			{
+				SerializerDebugging.UseLegacyNullMapEntryHandling = false;
+			}
+		}
+
+#if FEATURE_TAP
+
+		[Test]
+		public void TestOmitNullEntryInDictionary_BackwordCompatibility_Async()
+		{
+			SerializerDebugging.UseLegacyNullMapEntryHandling = true;
+			try
+			{
+				var context = GetSerializationContext();
+				context.DictionarySerlaizationOptions.OmitNullEntry = true;
+				TestOmitNullEntryInDictionaryCore( context, true, true );
+			}
+			finally
+			{
+				SerializerDebugging.UseLegacyNullMapEntryHandling = false;
+			}
+		}
+
+#endif // FEATURE_TAP
+
+		private static void TestOmitNullEntryInDictionaryCore( SerializationContext context, bool shouldContainNulls, bool isAsync )
+		{
+			var serializer = context.GetSerializer<SimpleClass>();
+			var obj = new SimpleClass { FirstProperty = "foo", SecondProperty = null };
+			using ( var buffer = new MemoryStream() )
+			{
+#if FEATURE_TASK
+				if ( isAsync )
+				{
+					serializer.PackAsync( buffer, obj, CancellationToken.None ).Wait();
+				}
+				else
+				{
+#endif // FEATURE_TASK
+					serializer.Pack( buffer, obj );
+#if FEATURE_TASK
+				}
+#endif // FEATURE_TASK
+
+				buffer.Position = 0;
+				var map = MessagePackSerializer.UnpackMessagePackObject( buffer ).AsDictionary();
+
+				Assert.That( map.ContainsKey( "FirstProperty" ) );
+				Assert.That( map.ContainsKey( "SecondProperty" ), Is.EqualTo( shouldContainNulls ) );
+				Assert.That( map.ContainsKey( "ThirdProperty" ), Is.EqualTo( shouldContainNulls ) );
+				Assert.That( map.ContainsKey( "FourthProperty" ) );
+				
+				Assert.That( map[ "FirstProperty" ].AsString(), Is.EqualTo( "foo" ) );
+				if ( shouldContainNulls )
+				{
+					Assert.That( map[ "SecondProperty" ].IsNil );
+					Assert.That( map[ "ThirdProperty" ].IsNil );
+				}
+				Assert.That( map[ "FourthProperty" ].AsInt32(), Is.EqualTo( 0 ) );
+
+				buffer.Position = 0;
+
+				SimpleClass deserialized;
+#if FEATURE_TASK
+				if ( isAsync )
+				{
+					deserialized = serializer.UnpackAsync( buffer, CancellationToken.None ).Result;
+				}
+				else
+				{
+#endif // FEATURE_TASK
+					deserialized = serializer.Unpack( buffer );
+#if FEATURE_TASK
+				}
+#endif // FEATURE_TASK
+
+				Assert.That( deserialized.FirstProperty, Is.EqualTo( obj.FirstProperty) );
+				Assert.That( deserialized.SecondProperty, Is.EqualTo( obj.SecondProperty) );
+				Assert.That( deserialized.ThirdProperty, Is.EqualTo( obj.ThirdProperty) );
+				Assert.That( deserialized.FourthProperty, Is.EqualTo( obj.FourthProperty) );
+			}
+		}
+
+		// Issue #175
+		[Test]
+		public void TestDictionaryKeyTransformer_Default_AsIs()
+		{
+			var context = GetSerializationContext();
+			Assert.That( context.DictionarySerlaizationOptions.KeyTransformer, Is.Null, "default value" );
+			TestDictionaryKeyCore( context, "FirstProperty", "SecondProperty", "ThirdProperty", "FourthProperty", asIs: true, isAsync: false );
+		}
+
+#if FEATURE_TAP
+
+		[Test]
+		public void TestDictionaryKeyTransformer_Default_AsIs_Async()
+		{
+			var context = GetSerializationContext();
+			Assert.That( context.DictionarySerlaizationOptions.KeyTransformer, Is.Null, "default value" );
+			TestDictionaryKeyCore( context, "FirstProperty", "SecondProperty", "ThirdProperty", "FourthProperty", asIs: true, isAsync: true );
+		}
+
+#endif // FEATURE_TAP
+
+		[Test]
+		public void TestDictionaryKeyTransformer_LowerCamel()
+		{
+			var context = GetSerializationContext();
+			context.DictionarySerlaizationOptions.KeyTransformer = DictionaryKeyTransformers.LowerCamel;
+			TestDictionaryKeyCore( context, "firstProperty", "secondProperty", "thirdProperty", "fourthProperty", asIs: false, isAsync: false );
+		}
+
+#if FEATURE_TAP
+
+		[Test]
+		public void TestDictionaryKeyTransformer_LowerCamel_Async()
+		{
+			var context = GetSerializationContext();
+			context.DictionarySerlaizationOptions.KeyTransformer = DictionaryKeyTransformers.LowerCamel;
+			TestDictionaryKeyCore( context, "firstProperty", "secondProperty", "thirdProperty", "fourthProperty", asIs: false, isAsync: true );
+		}
+
+#endif // FEATURE_TAP
+
+		[Test]
+		public void TestDictionaryKeyTransformer_Custom()
+		{
+			var context = GetSerializationContext();
+			context.DictionarySerlaizationOptions.KeyTransformer = 
+				key => Regex.Replace( key, "[A-Z]", match => match.Index == 0 ? match.Value.ToLower() : "-" + match.Value.ToLower() );
+			TestDictionaryKeyCore( context, "first-property", "second-property", "third-property", "fourth-property", asIs: false, isAsync: false );
+		}
+
+#if FEATURE_TAP
+
+		[Test]
+		public void TestDictionaryKeyTransformer_Custom_Async()
+		{
+			var context = GetSerializationContext();
+			context.DictionarySerlaizationOptions.KeyTransformer = 
+				key => Regex.Replace( key, "[A-Z]", match => match.Index == 0 ? match.Value.ToLower() : "-" + match.Value.ToLower() );
+			TestDictionaryKeyCore( context, "first-property", "second-property", "third-property", "fourth-property", asIs: false, isAsync: true );
+		}
+
+#endif // FEATURE_TAP
+
+		private static void TestDictionaryKeyCore( SerializationContext context, string expectedKey1, string expectedKey2, string expectedKey3, string expectedKey4, bool asIs, bool isAsync )
+		{
+			var serializer = context.GetSerializer<SimpleClass>();
+			var obj = new SimpleClass { FirstProperty = "foo", SecondProperty = "bar", ThirdProperty = 3, FourthProperty = 4 };
+			using ( var buffer = new MemoryStream() )
+			{
+#if FEATURE_TAP
+				if ( isAsync )
+				{
+					serializer.PackAsync( buffer, obj, CancellationToken.None ).Wait();
+				}
+				else
+				{
+#endif // FEATURE_TAP
+					serializer.Pack( buffer, obj );
+#if FEATURE_TAP
+				}
+#endif // FEATURE_TAP
+
+				buffer.Position = 0;
+				var map = MessagePackSerializer.UnpackMessagePackObject( buffer ).AsDictionary();
+
+				Assert.That( map.ContainsKey( "FirstProperty" ), Is.EqualTo( asIs ) );
+				Assert.That( map.ContainsKey( "SecondProperty" ), Is.EqualTo( asIs ) );
+				Assert.That( map.ContainsKey( "ThirdProperty" ), Is.EqualTo( asIs ) );
+				Assert.That( map.ContainsKey( "FourthProperty" ), Is.EqualTo( asIs ) );
+				Assert.That( map.ContainsKey( expectedKey1 ) );
+				Assert.That( map.ContainsKey( expectedKey2 ) );
+				Assert.That( map.ContainsKey( expectedKey3 ) );
+				Assert.That( map.ContainsKey( expectedKey4 ) );
+
+				buffer.Position = 0;
+
+				SimpleClass deserialized;
+#if FEATURE_TAP
+				if ( isAsync )
+				{
+					deserialized = serializer.UnpackAsync( buffer, CancellationToken.None ).Result;
+				}
+				else
+				{
+#endif // FEATURE_TAP
+					deserialized = serializer.Unpack( buffer );
+#if FEATURE_TAP
+				}
+#endif // FEATURE_TAP
+
+				Assert.That( deserialized.FirstProperty, Is.EqualTo( obj.FirstProperty ) );
+				Assert.That( deserialized.SecondProperty, Is.EqualTo( obj.SecondProperty ) );
+				Assert.That( deserialized.ThirdProperty, Is.EqualTo( obj.ThirdProperty ) );
+				Assert.That( deserialized.FourthProperty, Is.EqualTo( obj.FourthProperty ) );
+			}
+		}
+<#+
+	} // if  serializationMethod == "Map" && !forIoS
+#>
+#endregion issue #169
+
+		#region -- Asymmetric --
+<#+
+	foreach ( var testCase in
+		new []
+		{
+			new { Type = "NoSettableNoConstructors",		Init = "().Initialize( \"A\" )" },
+			new { Type = "NoSettableMultipleConstructors",	Init = "( \"A\", 0 )" },
+			new { Type = "NoDefaultConstructor",			Init = "( 'A' )" },
+		}
+	)
+	{
+#>
+		[Test]
+		public void TestAsymmetric_PackOnly_<#= testCase.Type #>_Packable()
+		{
+			this.TestAsymmetricPackOnlyCore(
+				() => new <#= testCase.Type #>ForAsymmetricTest<#= testCase.Init #>,
+				SerializerCapabilities.PackTo,
+<#+
+		if ( serializationMethod == "Map" )
+		{
+#>
+				new byte[] { 0x81, 0xA5, ( byte )'V', ( byte )'a', ( byte )'l', ( byte )'u', ( byte )'e', 0xA1, ( byte )'A' }
+<#+
+		}
+		else
+		{
+#>
+				new byte[] { 0x91, 0xA1, ( byte )'A' }
+<#+
+		}
+#>
+			);
+		}
+
+<#+
+	}
+#>
+
+<#+
+	foreach ( var testCase in
+		new []
+		{
+			new { Type = "UnconstructableEnumerable",				IsDictionary = false,	Init = "( \"A\" )" },
+			new { Type = "UnconstructableCollection",				IsDictionary = false,	Init = "( \"A\" )" },
+			new { Type = "UnconstructableList",						IsDictionary = false,	Init = "( \"A\" )" },
+			new { Type = "UnconstructableDictionary",				IsDictionary = true,	Init = "( new KeyValuePair<string, string>( \"A\", \"A\" ) )" },
+			new { Type = "UnconstructableNonGenericEnumerable",		IsDictionary = false,	Init = "( \"A\" )" },
+			new { Type = "UnconstructableNonGenericCollection",		IsDictionary = false,	Init = "( \"A\" )" },
+			new { Type = "UnconstructableNonGenericList",			IsDictionary = false,	Init = "( \"A\" )" },
+			new { Type = "UnconstructableNonGenericDictionary",		IsDictionary = true,	Init = "( new DictionaryEntry( \"A\", \"A\" ) )" },
+			new { Type = "UnappendableEnumerable",					IsDictionary = false,	Init = "( \"A\" )" },
+			new { Type = "UnappendableNonGenericEnumerable",		IsDictionary = false,	Init = "( \"A\" )" },
+			new { Type = "UnappendableNonGenericCollection",		IsDictionary = false,	Init = "( \"A\" )" }
+		}
+	)
+	{
+#>
+		[Test]
+		public void TestAsymmetric_PackOnly_<#= testCase.Type #>_Packable()
+		{
+			this.TestAsymmetricPackOnlyCore(
+				() => new <#= testCase.Type #>ForAsymmetricTest<#= testCase.Init #>,
+				SerializerCapabilities.PackTo,
+<#+
+		if ( testCase.IsDictionary )
+		{
+#>
+				new byte[] { 0x81, 0xA1, ( byte )'A', 0xA1, ( byte )'A' }
+<#+
+		}
+		else
+		{
+#>
+				new byte[] { 0x91, 0xA1, ( byte )'A' }
+<#+
+		}
+#>
+			);
+		}
+
+<#+
+	}
+#>
+
+		[Test]
+		public void TestAsymmetric_PackOnly_UnsettableArrayMemberObject_Packable()
+		{
+			this.TestAsymmetricPackOnlyCore(
+				() => new UnsettableArrayMemberObjectForAsymmetricTest(),
+				SerializerCapabilities.PackTo,
+<#+
+		if ( serializationMethod == "Map" )
+		{
+#>
+				new byte[] { 0x82, 0xA5, ( byte )'F', ( byte )'i', ( byte )'e', ( byte )'l', ( byte )'d', 0x91, 0xA1, ( byte )'A', 0xA8, ( byte )'P', ( byte )'r', ( byte )'o', ( byte )'p', ( byte )'e', ( byte )'r', ( byte )'t', ( byte )'y', 0x91, 0xA1, ( byte )'A' }
+<#+
+		}
+		else
+		{
+#>
+				new byte[] { 0x92, 0x91, 0xA1, ( byte )'A', 0x91, 0xA1, ( byte )'A' }
+<#+
+		}
+#>
+			);
+		}
+
+		private void TestAsymmetricPackOnlyCore<T>( Func<T> factory, SerializerCapabilities expectedCapabilities, byte[] serialized )
+		{
+			this.TestAsymmetricPackOnlyCore( factory, expectedCapabilities, serialized, true );
+			this.TestAsymmetricPackOnlyCore( factory, expectedCapabilities, serialized, false );
+		}
+
+		private void TestAsymmetricPackOnlyCore<T>( Func<T> factory, SerializerCapabilities expectedCapabilities, byte[] serialized, bool avoidsGenericSerializer )
+		{
+			var previousAvoidsGenericSerializer = SerializerDebugging.AvoidsGenericSerializer;
+			SerializerDebugging.AvoidsGenericSerializer = avoidsGenericSerializer;
+			try 
+			{
+				var context = GetSerializationContext();
+				context.CompatibilityOptions.AllowAsymmetricSerializer = true;
+				context.CompatibilityOptions.AllowNonCollectionEnumerableTypes = false;
+
+				var serializer = this.CreateTarget<T>( context );
+				Assert.That( serializer.Capabilities, Is.EqualTo( expectedCapabilities ) );
+
+				var obj = factory();
+				using ( var buffer = new MemoryStream() )
+				{
+					if ( ( expectedCapabilities & SerializerCapabilities.PackTo ) != 0 )
+					{
+						serializer.Pack( buffer, obj );
+						Assert.That( buffer.ToArray(), Is.EqualTo( serialized ), "{0} != {1}", BitConverter.ToString( buffer.ToArray() ), BitConverter.ToString( serialized ) );
+					}
+					else if ( ( expectedCapabilities & SerializerCapabilities.UnpackFrom ) != 0 )
+					{
+						buffer.Write( serialized, 0, serialized.Length );
+						buffer.Position = 0;
+						var unpacked = serializer.Unpack( buffer );
+						Assert.That( obj, Is.EqualTo( unpacked ) );
+					}
+				}
+			}
+			finally
+			{
+				SerializerDebugging.AvoidsGenericSerializer = previousAvoidsGenericSerializer;
+			}
+		}
+
+		#endregion -- Asymmetric --
+
+		#region -- Object Packing/Unpacking --
+
+		[Test]
+		public void TestToFromMessagePackObject_Complex()
+		{
+			var target = new ComplexType() { Source = new Uri( "http://www.exambple.com" ), TimeStamp = DateTime.Now, Data = new byte[] { 0x1, 0x2, 0x3, 0x4 } };
+			target.History.Add( DateTime.Now.Subtract( TimeSpan.FromDays( 1 ) ), "Create New" );
+			target.Points.Add( 123 );
+			TestToFromMessagePackObjectCore(
+				target,
+				mpo =>
+				{
+<#+
+	if ( serializationMethod == "Array" )
+	{
+#>
+					Assert.That( mpo.IsArray );
+					var asList = mpo.AsList();
+					Assert.That( asList.Count, Is.EqualTo( 5 ) );
+
+					Assert.That( asList[ 0 ].IsTypeOf<string>().Value );
+					Assert.That( asList[ 0 ].AsString(), Is.EqualTo( target.Source.ToString() ) );
+
+					Assert.That( asList[ 1 ].IsTypeOf<byte[]>().Value );
+					Assert.That( asList[ 1 ].AsBinary(), Is.EqualTo( target.Data ) );
+
+					Assert.That( asList[ 2 ].IsTypeOf<MessagePackExtendedTypeObject>().Value );
+					var timestamp = asList[ 2 ].AsTimestamp();
+					Assert.That( timestamp.ToDateTime(), Is.EqualTo( target.TimeStamp.ToUniversalTime() ) );
+
+					Assert.That( asList[ 3 ].IsDictionary );
+					var historyKey = asList[ 3 ].AsDictionary().Single().Key.AsTimestamp();
+					Assert.That( historyKey.ToDateTime(), Is.EqualTo( target.History.Single().Key.ToUniversalTime() ) );
+					Assert.That( asList[ 3 ].AsDictionary().Single().Value.AsString(), Is.EqualTo( target.History.Single().Value ) );
+
+					Assert.That( asList[ 4 ].IsArray );
+					Assert.That( asList[ 4 ].AsList().Single().AsInt32(), Is.EqualTo( target.Points.Single() ) );
+<#+
+	}
+	else
+	{
+#>
+					Assert.That( mpo.IsDictionary );
+					var asDictionary = mpo.AsDictionary();
+					Assert.That( asDictionary.Count, Is.EqualTo( 5 ) );
+
+					Assert.That( asDictionary[ "Source" ].IsTypeOf<string>().Value );
+					Assert.That( asDictionary[ "Source" ].AsString(), Is.EqualTo( target.Source.ToString() ) );
+
+					Assert.That( asDictionary[ "Data" ].IsTypeOf<byte[]>().Value );
+					Assert.That( asDictionary[ "Data" ].AsBinary(), Is.EqualTo( target.Data ) );
+
+					Assert.That( asDictionary[ "TimeStamp" ].IsTypeOf<MessagePackExtendedTypeObject>().Value );
+					var timestamp = asDictionary[ "TimeStamp" ].AsTimestamp();
+					Assert.That( timestamp.ToDateTime(), Is.EqualTo( target.TimeStamp.ToUniversalTime() ) );
+
+					Assert.That( asDictionary[ "History" ].IsDictionary );
+					var historyKey = asDictionary[ "History" ].AsDictionary().Single().Key.AsTimestamp();
+					Assert.That( historyKey.ToDateTime(), Is.EqualTo( target.History.Single().Key.ToUniversalTime() ) );
+					Assert.That( asDictionary[ "History" ].AsDictionary().Single().Value.AsString(), Is.EqualTo( target.History.Single().Value ) );
+
+					Assert.That( asDictionary[ "Points" ].IsArray );
+					Assert.That( asDictionary[ "Points" ].AsList().Single().AsInt32(), Is.EqualTo( target.Points.Single() ) );
+<#+
+	}
+#>
+				}
+			);
+		}
+
+		[Test]
+		public void TestToFromMessagePackObject_ComplexGenerated()
+		{
+			var target = new ComplexTypeGenerated();
+			target.Initialize();
+			// This test does not check packed result -- it is verfied with previous test and seems overkill.
+			this.TestToFromMessagePackObjectCore( target, _ => {} );
+		}
+
+		private void TestToFromMessagePackObjectCore<T>( T value, Action<MessagePackObject> mpoAssertion )
+			where T : IVerifiable<T>
+		{
+			this.TestToFromMessagePackObjectCore( value, mpoAssertion, true );
+			this.TestToFromMessagePackObjectCore( value, mpoAssertion, false );
+		}
+
+		private void TestToFromMessagePackObjectCore<T>( T value, Action<MessagePackObject> mpoAssertion, bool avoidsGenericSerializer )
+			where T : IVerifiable<T>
+		{
+			var previousAvoidsGenericSerializer = SerializerDebugging.AvoidsGenericSerializer;
+			SerializerDebugging.AvoidsGenericSerializer = avoidsGenericSerializer;
+			try 
+			{
+				var context = GetSerializationContext();
+				var serializer = this.CreateTarget<T>( context );
+				var mpo = serializer.ToMessagePackObject( value );
+				mpoAssertion( mpo );
+				var result = serializer.FromMessagePackObject( mpo );
+				result.Verify( value );
+
+				var mpoLoose = ( ( MessagePackSerializer )serializer ).ToMessagePackObject( value );
+				mpoAssertion( mpoLoose );
+				var resultLoose = ( ( MessagePackSerializer )serializer ).FromMessagePackObject( mpoLoose );
+				Assert.That( resultLoose, Is.TypeOf<T>() );
+				( ( T )resultLoose ).Verify( value );
+			}
+			finally
+			{
+				SerializerDebugging.AvoidsGenericSerializer = previousAvoidsGenericSerializer;
+			}
+		}
+
+		#endregion -- Object Packing/Unpacking --
+
+		#region -- Issue 207 --
+
+		[Test]
+		public void TestReadOnlyAndConstructor()
+		{
+			var context = GetSerializationContext();
+			var serializer = context.GetSerializer<ReadOnlyAndConstructor>();
+			var item = new ReadOnlyAndConstructor( Guid.NewGuid(), new List<int>() { 5, 11 } );
+			var serializedItem = serializer.PackSingleObject( item );
+<#+
+	if ( serializationMethod == "Array" )
+	{
+#>
+			Assert.That(
+				serializedItem,
+				Is.EqualTo(
+					new byte[] { 0x92, MessagePackCode.Bin8, 0x10 }.Concat( item.Id.ToByteArray() )
+					.Concat( new byte[] { 0x92, 5, 11 } ).ToArray()
+				)
+			);
+<#+
+	}
+	else
+	{
+#>
+			Assert.That(
+				serializedItem,
+				Is.EqualTo( new byte[] { 0x82, 0xA2 }.Concat( Encoding.UTF8.GetBytes( "Id" ) )
+					.Concat( new byte[] { MessagePackCode.Bin8, 0x10 } ).Concat( item.Id.ToByteArray() )
+					.Concat( new byte[] { 0xA4 } ).Concat( Encoding.UTF8.GetBytes( "Ints" ) )
+					.Concat( new byte[] { 0x92, 5, 11 } ).ToArray()
+				)
+			);
+<#+
+	}
+#>
+			var deserializedItem = serializer.UnpackSingleObject( serializedItem );
+			Assert.That( deserializedItem.Id, Is.EqualTo( item.Id ) );
+			Assert.That( deserializedItem.Ints, Is.EqualTo( item.Ints ) );
+		}
+
+		[Test]
+		public void TestGetOnlyAndConstructor()
+		{
+			var context = GetSerializationContext();
+			var serializer = context.GetSerializer<GetOnlyAndConstructor>();
+			var item = new GetOnlyAndConstructor( Guid.NewGuid(), new List<int>() { 5, 11 } );
+			var serializedItem = serializer.PackSingleObject( item );
+<#+
+	if ( serializationMethod == "Array" )
+	{
+#>
+			Assert.That(
+				serializedItem,
+				Is.EqualTo(
+					new byte[] { 0x92, MessagePackCode.Bin8, 0x10 }.Concat( item.Id.ToByteArray() )
+					.Concat( new byte[] { 0x92, 5, 11 } ).ToArray()
+				)
+			);
+<#+
+	}
+	else
+	{
+#>
+			Assert.That(
+				serializedItem,
+				Is.EqualTo( new byte[] { 0x82, 0xA2 }.Concat( Encoding.UTF8.GetBytes( "Id" ) )
+					.Concat( new byte[] { MessagePackCode.Bin8, 0x10 } ).Concat( item.Id.ToByteArray() )
+					.Concat( new byte[] { 0xA4 } ).Concat( Encoding.UTF8.GetBytes( "Ints" ) )
+					.Concat( new byte[] { 0x92, 5, 11 } ).ToArray()
+				)
+			);
+<#+
+	}
+#>
+			var deserializedItem = serializer.UnpackSingleObject( serializedItem );
+			Assert.That( deserializedItem.Id, Is.EqualTo( item.Id ) );
+			Assert.That( deserializedItem.Ints, Is.EqualTo( item.Ints ) );
+		}
+
+		#endregion -- Issue 207 --
+
+
+		#region -- Issue 202 --
+
+		private static SerializationContext GetSerializationContextWithAsyncEnabled( bool withAsync )
+		{
+			var context = GetSerializationContext();
+
+#if FEATURE_TAP
+			context.SerializerOptions.WithAsync = withAsync;
+#endif // FEATURE_TAP
+
+			return context;
+		}
+
+		private static void TestNoMembersPackableLikeCore<T>( Func<T> factory, Action<MessagePackSerializer<T>, MemoryStream, T> pack, Func<MessagePackSerializer<T>, MemoryStream, T> unpack, Action<T, T> assertion, bool withAsync )
+		{
+			var context = GetSerializationContextWithAsyncEnabled( withAsync );
+			var serializer = context.GetSerializer<T>();
+			using ( var buffer = new MemoryStream() )
+			{
+				var expected = factory();
+				pack( serializer, buffer, expected );
+				buffer.Position = 0L;
+				var actual = unpack( serializer, buffer );
+				assertion( expected, actual );
+			}
+		}
+
+<#+
+	foreach ( var isPackable in new [] { true, false } )
+	{
+		foreach ( var isUnpackable in new [] { true, false } )
+		{
+			foreach ( var isAsyncPackable in new [] { true, false } )
+			{
+				foreach ( var isAsyncUnpackable in new [] { true, false } )
+				{
+					var considerAsync = isAsyncPackable || isAsyncUnpackable;
+
+					foreach ( var enableAsync in new [] { true, false } )
+					{
+						if ( !considerAsync && enableAsync )
+						{
+							// skip
+							continue;
+						}
+
+						var shouldFail =
+							!isPackable
+							|| !isUnpackable
+							|| ( !isAsyncPackable && enableAsync )
+							|| ( !isAsyncUnpackable && enableAsync );
+
+						var suffix =
+							( isPackable ? "Packable" : String.Empty ) +
+							( isUnpackable ? "Unpackable" : String.Empty ) +
+							( isAsyncPackable ? "AsyncPackable" : String.Empty ) +
+							( isAsyncUnpackable ? "AsyncUnpackable" : String.Empty );
+						var methodSuffix = suffix;
+						if ( considerAsync )
+						{
+							methodSuffix += enableAsync ? "_AsyncEnabled" : "_AsyncDisabled";
+						}
+
+						methodSuffix += !shouldFail ? "Success" : "Fail";
+
+						if ( considerAsync )
+						{
+#>
+#if FEATURE_TAP
+
+<#+
+						}
+#>
+		[Test]
+		public void TestNoMembers_<#= methodSuffix #>()
+		{
+<#+
+						if ( shouldFail )
+						{
+#>
+			Assert.Throws<SerializationException>( () => GetSerializationContextWithAsyncEnabled( <#= enableAsync.ToString().ToLowerInvariant() #> ).GetSerializer<NoMembers<#= suffix #>>() );
+<#+
+						}
+						else
+						{
+		#>
+			TestNoMembersPackableLikeCore(
+				() => new NoMembers<#= suffix #>("ABC"),
+<#+
+							if ( isPackable )
+							{
+#>
+				( s, b, x ) => s.Pack( b, x ),
+<#+
+							}
+							else if ( isAsyncPackable )
+							{
+#>
+				( s, b, x ) => s.PackAsync( b, x ).GetAwaiter().GetResult(),
+<#+
+							}
+							else
+							{
+#>
+				( s, b, x ) => b.Write( new byte[] { 0x91, 0xA3, ( byte )'A', ( byte )'B', ( byte )'C' }, 0, 5 ),
+<#+
+							} // isPackable
+
+							if ( isUnpackable )
+							{
+#>
+				( s, b ) => s.Unpack( b ),
+<#+
+							}
+							else if ( isAsyncUnpackable )
+							{
+#>
+				( s, b ) => s.UnpackAsync( b ).GetAwaiter().GetResult(),
+<#+
+							}
+							else
+							{
+#>
+				( s, b ) =>
+				{
+					Assert.That( b.ToArray(), Is.EqualTo( new byte[] { 0x91, 0xA3, ( byte )'A', ( byte )'B', ( byte )'C' } ) );
+					return new Empty<#= suffix #>( Encoding.UTF8.GetString( b.ToArray(), 2, 3 ) );
+				},
+<#+
+							} // isUnpackable
+#>
+				( expected, actual ) => Assert.That( actual.GetValue(), Is.EqualTo( expected.GetValue() ) ),
+				<#= enableAsync.ToString().ToLowerInvariant() #>
+			);
+<#+
+						} // shouldFail
+#>
+		}
+
+<#+
+						if ( considerAsync )
+						{
+#>
+#endif // FEATURE_TAP
+
+<#+
+						}
+					}
+				}
+			}
+		}
+	}
+#>
+
+		#endregion -- Issue 202 --
 
 <#+
 	GeneratePolymorphismTestParts();

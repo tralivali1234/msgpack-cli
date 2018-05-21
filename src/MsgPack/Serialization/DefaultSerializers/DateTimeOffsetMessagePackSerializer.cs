@@ -2,7 +2,7 @@
 //
 // MessagePack for CLI
 //
-// Copyright (C) 2015 FUJIWARA, Yusuke
+// Copyright (C) 2015-2017 FUJIWARA, Yusuke
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -23,10 +23,16 @@
 #endif
 
 using System;
-#if !UNITY
+#if FEATURE_MPCONTRACT
+using Contract = MsgPack.MPContract;
+#else
 using System.Diagnostics.Contracts;
-#endif // !UNITY
+#endif // FEATURE_MPCONTRACT
 using System.Runtime.Serialization;
+#if FEATURE_TAP
+using System.Threading;
+using System.Threading.Tasks;
+#endif // FEATURE_TAP
 
 namespace MsgPack.Serialization.DefaultSerializers
 {
@@ -38,7 +44,7 @@ namespace MsgPack.Serialization.DefaultSerializers
 		private readonly DateTimeConversionMethod _conversion;
 
 		public DateTimeOffsetMessagePackSerializer( SerializationContext ownerContext, DateTimeConversionMethod conversion )
-			: base( ownerContext )
+			: base( ownerContext, SerializerCapabilities.PackTo | SerializerCapabilities.UnpackFrom )
 		{
 			this._conversion = conversion;
 		}
@@ -46,7 +52,11 @@ namespace MsgPack.Serialization.DefaultSerializers
 		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "Validated by caller in base class" )]
 		protected internal override void PackToCore( Packer packer, DateTimeOffset objectTree )
 		{
-			if ( this._conversion == DateTimeConversionMethod.Native )
+			if ( this._conversion == DateTimeConversionMethod.Timestamp )
+			{
+				packer.Pack( Timestamp.FromDateTimeOffset( objectTree ).Encode() );
+			}
+			else if ( this._conversion == DateTimeConversionMethod.Native )
 			{
 				packer.PackArrayHeader( 2 );
 				packer.Pack( objectTree.DateTime.ToBinary() );
@@ -57,9 +67,9 @@ namespace MsgPack.Serialization.DefaultSerializers
 			}
 			else
 			{
-#if DEBUG && !UNITY
+#if DEBUG
 				Contract.Assert( this._conversion == DateTimeConversionMethod.UnixEpoc );
-#endif // DEBUG && !UNITY
+#endif // DEBUG
 				packer.Pack( MessagePackConvert.FromDateTimeOffset( objectTree ) );
 			}
 		}
@@ -67,31 +77,80 @@ namespace MsgPack.Serialization.DefaultSerializers
 		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "Validated by caller in base class" )]
 		protected internal override DateTimeOffset UnpackFromCore( Unpacker unpacker )
 		{
-			if ( unpacker.IsArrayHeader )
+			if ( unpacker.LastReadData.IsTypeOf<MessagePackExtendedTypeObject>().GetValueOrDefault() )
+			{
+				return Timestamp.Decode( unpacker.LastReadData.DeserializeAsMessagePackExtendedTypeObject() ).ToDateTimeOffset();
+			}
+			else if ( unpacker.IsArrayHeader )
 			{
 				if ( UnpackHelpers.GetItemsCount( unpacker ) != 2 )
 				{
-					throw new SerializationException( "Invalid DateTimeOffset serialization." );
+					SerializationExceptions.ThrowInvalidArrayItemsCount( unpacker, typeof( DateTimeOffset ), 2 );
 				}
 
 				long ticks;
 				if ( !unpacker.ReadInt64( out ticks ) )
 				{
-					throw SerializationExceptions.NewUnexpectedEndOfStream();
+					SerializationExceptions.ThrowUnexpectedEndOfStream( unpacker );
 				}
 
 				short offsetMinutes;
 				if ( !unpacker.ReadInt16( out offsetMinutes ) )
 				{
-					throw SerializationExceptions.NewUnexpectedEndOfStream();
+					SerializationExceptions.ThrowUnexpectedEndOfStream( unpacker );
 				}
 
 				return new DateTimeOffset( DateTime.FromBinary( ticks ), TimeSpan.FromMinutes( offsetMinutes ) );
 			}
 			else
 			{
-				return MessagePackConvert.ToDateTimeOffset( unpacker.LastReadData.AsInt64() );
+				return MessagePackConvert.ToDateTimeOffset( unpacker.LastReadData.DeserializeAsInt64() );
 			}
 		}
+
+#if FEATURE_TAP
+
+		protected internal override async Task PackToAsyncCore( Packer packer, DateTimeOffset objectTree, CancellationToken cancellationToken )
+		{
+			if ( this._conversion == DateTimeConversionMethod.Timestamp )
+			{
+				await packer.PackAsync( Timestamp.FromDateTimeOffset( objectTree ).Encode(), cancellationToken ).ConfigureAwait( false );
+			}
+			else if ( this._conversion == DateTimeConversionMethod.Native )
+			{
+				await packer.PackArrayHeaderAsync( 2, cancellationToken ).ConfigureAwait( false );
+				await packer.PackAsync( objectTree.DateTime.ToBinary(), cancellationToken ).ConfigureAwait( false );
+				unchecked
+				{
+					await packer.PackAsync( ( short )( objectTree.Offset.Hours * 60 + objectTree.Offset.Minutes ), cancellationToken ).ConfigureAwait( false );
+				}
+			}
+			else
+			{
+#if DEBUG
+				Contract.Assert( this._conversion == DateTimeConversionMethod.UnixEpoc );
+#endif // DEBUG
+				await packer.PackAsync( MessagePackConvert.FromDateTimeOffset( objectTree ), cancellationToken ).ConfigureAwait( false );
+			}
+		}
+
+		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes", Justification = "Transfers all catched exceptions." )]
+		protected internal override Task<DateTimeOffset> UnpackFromAsyncCore( Unpacker unpacker, CancellationToken cancellationToken )
+		{
+			var tcs = new TaskCompletionSource<DateTimeOffset>();
+			try
+			{
+				tcs.SetResult( this.UnpackFromCore( unpacker ) );
+			}
+			catch ( Exception ex )
+			{
+				tcs.SetException( ex );
+			} 
+			
+			return tcs.Task;
+		}
+
+#endif // FEATURE_TAP
+
 	}
 }

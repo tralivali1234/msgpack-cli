@@ -22,7 +22,7 @@ Type[] _valueTypes =
 //
 // MessagePack for CLI
 //
-// Copyright (C) 2010-2014 FUJIWARA, Yusuke
+// Copyright (C) 2010-2016 FUJIWARA, Yusuke
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -40,6 +40,10 @@ Type[] _valueTypes =
 
 using System;
 using System.Collections.Generic;
+#if FEATURE_TAP
+using System.Threading;
+using System.Threading.Tasks;
+#endif // FEATURE_TAP
 
 namespace MsgPack.Serialization.DefaultSerializers
 {
@@ -109,13 +113,14 @@ private void GeneratePrimitiveArraySerializer( string itemTypeName, string simpl
 {
 #>
 
+[Preserve( AllMembers = true )]
 internal sealed class <#= simpleName #>ArraySerializer : MessagePackSerializer<#= "<" + itemTypeName + "[]>" #>
 {
 	public <#= simpleName #>ArraySerializer( SerializationContext ownerContext )
-		: base ( ownerContext ) { }
+		: base ( ownerContext, SerializerCapabilities.PackTo | SerializerCapabilities.UnpackFrom | SerializerCapabilities.UnpackTo ) { }
 
-	[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "By design" )]
-	[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "1", Justification = "By design" )]
+	[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "Validated by caller in base class" )]
+	[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "1", Justification = "Validated by caller in base class" )]
 	protected internal override void PackToCore( Packer packer, <#= itemTypeName #>[] objectTree )
 	{
 		packer.PackArrayHeader( objectTree.Length );
@@ -157,12 +162,12 @@ internal sealed class <#= simpleName #>ArraySerializer : MessagePackSerializer<#
 		}
 	}
 
-	[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "By design" )]
+	[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "Validated by caller in base class" )]
 	protected internal override <#= itemTypeName #>[] UnpackFromCore( Unpacker unpacker )
 	{
 		if ( !unpacker.IsArrayHeader )
 		{
-			throw SerializationExceptions.NewIsNotArrayHeader();
+			SerializationExceptions.ThrowIsNotArrayHeader( unpacker );
 		}
 
 		var count = UnpackHelpers.GetItemsCount( unpacker );
@@ -184,12 +189,12 @@ internal sealed class <#= simpleName #>ArraySerializer : MessagePackSerializer<#
 		return result;
 	}
 
-	[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "By design" )]
+	[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "Validated by caller in base class" )]
 	protected internal override void UnpackToCore( Unpacker unpacker, <#= itemTypeName #>[] collection )
 	{
 		if ( !unpacker.IsArrayHeader )
 		{
-			throw SerializationExceptions.NewIsNotArrayHeader();
+			SerializationExceptions.ThrowIsNotArrayHeader( unpacker );
 		}
 
 		UnpackToCore( unpacker, collection, UnpackHelpers.GetItemsCount( unpacker ) );
@@ -202,12 +207,113 @@ internal sealed class <#= simpleName #>ArraySerializer : MessagePackSerializer<#
 			<#= itemTypeName #> item;
 			if ( !unpacker.Read<#= simpleName == "MessagePackObject" ? "Object" : simpleName #>( out item ) )
 			{
-				throw SerializationExceptions.NewMissingItem( i );
+				SerializationExceptions.ThrowMissingItem( i, unpacker );
 			}
 
 			collection[ i ] = item;
 		}
 	}
+
+#if FEATURE_TAP
+
+	[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "Validated by caller in base class" )]
+	[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "1", Justification = "Validated by caller in base class" )]
+	protected internal override async Task PackToAsyncCore( Packer packer, <#= itemTypeName #>[] objectTree, CancellationToken cancellationToken )
+	{
+		await packer.PackArrayHeaderAsync( objectTree.Length, cancellationToken ).ConfigureAwait( false );
+		foreach ( var item in objectTree )
+		{
+<#+
+	switch ( simpleName )
+	{
+		case "String":
+		{
+#>
+			await packer.PackStringAsync( item, cancellationToken ).ConfigureAwait( false );
+<#+
+			break;
+		}
+		case "Binary":
+		{
+#>
+			await packer.PackBinaryAsync( item, cancellationToken ).ConfigureAwait( false );
+<#+
+			break;
+		}
+		case "MessagePackObject":
+		{
+#>
+			await item.PackToMessageAsync( packer, null, cancellationToken ).ConfigureAwait( false );
+<#+
+			break;
+		}
+		default:
+		{
+#>
+			await packer.PackAsync( item, cancellationToken ).ConfigureAwait( false );
+<#+
+			break;
+		}
+	}
+#>
+		}
+	}
+
+	[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "Validated by caller in base class" )]
+	protected internal override async Task<<#= itemTypeName #>[]> UnpackFromAsyncCore( Unpacker unpacker, CancellationToken cancellationToken )
+	{
+		if ( !unpacker.IsArrayHeader )
+		{
+			SerializationExceptions.ThrowIsNotArrayHeader( unpacker );
+		}
+
+		var count = UnpackHelpers.GetItemsCount( unpacker );
+<#+
+	if ( itemTypeName.EndsWith( "[]" ) )
+	{
+#>
+		var result = new <#= itemTypeName.Substring( 0, itemTypeName.Length - 2 ) #>[ count ][];
+<#+
+	}
+	else
+	{
+#>
+		var result = new <#= itemTypeName #>[ count ];
+<#+
+	}
+#>
+		await UnpackToAsyncCore( unpacker, result, count, cancellationToken ).ConfigureAwait( false );
+		return result;
+	}
+
+	[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "Validated by caller in base class" )]
+	protected internal override Task UnpackToAsyncCore( Unpacker unpacker, <#= itemTypeName #>[] collection, CancellationToken cancellationToken )
+	{
+		if ( !unpacker.IsArrayHeader )
+		{
+			SerializationExceptions.ThrowIsNotArrayHeader( unpacker );
+		}
+
+		return UnpackToAsyncCore( unpacker, collection, UnpackHelpers.GetItemsCount( unpacker ), cancellationToken );
+	}
+
+	private static async Task UnpackToAsyncCore( Unpacker unpacker, <#= itemTypeName #>[] collection, int count, CancellationToken cancellationToken )
+	{
+		for ( int i = 0; i < count; i++ )
+		{
+			var item = await unpacker.Read<#= simpleName == "MessagePackObject" ? "Object" : simpleName #>Async( cancellationToken ).ConfigureAwait( false );
+			if ( !item.Success )
+			{
+				SerializationExceptions.ThrowMissingItem( i, unpacker );
+			}
+
+			collection[ i ] = item.Value;
+		}
+	}
+
+
+#endif // FEATURE_TAP
+
 }
 <#+
 }

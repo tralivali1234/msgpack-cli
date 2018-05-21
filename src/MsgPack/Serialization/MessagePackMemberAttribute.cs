@@ -23,13 +23,11 @@
 #endif
 
 using System;
-#if !UNITY
-#if XAMIOS || XAMDROID
+#if FEATURE_MPCONTRACT
 using Contract = MsgPack.MPContract;
 #else
 using System.Diagnostics.Contracts;
-#endif // XAMIOS || XAMDROID
-#endif // !UNITY
+#endif // FEATURE_MPCONTRACT
 
 namespace MsgPack.Serialization
 {
@@ -79,9 +77,9 @@ namespace MsgPack.Serialization
 		{
 			get
 			{
-#if !UNITY
+#if DEBUG
 				Contract.Ensures( Enum.IsDefined( typeof( NilImplication ), Contract.Result<NilImplication>() ) );
-#endif // !UNITY
+#endif // DEBUG
 
 				return this._nilImplication;
 			}
@@ -101,10 +99,7 @@ namespace MsgPack.Serialization
 					}
 				}
 
-#if !UNITY
 				Contract.EndContractBlock();
-#endif // !UNITY
-
 
 				this._nilImplication = value;
 			}

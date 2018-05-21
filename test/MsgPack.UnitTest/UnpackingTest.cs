@@ -1,4 +1,4 @@
-﻿#region -- License Terms --
+#region -- License Terms --
 //
 // MessagePack for CLI
 //
@@ -140,7 +140,8 @@ namespace MsgPack
 		[Test]
 		public void TestUnpackString_ByteArray_Encoding_1ByteNonSpecifiedString()
 		{
-#if MONO || XAMDROID
+#if MONO || XAMDROID || UNITY
+#warning TODO: Workaround
 			Assert.Inconclusive( "UTF32Encoding does not throw exception on Mono FCL." );
 #elif !NETFX_CORE && !SILVERLIGHT
 			Assert.Throws<MessageTypeException>( () => Unpacking.UnpackString( new byte[] { 0xA4, 0x7F, 0x7F, 0x7F, 0x7F }, new UTF32Encoding( bigEndian: true, byteOrderMark: false, throwOnInvalidCharacters: true ) ) );
@@ -292,7 +293,8 @@ namespace MsgPack
 		[Test]
 		public void TestUnpackString_Stream_Encoding_1ByteNonSpecifiedString()
 		{
-#if MONO || XAMDROID
+#if MONO || XAMDROID || UNITY
+#warning TODO: Workaround
 			Assert.Inconclusive( "UTF32Encoding does not throw exception on Mono FCL." );
 #endif
 
@@ -340,7 +342,7 @@ namespace MsgPack
 			Assert.That( readCountExtra, Is.EqualTo( 0 ) );
 		}
 
-#if !NETFX_CORE && !SILVERLIGHT && !XAMDROID
+#if !NETFX_CORE && !SILVERLIGHT && !XAMARIN
 		[Test]
 		public void TestUnpackByteStream_Stream_LengthIsGreaterThanInt32MaxValue_CanReadToEnd()
 		{
@@ -379,7 +381,7 @@ namespace MsgPack
 				File.Delete( filePath );
 			}
 		}
-#endif // !NETFX_CORE && !SILVERLIGHT && !XAMDROID
+#endif // !NETFX_CORE && !SILVERLIGHT && !XAMARIN
 
 		[Test]
 		public void TestUnpackByteStream_Stream_Empty_AsIsAndBounded()
@@ -584,7 +586,8 @@ namespace MsgPack
 		[Test]
 		public void TestUnpackCharStream_Stream_Encoding_1ByteNonSpecifiedString_ExceptionInReaderOperation()
 		{
-#if MONO || XAMDROID
+#if MONO || XAMDROID || UNITY
+#warning TODO: Workaround
 			Assert.Inconclusive( "UTF32Encoding does not throw exception on Mono FCL." );
 #endif
 #if !NETFX_CORE && !SILVERLIGHT
@@ -831,7 +834,7 @@ namespace MsgPack
 		[Test]
 		public void TestUnpackInt32_Eof()
 		{
-			Assert.Throws<InvalidMessagePackStreamException>( () => Unpacking.UnpackInt32( new byte[] { 0xD0 } ) );
+			Assert.Throws<UnpackException>( () => Unpacking.UnpackInt32( new byte[] { 0xD0 } ) );
 		}
 
 		[Test]
@@ -849,13 +852,13 @@ namespace MsgPack
 		[Test]
 		public void TestUnpackBinary_EofInHeader()
 		{
-			Assert.Throws<InvalidMessagePackStreamException>( () => Unpacking.UnpackBinary( new byte[] { 0xDA, 0x1 } ) );
+			Assert.Throws<UnpackException>( () => Unpacking.UnpackBinary( new byte[] { 0xDA, 0x1 } ) );
 		}
 
 		[Test]
 		public void TestUnpackBinary_EofInBody()
 		{
-			Assert.Throws<InvalidMessagePackStreamException>( () => Unpacking.UnpackBinary( new byte[] { 0xA1 } ) );
+			Assert.Throws<UnpackException>( () => Unpacking.UnpackBinary( new byte[] { 0xA1 } ) );
 		}
 
 		[Test]

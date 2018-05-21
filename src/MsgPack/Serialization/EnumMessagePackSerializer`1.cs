@@ -2,7 +2,7 @@
 //
 // MessagePack for CLI
 //
-// Copyright (C) 2014-2015 FUJIWARA, Yusuke
+// Copyright (C) 2014-2016 FUJIWARA, Yusuke
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -23,8 +23,13 @@
 #endif
 
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Runtime.Serialization;
+#if FEATURE_TAP
+using System.Threading;
+using System.Threading.Tasks;
+#endif // FEATURE_TAP
 
 namespace MsgPack.Serialization
 {
@@ -39,6 +44,8 @@ namespace MsgPack.Serialization
 		where TEnum : struct
 	{
 		private readonly Type _underlyingType;
+		private readonly Dictionary<TEnum, string> _serializationMapping;
+		private readonly Dictionary<string, TEnum> _deserializationMapping;
 		private EnumSerializationMethod _serializationMethod; // not readonly -- changed in cloned instance in GetCopyAs()
 
 		/// <summary>
@@ -47,8 +54,9 @@ namespace MsgPack.Serialization
 		/// <param name="ownerContext">A <see cref="SerializationContext"/> which owns this serializer.</param>
 		/// <param name="serializationMethod">The <see cref="EnumSerializationMethod"/> which determines serialization form of the enums.</param>
 		/// <exception cref="InvalidOperationException"><c>TEnum</c> is not enum type.</exception>
+		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "Validated in base consctructor." )]
 		protected EnumMessagePackSerializer( SerializationContext ownerContext, EnumSerializationMethod serializationMethod )
-			: base( ownerContext )
+			: base( ownerContext, SerializerCapabilities.PackTo | SerializerCapabilities.UnpackFrom )
 		{
 			if ( !typeof( TEnum ).GetIsEnum() )
 			{
@@ -59,6 +67,15 @@ namespace MsgPack.Serialization
 
 			this._serializationMethod = serializationMethod;
 			this._underlyingType = Enum.GetUnderlyingType( typeof( TEnum ) );
+			var members = Enum.GetValues( typeof( TEnum ) ) as TEnum[];
+			this._serializationMapping = new Dictionary<TEnum, string>( members.Length );
+			this._deserializationMapping = new Dictionary<string, TEnum>( members.Length );
+			foreach ( var member in members )
+			{
+				var asString = ownerContext.EnumSerializationOptions.SafeNameTransformer( member.ToString() );
+				this._serializationMapping[ member ] = asString;
+				this._deserializationMapping[ asString ] = member;
+			}
 		}
 
 		/// <summary>
@@ -66,7 +83,7 @@ namespace MsgPack.Serialization
 		/// </summary>
 		/// <param name="packer"><see cref="Packer"/> which packs values in <paramref name="objectTree"/>. This value will not be <c>null</c>.</param>
 		/// <param name="objectTree">Object to be serialized.</param>
-		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "By design" )]
+		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "Validated by caller in base class" )]
 		protected internal sealed override void PackToCore( Packer packer, TEnum objectTree )
 		{
 			if ( this._serializationMethod == EnumSerializationMethod.ByUnderlyingValue )
@@ -75,7 +92,14 @@ namespace MsgPack.Serialization
 			}
 			else
 			{
-				packer.PackString( objectTree.ToString() );
+				string asString;
+				if ( !this._serializationMapping.TryGetValue( objectTree, out asString ) )
+				{
+					// May be undefined value which should be numeric.
+					asString = objectTree.ToString();
+				}
+
+				packer.PackString( asString );
 			}
 		}
 
@@ -85,6 +109,54 @@ namespace MsgPack.Serialization
 		/// <param name="packer">The packer.</param>
 		/// <param name="enumValue">The enum value to be packed.</param>
 		protected internal abstract void PackUnderlyingValueTo( Packer packer, TEnum enumValue );
+
+#if FEATURE_TAP
+
+		/// <summary>
+		/// Serializes specified object with specified <see cref="Packer" /> asynchronously.
+		/// </summary>
+		/// <param name="packer"><see cref="Packer" /> which packs values in <paramref name="objectTree" />. This value will not be <c>null</c>.</param>
+		/// <param name="objectTree">Object to be serialized.</param>
+		/// <param name="cancellationToken">The token to monitor for cancellation requests. The default value is <see cref="CancellationToken.None" />.</param>
+		/// <returns>
+		/// A <see cref="Task" /> that represents the asynchronous operation.
+		/// </returns>
+		/// <seealso cref="P:Capabilities" />
+		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "Validated by caller in base class" )]
+		protected internal sealed override Task PackToAsyncCore( Packer packer, TEnum objectTree, CancellationToken cancellationToken )
+		{
+			if ( this._serializationMethod == EnumSerializationMethod.ByUnderlyingValue )
+			{
+				return this.PackUnderlyingValueToAsync( packer, objectTree, cancellationToken );
+			}
+			else
+			{
+				string asString;
+				if ( !this._serializationMapping.TryGetValue( objectTree, out asString ) )
+				{
+					// May be undefined value which should be numeric.
+					asString = objectTree.ToString();
+				}
+
+				return packer.PackStringAsync( asString, cancellationToken );
+			}
+		}
+
+		/// <summary>
+		///		Packs enum value as its underlying value asynchronously.
+		/// </summary>
+		/// <param name="packer">The packer.</param>
+		/// <param name="enumValue">The enum value to be packed.</param>
+		/// <param name="cancellationToken">The token to monitor for cancellation requests. The default value is <see cref="CancellationToken.None"/>.</param>
+		protected internal virtual Task PackUnderlyingValueToAsync( Packer packer, TEnum enumValue, CancellationToken cancellationToken )
+		{
+#if DEBUG
+			SerializerDebugging.EnsureNaiveAsyncAllowed( this );
+#endif // DEBUG
+			return Task.Run( () => this.PackUnderlyingValueTo( packer, enumValue ), cancellationToken );
+		}
+
+#endif // FEATURE_TAP
 
 		/// <summary>
 		///		Deserializes object with specified <see cref="Unpacker"/>.
@@ -100,7 +172,7 @@ namespace MsgPack.Serialization
 		/// <exception cref="InvalidMessagePackStreamException">
 		///		Failed to deserialize object due to invalid unpacker state, stream content, or so.
 		/// </exception>
-		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "By design" )]
+		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "Validated by caller in base class" )]
 		protected internal sealed override TEnum UnpackFromCore( Unpacker unpacker )
 		{
 			if ( unpacker.LastReadData.IsRaw )
@@ -108,36 +180,40 @@ namespace MsgPack.Serialization
 				var asString = unpacker.LastReadData.AsString();
 
 				TEnum result;
-#if NETFX_35 || UNITY
-				try
+				if ( !this._deserializationMapping.TryGetValue( asString, out result ) )
 				{
-					result = ( TEnum ) Enum.Parse( typeof( TEnum ), asString, false );
-				}
-				catch ( ArgumentException ex )
-				{
-					throw new SerializationException(
-						String.Format(
-							CultureInfo.CurrentCulture,
-							"Name '{0}' is not member of enum type '{1}'.",
-							asString,
-							typeof( TEnum )
-							),
-						ex
-					);
-				}
+					// May be undefined value which should be numeric, or PacakCasing.
+#if NET35 || UNITY
+					try
+					{
+						result = ( TEnum ) Enum.Parse( typeof( TEnum ), asString, false );
+					}
+					catch ( ArgumentException ex )
+					{
+						throw new SerializationException(
+							String.Format(
+								CultureInfo.CurrentCulture,
+								"Name '{0}' is not member of enum type '{1}'.",
+								asString,
+								typeof( TEnum )
+								),
+							ex
+						);
+					}
 #else
-				if ( !Enum.TryParse( asString, false, out result ) )
-				{
-					throw new SerializationException(
-						String.Format(
-							CultureInfo.CurrentCulture,
-							"Name '{0}' is not member of enum type '{1}'.",
-							asString,
-							typeof( TEnum )
-						)
-					);
+					if ( !Enum.TryParse( asString, false, out result ) )
+					{
+						throw new SerializationException(
+								String.Format(
+									CultureInfo.CurrentCulture,
+									"Name '{0}' is not member of enum type '{1}'.",
+									asString,
+									typeof( TEnum )
+								)
+							);
+					}
+#endif // NET35 || UNITY
 				}
-#endif // NETFX_35 || UNITY
 
 				return result;
 			}
@@ -168,6 +244,27 @@ namespace MsgPack.Serialization
 		/// <exception cref="SerializationException">The type of integral value is not compatible with underlying type of the enum.</exception>
 		protected internal abstract TEnum UnpackFromUnderlyingValue( MessagePackObject messagePackObject );
 
+#if FEATURE_TAP
+
+		/// <summary>
+		/// Deserializes object with specified <see cref="Unpacker" /> asynchronously.
+		/// </summary>
+		/// <param name="unpacker"><see cref="Unpacker" /> which unpacks values of resulting object tree. This value will not be <c>null</c>.</param>
+		/// <param name="cancellationToken">The token to monitor for cancellation requests. The default value is <see cref="CancellationToken.None" />.</param>
+		/// <returns>
+		/// A <see cref="Task" /> that represents the asynchronous operation.
+		/// The value of the <c>TResult</c> parameter contains the deserialized object.
+		/// </returns>
+		/// <seealso cref="P:Capabilities" />
+		protected internal sealed override Task<TEnum> UnpackFromAsyncCore( Unpacker unpacker, CancellationToken cancellationToken )
+		{
+			var result = new TaskCompletionSource<TEnum>();
+			result.SetResult( this.UnpackFromCore( unpacker ) );
+			return result.Task;
+		}
+
+#endif // FEATURE_TAP
+
 		ICustomizableEnumSerializer ICustomizableEnumSerializer.GetCopyAs( EnumSerializationMethod method )
 		{
 			if ( method == this._serializationMethod )
@@ -186,10 +283,12 @@ namespace MsgPack.Serialization
 	internal abstract class UnityEnumMessagePackSerializer : NonGenericMessagePackSerializer, ICustomizableEnumSerializer
 	{
 		private readonly Type _underlyingType;
+		private readonly Dictionary<object, string> _serializationMapping;
+		private readonly Dictionary<string, object> _deserializationMapping;
 		private EnumSerializationMethod _serializationMethod; // not readonly -- changed in cloned instance in GetCopyAs()
 
 		protected UnityEnumMessagePackSerializer( SerializationContext ownerContext, Type targetType, EnumSerializationMethod serializationMethod )
-			: base( ownerContext, targetType )
+			: base( ownerContext, targetType, SerializerCapabilities.PackTo | SerializerCapabilities.UnpackFrom )
 		{
 			if ( !targetType.GetIsEnum() )
 			{
@@ -200,9 +299,18 @@ namespace MsgPack.Serialization
 
 			this._serializationMethod = serializationMethod;
 			this._underlyingType = Enum.GetUnderlyingType( targetType );
+			var members = Enum.GetValues( targetType );
+			this._serializationMapping = new Dictionary<object, string>( members.Length );
+			this._deserializationMapping = new Dictionary<string, object>( members.Length );
+			foreach ( var member in members )
+			{
+				var asString = ownerContext.EnumSerializationOptions.SafeNameTransformer( member.ToString() );
+				this._serializationMapping[ member ] = asString;
+				this._deserializationMapping[ asString ] = member;
+			}
 		}
 
-		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "By design" )]
+		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "Validated by caller in base class" )]
 		protected internal sealed override void PackToCore( Packer packer, object objectTree )
 		{
 			if ( this._serializationMethod == EnumSerializationMethod.ByUnderlyingValue )
@@ -211,35 +319,49 @@ namespace MsgPack.Serialization
 			}
 			else
 			{
-				packer.PackString( objectTree.ToString() );
+				string asString;
+				if ( !this._serializationMapping.TryGetValue( objectTree, out asString ) )
+				{
+					// May be undefined value which should be numeric.
+					asString = objectTree.ToString();
+				}
+
+				packer.PackString( asString );
 			}
 		}
 
 		protected internal abstract void PackUnderlyingValueTo( Packer packer, object enumValue );
 
-		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "By design" )]
+		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "Validated by caller in base class" )]
 		protected internal sealed override object UnpackFromCore( Unpacker unpacker )
 		{
 			if ( unpacker.LastReadData.IsRaw )
 			{
 				var asString = unpacker.LastReadData.AsString();
 
-				try
+				object result;
+				if ( !this._deserializationMapping.TryGetValue( asString, out result ) )
 				{
-					return Enum.Parse( this.TargetType, asString, false );
+					// May be undefined value which should be numeric, or PacakCasing.
+					try
+					{
+						result = Enum.Parse( this.TargetType, asString, false );
+					}
+					catch ( ArgumentException ex )
+					{
+						throw new SerializationException(
+							String.Format(
+								CultureInfo.CurrentCulture,
+								"Name '{0}' is not member of enum type '{1}'.",
+								asString,
+								this.TargetType
+								),
+							ex
+						);
+					}
 				}
-				catch ( ArgumentException ex )
-				{
-					throw new SerializationException(
-						String.Format(
-							CultureInfo.CurrentCulture,
-							"Name '{0}' is not member of enum type '{1}'.",
-							asString,
-							this.TargetType
-							),
-						ex
-					);
-				}
+
+				return result;
 			}
 			else if ( unpacker.LastReadData.IsTypeOf( this._underlyingType ).GetValueOrDefault() )
 			{

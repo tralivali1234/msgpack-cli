@@ -2,7 +2,7 @@
 //
 // MessagePack for CLI
 //
-// Copyright (C) 2010-2013 FUJIWARA, Yusuke
+// Copyright (C) 2010-2015 FUJIWARA, Yusuke
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ using System;
 using System.Globalization;
 using System.Reflection;
 
+using MsgPack.Serialization.AbstractSerializers;
 using MsgPack.Serialization.Reflection;
 
 namespace MsgPack.Serialization.EmittingSerializers
@@ -33,7 +34,7 @@ namespace MsgPack.Serialization.EmittingSerializers
 		private readonly FieldInfo _field;
 
 		public StoreFieldILConstruct( ILConstruct instance, FieldInfo field, ILConstruct value )
-			: base( typeof( void ) )
+			: base( TypeDefinition.VoidType )
 		{
 			this._instance = instance;
 			this._field = field;
@@ -50,7 +51,7 @@ namespace MsgPack.Serialization.EmittingSerializers
 			il.TraceWriteLine( "// Stor->: {0}", this );
 			if ( this._instance != null )
 			{
-				this._instance.LoadValue( il, this._instance.ContextType.GetIsValueType() );
+				this._instance.LoadValue( il, this._instance.ContextType.ResolveRuntimeType().GetIsValueType() );
 			}
 
 			this._value.LoadValue( il, false );

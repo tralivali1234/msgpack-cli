@@ -2,7 +2,7 @@
 //
 // MessagePack for CLI
 //
-// Copyright (C) 2010-2012 FUJIWARA, Yusuke
+// Copyright (C) 2010-2016 FUJIWARA, Yusuke
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -23,6 +23,12 @@
 #endif
 
 using System;
+using System.Globalization;
+#if FEATURE_MPCONTRACT
+using MPContract = MsgPack.MPContract;
+#else
+using MPContract = System.Diagnostics.Contracts.Contract;
+#endif // FEATURE_MPCONTRACT
 using System.Reflection;
 
 namespace MsgPack.Serialization
@@ -38,6 +44,7 @@ namespace MsgPack.Serialization
 	{
 		public readonly MemberInfo Member;
 		public readonly DataMemberContract Contract;
+		public readonly string MemberName;
 
 #if UNITY
 		public SerializingMember()
@@ -49,13 +56,31 @@ namespace MsgPack.Serialization
 
 		public SerializingMember( MemberInfo member, DataMemberContract contract )
 		{
+#if DEBUG
+			MPContract.Assert( member != null );
+#endif // DEBUG
 			this.Member = member;
 			this.Contract = contract;
+			// Use contract name for aliased map serialization.
+			this.MemberName = member == null ? null : contract.Name;
 		}
+
+#if !NET35
+		// For Tuple
+		public SerializingMember( string name )
+		{
+#if DEBUG
+			MPContract.Assert( name.StartsWith( "Item" ), name + ".StartsWith(\"Item\")" );
+#endif // DEBUG
+			this.Member = null;
+			this.Contract = default ( DataMemberContract );
+			this.MemberName = name;
+		}
+#endif // !NET35
 
 		public EnumMemberSerializationMethod GetEnumMemberSerializationMethod()
 		{
-#if NETFX_CORE
+#if NETSTANDARD1_1 || NETSTANDARD1_3
 			var messagePackEnumMemberAttribute = 
 				this.Member.GetCustomAttribute<MessagePackEnumMemberAttribute>();
 			if ( messagePackEnumMemberAttribute != null)
@@ -69,7 +94,7 @@ namespace MsgPack.Serialization
 				return
 					// ReSharper disable once PossibleNullReferenceException
 					( messagePackEnumMemberAttributes[ 0 ] as MessagePackEnumMemberAttribute ).SerializationMethod;
-#endif // NETFX_CORE
+#endif // NETSTANDARD1_1 || NETSTANDARD1_3
 			}
 
 			return EnumMemberSerializationMethod.Default;
@@ -77,7 +102,7 @@ namespace MsgPack.Serialization
 
 		public DateTimeMemberConversionMethod GetDateTimeMemberConversionMethod()
 		{
-#if NETFX_CORE
+#if NETSTANDARD1_1 || NETSTANDARD1_3
 			var messagePackDateTimeMemberAttribute = 
 				this.Member.GetCustomAttribute<MessagePackDateTimeMemberAttribute>();
 			if ( messagePackDateTimeMemberAttribute != null)
@@ -91,10 +116,20 @@ namespace MsgPack.Serialization
 				return
 					// ReSharper disable once PossibleNullReferenceException
 					( messagePackDateTimeMemberAttribute[ 0 ] as MessagePackDateTimeMemberAttribute ).DateTimeConversionMethod;
-#endif // NETFX_CORE
+#endif // NETSTANDARD1_1 || NETSTANDARD1_3
 			}
 
 			return DateTimeMemberConversionMethod.Default;
+		}
+
+		public override string ToString()
+		{
+			if ( this.MemberName == null )
+			{
+				return String.Empty;
+			}
+
+			return String.Format( CultureInfo.InvariantCulture, "{{\"Name\": \"{0}\", \"Id\": {1}, \"Member\": \"{2}\", \"NilImplication\": \"{3}\" }}", this.MemberName, this.Contract.Id, this.MemberName, this.Contract.NilImplication );
 		}
 	}
 }

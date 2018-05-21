@@ -23,13 +23,11 @@
 #endif
 
 using System;
-#if !UNITY
-#if XAMIOS || XAMDROID
+#if FEATURE_MPCONTRACT
 using Contract = MsgPack.MPContract;
 #else
 using System.Diagnostics.Contracts;
-#endif // XAMIOS || XAMDROID
-#endif // !UNITY
+#endif // FEATURE_MPCONTRACT
 using System.Globalization;
 using System.IO;
 using System.Text;
@@ -189,10 +187,7 @@ namespace MsgPack
 				throw new ArgumentNullException( "encoding" );
 			}
 
-#if !UNITY
 			Contract.EndContractBlock();
-#endif // !UNITY
-
 
 			try
 			{
@@ -280,10 +275,7 @@ namespace MsgPack
 				throw new ArgumentNullException( "encoding" );
 			}
 
-#if !UNITY
 			Contract.EndContractBlock();
-#endif // !UNITY
-
 
 			try
 			{

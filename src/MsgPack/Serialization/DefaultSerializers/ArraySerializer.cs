@@ -23,13 +23,11 @@
 #endif
 
 using System;
-#if !UNITY
-#if XAMIOS || XAMDROID
+#if FEATURE_MPCONTRACT
 using Contract = MsgPack.MPContract;
 #else
 using System.Diagnostics.Contracts;
-#endif // XAMIOS || XAMDROID
-#endif // !UNITY
+#endif // FEATURE_MPCONTRACT
 
 namespace MsgPack.Serialization.DefaultSerializers
 {
@@ -40,11 +38,11 @@ namespace MsgPack.Serialization.DefaultSerializers
 			return Create( context, typeof( T ), itemsSchema ) as MessagePackSerializer<T>;
 		}
 
-		public static IMessagePackSingleObjectSerializer Create( SerializationContext context, Type targetType, PolymorphismSchema itemsSchema ) 
+		public static MessagePackSerializer Create( SerializationContext context, Type targetType, PolymorphismSchema itemsSchema )
 		{
-#if DEBUG && !UNITY
+#if DEBUG
 			Contract.Assert( targetType.IsArray, "targetType.IsArray" );
-#endif // DEBUG && !UNITY
+#endif // DEBUG
 
 			// Check the T is SZArray -- Type.GetArrayRank() returns 1 for single dimension, non-zero based arrays, so use (SZArrayType).IsAssinableFrom() instead.
 			if ( targetType.GetElementType().MakeArrayType().IsAssignableFrom( targetType ) )
@@ -60,7 +58,7 @@ namespace MsgPack.Serialization.DefaultSerializers
 #else
 					?? new UnityArraySerializer( context, targetType.GetElementType(), itemsSchema )
 #endif
-					) as IMessagePackSingleObjectSerializer;
+					) as MessagePackSerializer;
 			}
 			else
 			{
@@ -70,7 +68,7 @@ namespace MsgPack.Serialization.DefaultSerializers
 						typeof( MultidimensionalArraySerializer<,> ).MakeGenericType( targetType, targetType.GetElementType() ),
 						context,
 						itemsSchema
-					) as IMessagePackSingleObjectSerializer;
+					) as MessagePackSerializer;
 #else
 					new UnityMultidimensionalArraySerializer( context, targetType.GetElementType(), itemsSchema );
 #endif
@@ -79,9 +77,9 @@ namespace MsgPack.Serialization.DefaultSerializers
 
 		private static object GetPrimitiveArraySerializer( SerializationContext context, Type targetType )
 		{
-#if DEBUG && !UNITY
+#if DEBUG
 			Contract.Assert( targetType.IsArray, "targetType.IsArray" );
-#endif // DEBUG && !UNITY
+#endif // DEBUG
 
 			Func<SerializationContext, object> serializerFactory;
 			if ( !_arraySerializerFactories.TryGetValue( targetType, out serializerFactory ) )

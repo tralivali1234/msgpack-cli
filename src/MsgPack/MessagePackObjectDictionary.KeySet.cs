@@ -2,7 +2,7 @@
 //
 // MessagePack for CLI
 //
-// Copyright (C) 2010-2015 FUJIWARA, Yusuke
+// Copyright (C) 2010-2016 FUJIWARA, Yusuke
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -27,13 +27,11 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-#if !UNITY
-#if XAMIOS || XAMDROID
+#if FEATURE_MPCONTRACT
 using Contract = MsgPack.MPContract;
 #else
 using System.Diagnostics.Contracts;
-#endif // XAMIOS || XAMDROID
-#endif // !UNITY
+#endif // FEATURE_MPCONTRACT
 
 namespace MsgPack
 {
@@ -42,17 +40,17 @@ namespace MsgPack
 		/// <summary>
 		///		Represents the set of <see cref="MessagePackObjectDictionary"/> keys.
 		/// </summary>
-#if !SILVERLIGHT && !NETFX_CORE
+#if !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 		[Serializable]
-#endif
+#endif // !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 		[DebuggerDisplay( "Count={Count}" )]
 		[DebuggerTypeProxy( typeof( CollectionDebuggerProxy<> ) )]
 		[SuppressMessage( "Microsoft.Design", "CA1034:NestedTypesShouldNotBeVisible", Justification = "ICollection implementing dictionary should return ICollection implementing values." )]
 #if !UNITY
 		public sealed partial class KeySet :
-#if !NETFX_35
+#if !NET35
 			ISet<MessagePackObject>,
-#endif // !NETFX_35
+#endif // !NET35
 #else
 		public sealed partial class KeyCollection :
 #endif // !UNITY
@@ -93,9 +91,7 @@ namespace MsgPack
 			internal KeyCollection( MessagePackObjectDictionary dictionary )
 #endif // !UNITY
 			{
-#if !UNITY
 				Contract.Assert( dictionary != null, "dictionary != null" );
-#endif // !UNITY
 
 				this._dictionary = dictionary;
 			}
@@ -114,9 +110,7 @@ namespace MsgPack
 					throw new ArgumentNullException( "array" );
 				}
 
-#if !UNITY
 				Contract.EndContractBlock();
-#endif // !UNITY
 
 				CollectionOperation.CopyTo( this, this.Count, 0, array, 0, this.Count );
 			}
@@ -186,9 +180,7 @@ namespace MsgPack
 					throw new ArgumentException( "Specified array is too small to complete copy operation.", "array" );
 				}
 
-#if !UNITY
 				Contract.EndContractBlock();
-#endif // !UNITY
 
 				CollectionOperation.CopyTo( this, this.Count, index, array, arrayIndex, count );
 			}
@@ -227,7 +219,7 @@ namespace MsgPack
 			}
 
 #if !UNITY
-#if !NETFX_35
+#if !NET35
 			bool ISet<MessagePackObject>.Add( MessagePackObject item )
 			{
 				throw new NotSupportedException();
@@ -242,7 +234,7 @@ namespace MsgPack
 			{
 				throw new NotSupportedException();
 			}
-#endif // !NETFX_35
+#endif // !NET35
 
 			/// <summary>
 			///		Determines whether this set is proper subset of the specified collection.
@@ -346,7 +338,7 @@ namespace MsgPack
 				return SetOperation.SetEquals( this, other );
 			}
 
-#if !NETFX_35
+#if !NET35
 			void ISet<MessagePackObject>.SymmetricExceptWith( IEnumerable<MessagePackObject> other )
 			{
 				throw new NotSupportedException();
@@ -356,7 +348,7 @@ namespace MsgPack
 			{
 				throw new NotSupportedException();
 			}
-#endif // !NETFX_35
+#endif // !NET35
 #endif // !UNITY
 
 			/// <summary>

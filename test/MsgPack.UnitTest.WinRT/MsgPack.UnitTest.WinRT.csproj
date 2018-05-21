@@ -2,106 +2,46 @@
 <Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
-    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProductVersion>8.0.30703</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>{EC65EFFC-1D7B-4805-BCCB-3E8FCA99F8E8}</ProjectGuid>
     <OutputType>Library</OutputType>
-    <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>MsgPack</RootNamespace>
     <AssemblyName>MsgPack.UnitTest</AssemblyName>
     <DefaultLanguage>en-US</DefaultLanguage>
     <FileAlignment>512</FileAlignment>
     <ProjectTypeGuids>{BC8A1FFA-BEE3-4634-8014-F334798102B3};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
     <PackageCertificateKeyFile>MsgPack.UnitTest.WinRT_TemporaryKey.pfx</PackageCertificateKeyFile>
-    <PackageCertificateThumbprint>202044F5836CCA95275D68B47C9B4306D9016B91</PackageCertificateThumbprint>
+    <PackageCertificateThumbprint>A411E1A11B99FF48CFDEDA3098F7F4D0FB6D746D</PackageCertificateThumbprint>
     <TargetPlatformVersion>8.1</TargetPlatformVersion>
     <MinimumVisualStudioVersion>12</MinimumVisualStudioVersion>
     <TargetFrameworkVersion />
     <AppxBundle>Never</AppxBundle>
   </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <DebugSymbols>true</DebugSymbols>
-    <DebugType>full</DebugType>
-    <Optimize>false</Optimize>
-    <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>TRACE;DEBUG;NETFX_CORE;MSTEST</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>pdbonly</DebugType>
-    <Optimize>true</Optimize>
-    <OutputPath>bin\Release\</OutputPath>
-    <DefineConstants>TRACE;NETFX_CORE;MSTEST</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|ARM'">
-    <DebugSymbols>true</DebugSymbols>
-    <OutputPath>bin\ARM\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE;NETFX_CORE</DefineConstants>
+  <Import Project="..\..\MsgPack.Common.props" />
+  <PropertyGroup>
+    <DocumentationFile></DocumentationFile>
+    <DefineConstants>$(DefineConstants);NETFX_CORE;NETSTANDARD1_1;FEATURE_TAP;MSTEST</DefineConstants>
     <NoWarn>;2008</NoWarn>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
     <DebugType>full</DebugType>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' != 'Debug'">
+    <DebugType>pdbonly</DebugType>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Platform)' == 'ARM'">
     <PlatformTarget>ARM</PlatformTarget>
     <UseVSHostingProcess>false</UseVSHostingProcess>
-    <ErrorReport>prompt</ErrorReport>
     <Prefer32Bit>true</Prefer32Bit>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|ARM'">
-    <OutputPath>bin\ARM\Release\</OutputPath>
-    <DefineConstants>TRACE;NETFX_CORE</DefineConstants>
-    <Optimize>true</Optimize>
-    <NoWarn>;2008</NoWarn>
-    <DebugType>pdbonly</DebugType>
-    <PlatformTarget>ARM</PlatformTarget>
-    <UseVSHostingProcess>false</UseVSHostingProcess>
-    <ErrorReport>prompt</ErrorReport>
-    <Prefer32Bit>true</Prefer32Bit>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
-    <DebugSymbols>true</DebugSymbols>
-    <OutputPath>bin\x64\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE;NETFX_CORE</DefineConstants>
-    <NoWarn>;2008</NoWarn>
-    <DebugType>full</DebugType>
+  <PropertyGroup Condition="'$(Platform)' == 'x64'">
     <PlatformTarget>x64</PlatformTarget>
     <UseVSHostingProcess>false</UseVSHostingProcess>
-    <ErrorReport>prompt</ErrorReport>
     <Prefer32Bit>true</Prefer32Bit>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">
-    <OutputPath>bin\x64\Release\</OutputPath>
-    <DefineConstants>TRACE;NETFX_CORE</DefineConstants>
-    <Optimize>true</Optimize>
-    <NoWarn>;2008</NoWarn>
-    <DebugType>pdbonly</DebugType>
-    <PlatformTarget>x64</PlatformTarget>
-    <UseVSHostingProcess>false</UseVSHostingProcess>
-    <ErrorReport>prompt</ErrorReport>
-    <Prefer32Bit>true</Prefer32Bit>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x86'">
-    <DebugSymbols>true</DebugSymbols>
-    <OutputPath>bin\x86\Debug\</OutputPath>
-    <DefineConstants>TRACE;DEBUG;NETFX_CORE;MSTEST</DefineConstants>
-    <NoWarn>;2008</NoWarn>
-    <DebugType>full</DebugType>
+  <PropertyGroup Condition="'$(Platform)' == 'x86'">
     <PlatformTarget>x86</PlatformTarget>
     <UseVSHostingProcess>false</UseVSHostingProcess>
-    <ErrorReport>prompt</ErrorReport>
-    <Prefer32Bit>true</Prefer32Bit>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x86'">
-    <OutputPath>bin\x86\Release\</OutputPath>
-    <DefineConstants>TRACE;NETFX_CORE</DefineConstants>
-    <Optimize>true</Optimize>
-    <NoWarn>;2008</NoWarn>
-    <DebugType>pdbonly</DebugType>
-    <PlatformTarget>x86</PlatformTarget>
-    <UseVSHostingProcess>false</UseVSHostingProcess>
-    <ErrorReport>prompt</ErrorReport>
     <Prefer32Bit>true</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup>
@@ -118,11 +58,41 @@
     </SDKReference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\MsgPack.UnitTest\_SetUpFixture.cs">
+      <Link>_SetUpFixture.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\AssertEx.cs">
+      <Link>AssertEx.cs</Link>
+    </Compile>
     <Compile Include="..\MsgPack.UnitTest\BigEndianBinaryTest.cs">
       <Link>BigEndianBinaryTest.cs</Link>
     </Compile>
+    <Compile Include="..\MsgPack.UnitTest\ByteArrayPackerTest.Allocation.cs">
+      <Link>ByteArrayPackerTest.Allocation.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\ByteArrayPackerTest.cs">
+      <Link>ByteArrayPackerTest.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\ByteArrayUnpackerTest.cs">
+      <Link>ByteArrayUnpackerTest.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\ByteArrayUnpackerTest.Ext.cs">
+      <Link>ByteArrayUnpackerTest.Ext.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\ByteArrayUnpackerTest.Raw.cs">
+      <Link>ByteArrayUnpackerTest.Raw.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\ByteArrayUnpackerTest.Scalar.cs">
+      <Link>ByteArrayUnpackerTest.Scalar.cs</Link>
+    </Compile>
     <Compile Include="..\MsgPack.UnitTest\CollectionAssertEx.cs">
       <Link>CollectionAssertEx.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\CollectionValidatingByteArrayUnpackerTest.cs">
+      <Link>CollectionValidatingByteArrayUnpackerTest.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\CollectionValidatingStreamUnpackerTest.cs">
+      <Link>CollectionValidatingStreamUnpackerTest.cs</Link>
     </Compile>
     <Compile Include="..\MsgPack.UnitTest\DirectConversionTest.cs">
       <Link>DirectConversionTest.cs</Link>
@@ -136,11 +106,20 @@
     <Compile Include="..\MsgPack.UnitTest\ExceptionTest.cs">
       <Link>ExceptionTest.cs</Link>
     </Compile>
+    <Compile Include="..\MsgPack.UnitTest\FastByteArrayUnpackerTest.cs">
+      <Link>FastByteArrayUnpackerTest.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\FastStreamUnpackerTest.cs">
+      <Link>FastStreamUnpackerTest.cs</Link>
+    </Compile>
     <Compile Include="..\MsgPack.UnitTest\GenericExceptionTester.cs">
       <Link>GenericExceptionTester.cs</Link>
     </Compile>
     <Compile Include="..\MsgPack.UnitTest\Image.cs">
       <Link>Image.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\LegacyJapaneseCultureInfo.cs">
+      <Link>LegacyJapaneseCultureInfo.cs</Link>
     </Compile>
     <Compile Include="..\MsgPack.UnitTest\MessagePackConvertTest.cs">
       <Link>MessagePackConvertTest.cs</Link>
@@ -205,17 +184,14 @@
     <Compile Include="..\MsgPack.UnitTest\MessageUnpackableTest.cs">
       <Link>MessageUnpackableTest.cs</Link>
     </Compile>
+    <Compile Include="..\MsgPack.UnitTest\PackerFactoryTest.cs">
+      <Link>PackerFactoryTest.cs</Link>
+    </Compile>
     <Compile Include="..\MsgPack.UnitTest\PackerTest.cs">
       <Link>PackerTest.cs</Link>
     </Compile>
-    <Compile Include="..\MsgPack.UnitTest\PackerTest.Miscs.cs">
-      <Link>PackerTest.Miscs.cs</Link>
-    </Compile>
     <Compile Include="..\MsgPack.UnitTest\PackerTest.Pack.cs">
       <Link>PackerTest.Pack.cs</Link>
-    </Compile>
-    <Compile Include="..\MsgPack.UnitTest\PackerTest.Pack.Miscs.cs">
-      <Link>PackerTest.Pack.Miscs.cs</Link>
     </Compile>
     <Compile Include="..\MsgPack.UnitTest\PackerTest.PackBinary.cs">
       <Link>PackerTest.PackBinary.cs</Link>
@@ -235,17 +211,20 @@
     <Compile Include="..\MsgPack.UnitTest\PackUnpackTest.Scalar.cs">
       <Link>PackUnpackTest.Scalar.cs</Link>
     </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\_SetUpFixture.cs">
+      <Link>Serialization\_SetUpFixture.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\MessagePackMemberAndDataMemberMixedTarget.cs">
+      <Link>Serialization\MessagePackMemberAndDataMemberMixedTarget.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\MessagePackMemberAttributeTest.cs">
+      <Link>Serialization\MessagePackMemberAttributeTest.cs</Link>
+    </Compile>
     <Compile Include="..\MsgPack.UnitTest\Serialization\AddOnlyCollection`1.cs">
       <Link>Serialization\AddOnlyCollection`1.cs</Link>
     </Compile>
     <Compile Include="..\MsgPack.UnitTest\Serialization\AppendableReadOnlyCollections.cs">
       <Link>Serialization\AppendableReadOnlyCollections.cs</Link>
-    </Compile>
-    <Compile Include="..\MsgPack.UnitTest\Serialization\ArrayExpressionBasedAutoMessagePackSerializerTest.cs">
-      <Link>Serialization\ArrayExpressionBasedAutoMessagePackSerializerTest.cs</Link>
-    </Compile>
-    <Compile Include="..\MsgPack.UnitTest\Serialization\ArrayExpressionBasedEnumSerializationTest.cs">
-      <Link>Serialization\ArrayExpressionBasedEnumSerializationTest.cs</Link>
     </Compile>
     <Compile Include="..\MsgPack.UnitTest\Serialization\ArrayReflectionBasedAutoMessagePackSerializerTest.cs">
       <Link>Serialization\ArrayReflectionBasedAutoMessagePackSerializerTest.cs</Link>
@@ -258,6 +237,9 @@
     </Compile>
     <Compile Include="..\MsgPack.UnitTest\Serialization\AutoMessagePackSerializerTest.Types.cs">
       <Link>Serialization\AutoMessagePackSerializerTest.Types.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\BaseCollections.cs">
+      <Link>Serialization\BaseCollections.cs</Link>
     </Compile>
     <Compile Include="..\MsgPack.UnitTest\Serialization\ComplexType.cs">
       <Link>Serialization\ComplexType.cs</Link>
@@ -280,9 +262,6 @@
     <Compile Include="..\MsgPack.UnitTest\Serialization\ComplexTypeWithTwoMember.cs">
       <Link>Serialization\ComplexTypeWithTwoMember.cs</Link>
     </Compile>
-    <Compile Include="..\MsgPack.UnitTest\Serialization\CompositeTest.cs">
-      <Link>Serialization\CompositeTest.cs</Link>
-    </Compile>
     <Compile Include="..\MsgPack.UnitTest\Serialization\DataContractAndNonSerializedMixedTarget.cs">
       <Link>Serialization\DataContractAndNonSerializedMixedTarget.cs</Link>
     </Compile>
@@ -295,11 +274,8 @@
     <Compile Include="..\MsgPack.UnitTest\Serialization\EnumSerializationTest.EnumDefinitions.cs">
       <Link>Serialization\EnumSerializationTest.EnumDefinitions.cs</Link>
     </Compile>
-    <Compile Include="..\MsgPack.UnitTest\Serialization\ExpressionBasedNilImplicationTest.cs">
-      <Link>Serialization\ExpressionBasedNilImplicationTest.cs</Link>
-    </Compile>
-    <Compile Include="..\MsgPack.UnitTest\Serialization\FromExpressionTest.cs">
-      <Link>Serialization\FromExpressionTest.cs</Link>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\InheritanceTest.cs">
+      <Link>Serialization\InheritanceTest.cs</Link>
     </Compile>
     <Compile Include="..\MsgPack.UnitTest\Serialization\IVerifiable.cs">
       <Link>Serialization\IVerifiable.cs</Link>
@@ -307,23 +283,14 @@
     <Compile Include="..\MsgPack.UnitTest\Serialization\IVerifiable`1.cs">
       <Link>Serialization\IVerifiable`1.cs</Link>
     </Compile>
-    <Compile Include="..\MsgPack.UnitTest\Serialization\MapExpressionBasedAutoMessagePackSerializerTest.cs">
-      <Link>Serialization\MapExpressionBasedAutoMessagePackSerializerTest.cs</Link>
-    </Compile>
-    <Compile Include="..\MsgPack.UnitTest\Serialization\MapExpressionBasedEnumSerializationTest.cs">
-      <Link>Serialization\MapExpressionBasedEnumSerializationTest.cs</Link>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\KeyNameTransformersTest.cs">
+      <Link>Serialization\KeyNameTransformersTest.cs</Link>
     </Compile>
     <Compile Include="..\MsgPack.UnitTest\Serialization\MapReflectionBasedAutoMessagePackSerializerTest.cs">
       <Link>Serialization\MapReflectionBasedAutoMessagePackSerializerTest.cs</Link>
     </Compile>
     <Compile Include="..\MsgPack.UnitTest\Serialization\MapReflectionBasedEnumSerializationTest.cs">
       <Link>Serialization\MapReflectionBasedEnumSerializationTest.cs</Link>
-    </Compile>
-    <Compile Include="..\MsgPack.UnitTest\Serialization\MessagePackMemberAndDataMemberMixedTarget.cs">
-      <Link>Serialization\MessagePackMemberAndDataMemberMixedTarget.cs</Link>
-    </Compile>
-    <Compile Include="..\MsgPack.UnitTest\Serialization\MessagePackMemberAttributeTest.cs">
-      <Link>Serialization\MessagePackMemberAttributeTest.cs</Link>
     </Compile>
     <Compile Include="..\MsgPack.UnitTest\Serialization\MessagePackSerializerTest.cs">
       <Link>Serialization\MessagePackSerializerTest.cs</Link>
@@ -364,8 +331,14 @@
     <Compile Include="..\MsgPack.UnitTest\Serialization\StringKeyedCollection.cs">
       <Link>Serialization\StringKeyedCollection.cs</Link>
     </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\StructWithDataContractTest.cs">
+      <Link>Serialization\StructWithDataContractTest.cs</Link>
+    </Compile>
     <Compile Include="..\MsgPack.UnitTest\Serialization\TestValueType.cs">
       <Link>Serialization\TestValueType.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\Serialization\TimestampSerializationTest.cs">
+      <Link>Serialization\TimestampSerializationTest.cs</Link>
     </Compile>
     <Compile Include="..\MsgPack.UnitTest\Serialization\TypeWithDuplicatedMessagePackMemberAttributeMember.cs">
       <Link>Serialization\TypeWithDuplicatedMessagePackMemberAttributeMember.cs</Link>
@@ -382,14 +355,26 @@
     <Compile Include="..\MsgPack.UnitTest\Serialization\VersioningTest.cs">
       <Link>Serialization\VersioningTest.cs</Link>
     </Compile>
-    <Compile Include="..\MsgPack.UnitTest\Serialization\_SetUpFixture.cs">
-      <Link>Serialization\_SetUpFixture.cs</Link>
-    </Compile>
     <Compile Include="..\MsgPack.UnitTest\SplittingStream.cs">
       <Link>SplittingStream.cs</Link>
     </Compile>
-    <Compile Include="..\MsgPack.UnitTest\SubtreeUnpackerTest.cs">
-      <Link>SubtreeUnpackerTest.cs</Link>
+    <Compile Include="..\MsgPack.UnitTest\StreamExtensions.cs">
+      <Link>StreamExtensions.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\StreamPackerTest.cs">
+      <Link>StreamPackerTest.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\StreamUnpackerTest.cs">
+      <Link>StreamUnpackerTest.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\StreamUnpackerTest.Ext.cs">
+      <Link>StreamUnpackerTest.Ext.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\StreamUnpackerTest.Raw.cs">
+      <Link>StreamUnpackerTest.Raw.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\StreamUnpackerTest.Scalar.cs">
+      <Link>StreamUnpackerTest.Scalar.cs</Link>
     </Compile>
     <Compile Include="..\MsgPack.UnitTest\TestRandom.cs">
       <Link>TestRandom.cs</Link>
@@ -397,11 +382,41 @@
     <Compile Include="..\MsgPack.UnitTest\TestSuite.cs">
       <Link>TestSuite.cs</Link>
     </Compile>
+    <Compile Include="..\MsgPack.UnitTest\TimestampTest.Calculation.cs">
+      <Link>TimestampTest.Calculation.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\TimestampTest.Comparison.cs">
+      <Link>TimestampTest.Comparison.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\TimestampTest.Conversion.cs">
+      <Link>TimestampTest.Conversion.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\TimestampTest.cs">
+      <Link>TimestampTest.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\TimestampTest.EncodeDecode.cs">
+      <Link>TimestampTest.EncodeDecode.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\TimestampTest.Parse.cs">
+      <Link>TimestampTest.Parse.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\TimestampTest.Properties.cs">
+      <Link>TimestampTest.Properties.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\TimestampTest.ToString.cs">
+      <Link>TimestampTest.ToString.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\UnpackerFactoryTest.cs">
+      <Link>UnpackerFactoryTest.cs</Link>
+    </Compile>
     <Compile Include="..\MsgPack.UnitTest\UnpackerTest.cs">
       <Link>UnpackerTest.cs</Link>
     </Compile>
     <Compile Include="..\MsgPack.UnitTest\UnpackerTest.Ext.cs">
       <Link>UnpackerTest.Ext.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\UnpackerTest.Object.cs">
+      <Link>UnpackerTest.Object.cs</Link>
     </Compile>
     <Compile Include="..\MsgPack.UnitTest\UnpackerTest.Raw.cs">
       <Link>UnpackerTest.Raw.cs</Link>
@@ -414,6 +429,9 @@
     </Compile>
     <Compile Include="..\MsgPack.UnitTest\UnpackerTest.Skip.Variations.cs">
       <Link>UnpackerTest.Skip.Variations.cs</Link>
+    </Compile>
+    <Compile Include="..\MsgPack.UnitTest\UnpackerTest.Subtree.cs">
+      <Link>UnpackerTest.Subtree.cs</Link>
     </Compile>
     <Compile Include="..\MsgPack.UnitTest\UnpackingTest.Combinations.Array.cs">
       <Link>UnpackingTest.Combinations.Array.cs</Link>
@@ -472,9 +490,6 @@
     <Compile Include="..\MsgPack.UnitTest\UnpackingTest.Scalar.cs">
       <Link>UnpackingTest.Scalar.cs</Link>
     </Compile>
-    <Compile Include="..\MsgPack.UnitTest\_SetUpFixture.cs">
-      <Link>_SetUpFixture.cs</Link>
-    </Compile>
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -490,11 +505,9 @@
     <None Include="cases.mpac" />
     <None Include="cases_compact.mpac" />
     <None Include="MsgPack.UnitTest.WinRT_TemporaryKey.pfx" />
+    <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="..\MsgPack.UnitTest\gen\ReadMe.txt">
-      <Link>gen\ReadMe.txt</Link>
-    </Content>
     <Content Include="Images\UnitTestLogo.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -509,14 +522,28 @@
     </Content>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\MsgPack.WinRT.Portable\MsgPack.WinRT.Portable.csproj">
-      <Project>{e2817364-f217-465f-be3b-a5f85e2f8667}</Project>
-      <Name>MsgPack.WinRT.Portable</Name>
+    <ProjectReference Include="..\..\src\netstandard\build\NetStandardProjectBuilder.csproj">
+      <Project>{a1b322fc-aa39-4894-afa8-ab427a3fba09}</Project>
+      <Name>NetStandardProjectBuilder</Name>
     </ProjectReference>
     <ProjectReference Include="..\MsgPack.NUnitPortable\MsgPack.NUnitPortable.csproj">
       <Project>{fc521316-ebcd-4ef1-8235-c976b2a31eb0}</Project>
       <Name>MsgPack.NUnitPortable</Name>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="MsgPack, Version=1.0.0.0, Culture=neutral, PublicKeyToken=a2625990d5dc0167, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\src\netstandard\bin\Debug\netstandard1.1\MsgPack.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Numerics.Vectors, Version=4.1.3.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\..\packages\System.Numerics.Vectors.4.4.0\lib\portable-net45+win8+wp8+wpa81\System.Numerics.Vectors.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System.ValueTuple, Version=4.0.2.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\..\packages\System.ValueTuple.4.4.0\lib\netstandard1.0\System.ValueTuple.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
   </ItemGroup>
   <PropertyGroup Condition=" '$(VisualStudioVersion)' == '' or '$(VisualStudioVersion)' &lt; '12.0' ">
     <VisualStudioVersion>12.0</VisualStudioVersion>

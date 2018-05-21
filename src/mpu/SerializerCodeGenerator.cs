@@ -71,15 +71,17 @@ namespace mpu
 		public IEnumerable<string> GenerateSerializers(
 			string sourceAssemblyFile,
 			string includingPattern,
-			string excludingPattern
-			)
+			string excludingPattern,
+			bool admitNonPublicTypes
+		)
 		{
 			return
 				this.GenerateSerializers(
 					Assembly.LoadFrom( sourceAssemblyFile ),
 					includingPattern,
-					excludingPattern
-					);
+					excludingPattern,
+					admitNonPublicTypes
+				);
 		}
 
 		/// <summary>
@@ -95,8 +97,9 @@ namespace mpu
 		public IEnumerable<string> GenerateSerializers(
 			Assembly sourceAssembly,
 			string includingPattern,
-			string excludingPattern
-			)
+			string excludingPattern,
+			bool admitNonPublicTypes
+		)
 		{
 			if ( sourceAssembly == null )
 			{
@@ -129,13 +132,13 @@ namespace mpu
 					sourceAssembly.GetTypes()
 						.Where(
 							type =>
-								type.IsPublic
+								(admitNonPublicTypes || type.IsPublic)
 								&& !type.IsAbstract
 								&& !type.IsInterface
 								&& ( includingRegex == null || includingRegex.IsMatch( type.FullName ) )
 								&& ( excludingRegex == null || !excludingRegex.IsMatch( type.FullName ) )
 						).ToArray()
-					);
+				);
 
 		}
 	}

@@ -1,8 +1,8 @@
-﻿<#
+<#
 //
 // MessagePack for CLI
 //
-// Copyright (C) 2010-2015 FUJIWARA, Yusuke
+// Copyright (C) 2010-2017 FUJIWARA, Yusuke
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -32,9 +32,9 @@
 <#@ import namespace="System.Reflection" #>
 <#@ import namespace="System.Text" #>
 <#
-var __typeName = "SerializerRepository";
+var typeName = "SerializerRepository";
 // Copied from DefaultSerializers.tt
-var __excludes =
+var excludes =
 	new HashSet<Type>()
 	{
 		// Special(manual) handlings on builtin marshaler:
@@ -70,11 +70,13 @@ var __excludes =
 		typeof( System.IO.WaitForChangedResult ),
 		typeof( System.Net.Sockets.IPPacketInformation ),
 		typeof( System.Net.Sockets.SocketInformation ),
+		typeof( System.Net.Sockets.UdpReceiveResult ),
 		typeof( System.Reflection.CustomAttributeNamedArgument ),
 		typeof( System.Reflection.CustomAttributeTypedArgument ),
 		typeof( System.Reflection.InterfaceMapping ),
 		typeof( System.Reflection.ParameterModifier ),
 		typeof( System.Reflection.Emit.EventToken ),
+		typeof( System.Reflection.Emit.ExceptionHandler ),
 		typeof( System.Reflection.Emit.FieldToken ),
 		typeof( System.Reflection.Emit.Label ),
 		typeof( System.Reflection.Emit.MethodToken ),
@@ -84,6 +86,14 @@ var __excludes =
 		typeof( System.Reflection.Emit.SignatureToken ),
 		typeof( System.Reflection.Emit.StringToken ),
 		typeof( System.Reflection.Emit.TypeToken ),
+		typeof( System.Runtime.CompilerServices.AsyncTaskMethodBuilder ),
+		typeof( System.Runtime.CompilerServices.AsyncTaskMethodBuilder<> ),
+		typeof( System.Runtime.CompilerServices.AsyncVoidMethodBuilder ),
+		typeof( System.Runtime.CompilerServices.ConfiguredTaskAwaitable ),
+		typeof( System.Runtime.CompilerServices.ConfiguredTaskAwaitable<> ),
+		typeof( System.Runtime.CompilerServices.TaskAwaiter ),
+		typeof( System.Runtime.CompilerServices.TaskAwaiter<> ),
+		typeof( System.Runtime.CompilerServices.YieldAwaitable ),
 		typeof( System.Runtime.InteropServices.ArrayWithOffset ),
 		typeof( System.Runtime.InteropServices.GCHandle ),
 		typeof( System.Runtime.InteropServices.HandleRef ),
@@ -106,6 +116,7 @@ var __excludes =
 		typeof( System.Runtime.InteropServices.ComTypes.TYPEDESC ),
 		typeof( System.Runtime.InteropServices.ComTypes.TYPELIBATTR ),
 		typeof( System.Runtime.InteropServices.ComTypes.VARDESC ),
+		typeof( System.Runtime.InteropServices.WindowsRuntime.EventRegistrationToken ),
 		typeof( System.Runtime.Serialization.SerializationEntry ),
 		typeof( System.Runtime.Serialization.StreamingContext ),
 		typeof( System.Security.Cryptography.CngProperty ),
@@ -122,35 +133,24 @@ var __excludes =
 		typeof( System.Threading.SpinWait ),
 		typeof( System.Threading.Tasks.ParallelLoopResult ),
 		// .NET 4.6 Types -- comment out when you face T4Template problems
-		typeof( System.Security.Cryptography.HashAlgorithmName ),
 		typeof( System.Diagnostics.Tracing.EventSourceOptions ),
 		typeof( System.Threading.AsyncLocalValueChangedArgs<> ),
-		// SIMD types -- should be supported soon
-		typeof( System.Numerics.Matrix3x2 ),
-		typeof( System.Numerics.Matrix4x4 ),
-		typeof( System.Numerics.Plane ),
-		typeof( System.Numerics.Quaternion ),
-		typeof( System.Numerics.Vector2 ),
-		typeof( System.Numerics.Vector3 ),
-		typeof( System.Numerics.Vector4 ),
+		// .NET 4.7 Types -- comment out when you face T4Template problems
+		typeof( System.Security.Cryptography.ECCurve ),
+		typeof( System.Security.Cryptography.ECParameters ),
+		typeof( System.Security.Cryptography.ECPoint ),
+		// ValueTuples -- should be supported via tuple support
+		typeof( System.ValueTuple ),
+		typeof( System.ValueTuple<> ),
+		typeof( System.ValueTuple<,> ),
+		typeof( System.ValueTuple<,,> ),
+		typeof( System.ValueTuple<,,,> ),
+		typeof( System.ValueTuple<,,,,> ),
+		typeof( System.ValueTuple<,,,,,> ),
+		typeof( System.ValueTuple<,,,,,,> ),
+		typeof( System.ValueTuple<,,,,,,,> ),
 	};
-var __winRTExcludes =
-	new HashSet<string>()
-	{
-		"System.Runtime.InteropServices.WindowsRuntime.EventRegistrationToken",
-		"System.Runtime.CompilerServices.AsyncVoidMethodBuilder",
-		"System.Runtime.CompilerServices.AsyncTaskMethodBuilder",
-		"System.Runtime.CompilerServices.AsyncVoidMethodBuilder",
-		"System.Runtime.CompilerServices.AsyncTaskMethodBuilder`1",
-		"System.Runtime.CompilerServices.TaskAwaiter",
-		"System.Runtime.CompilerServices.TaskAwaiter`1",
-		"System.Runtime.CompilerServices.ConfiguredTaskAwaitable",
-		"System.Runtime.CompilerServices.ConfiguredTaskAwaitable`1",
-		"System.Runtime.CompilerServices.YieldAwaitable",
-		"System.Reflection.Emit.ExceptionHandler",
-		"System.Net.Sockets.UdpReceiveResult",
-	};
-var __structTypes = 
+var structTypes = 
 	typeof( object ).Assembly.GetTypes()
 	.Where( type => type.IsValueType && type.IsPublic && !Attribute.IsDefined( type, typeof( ObsoleteAttribute ) ) )
 	.Concat(
@@ -159,10 +159,9 @@ var __structTypes =
 		typeof( Enumerable ).Assembly.GetTypes().Where( type => type.IsValueType && type.IsPublic && !Attribute.IsDefined( type, typeof( ObsoleteAttribute ) ) )
 	).Concat(
 		typeof( BigInteger ).Assembly.GetTypes().Where( type => type.IsValueType && type.IsPublic && !Attribute.IsDefined( type, typeof( ObsoleteAttribute ) ) )
-	).Except( __excludes )
-	.Where( t => !__winRTExcludes.Contains( t.FullName ) )
+	).Except( excludes )
 	.ToArray();
-var __classTypes =
+var classTypes =
 	new[]
 	{
 		typeof( ArraySegment<> ),
@@ -178,18 +177,48 @@ var __classTypes =
 		typeof( Version ),		
 		typeof( NameValueCollection ),		
 	};
-var __tuples =
+var tuples =
 	typeof( Tuple<> ).Assembly
 	.GetTypes()
 	.Where( type => type.IsGenericType && type.Namespace == typeof( Tuple<> ).Namespace && type.Name == "Tuple" )
 	.ToArray();
-var __notInNet35s =
+var notInNet45s =
+	new HashSet<Type>()
+	{
+		typeof( System.Numerics.Vector2 ),
+		typeof( System.Numerics.Vector3 ),
+		typeof( System.Numerics.Vector4 ),
+		typeof( System.Numerics.Matrix3x2 ),
+		typeof( System.Numerics.Matrix4x4 ),
+		typeof( System.Numerics.Plane ),
+		typeof( System.Numerics.Quaternion ),
+		typeof( System.Security.Cryptography.HashAlgorithmName ),
+	};
+var notInNetStandard1_3 = // Not in UWP and Xamarin, so effectively not in netstd 1.3...
+	new HashSet<Type>()
+	{
+		typeof( System.Numerics.Vector2 ),
+		typeof( System.Numerics.Vector3 ),
+		typeof( System.Numerics.Vector4 ),
+		typeof( System.Numerics.Matrix3x2 ),
+		typeof( System.Numerics.Matrix4x4 ),
+		typeof( System.Numerics.Plane ),
+		typeof( System.Numerics.Quaternion ),
+		typeof( System.Security.Cryptography.HashAlgorithmName ),
+	};
+var notInNet35s =
 	new HashSet<Type>()
 	{
 		typeof( System.Numerics.BigInteger ),
 		typeof( System.Numerics.Complex ),
 	};
-var __notInSLs =
+var notInWP8SLs =
+	new HashSet<Type>()
+	{
+		typeof( System.Numerics.BigInteger ),
+		typeof( System.Numerics.Complex ),
+	};
+var notInSLs =
 	new HashSet<Type>()
 	{
 		typeof( System.Collections.Stack ),
@@ -198,29 +227,21 @@ var __notInSLs =
 		typeof( System.Collections.Specialized.NameValueCollection ),
 		typeof( System.Runtime.InteropServices.ComTypes.FILETIME ),
 	};
-var __inWinRTs =
+var notInNetStandard1_1 =
 	new HashSet<Type>()
 	{
-		typeof( System.Runtime.InteropServices.ComTypes.FILETIME ),
-	};
-var __notInWPs =
-	new HashSet<Type>()
-	{
-		typeof( System.Numerics.BigInteger ),
-		typeof( System.Numerics.Complex ),
-	};
-var __notInUnities =
-	new HashSet<Type>
-	{
-		typeof( ArraySegment<> ),
-		typeof( KeyValuePair<,> ),
+		typeof( System.Collections.Stack ),
+		typeof( System.Collections.Queue ),
+		typeof( System.Collections.Specialized.BitVector32 ),
+		typeof( System.Collections.Specialized.NameValueCollection ),
+		typeof( System.Security.Cryptography.HashAlgorithmName ),
 	};
 #>
 #region -- License Terms --
 //
 // MessagePack for CLI
 //
-// Copyright (C) 2010-2015 FUJIWARA, Yusuke
+// Copyright (C) 2010-2016 FUJIWARA, Yusuke
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -247,9 +268,9 @@ using System.Collections.Generic;
 using System.Collections.Specialized;
 #endif // !UNITY || MSGPACK_UNITY_FULL
 using System.Globalization;
-#if !WINDOWS_PHONE && !NETFX_35 && !UNITY
+#if !WINDOWS_PHONE && !NET35 && !UNITY
 using System.Numerics;
-#endif // !WINDOWS_PHONE && !NETFX_35 && !UNITY
+#endif // !WINDOWS_PHONE && !NET35 && !UNITY
 using System.Reflection;
 using System.Text;
 
@@ -257,13 +278,13 @@ using MsgPack.Serialization.DefaultSerializers;
 
 namespace MsgPack.Serialization
 {
-	// This file generated from <#= __typeName #>.tt T4Template.
-	// Do not modify this file. Edit <#= __typeName #>.tt instead.
+	// This file generated from <#= typeName #>.tt T4Template.
+	// Do not modify this file. Edit <#= typeName #>.tt instead.
 
 	// ReSharper disable RedundantNameQualifier
-	partial class <#= __typeName #> 
+	partial class <#= typeName #> 
 	{
-		internal const int DefaultTableCapacity = <#= __structTypes.Length + __classTypes.Length + __tuples.Length + 17 #>;
+		internal const int DefaultTableCapacity = <#= structTypes.Where( t => !t.IsEnum ).Count() + classTypes.Length + 21 #>;
 
 		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Maintainability", "CA1506:AvoidExcessiveClassCoupling", Justification = "This API is naturally coupled with many types" )]
 		internal static Dictionary<RuntimeTypeHandle, object> InitializeDefaultTable( SerializationContext ownerContext )
@@ -284,217 +305,227 @@ namespace MsgPack.Serialization
 			dictionary.Add( typeof( Byte[] ).TypeHandle, new MsgPack.Serialization.DefaultSerializers.<#= typeof( Byte ).FullName.Replace( Type.Delimiter, '_' ).Replace( '`', '_' ) #>ArrayMessagePackSerializer( ownerContext ) );
 			dictionary.Add( typeof( DateTime ).TypeHandle, new MsgPack.Serialization.DefaultSerializers.DateTimeMessagePackSerializerProvider( ownerContext, false ) );
 			dictionary.Add( typeof( DateTimeOffset ).TypeHandle, new MsgPack.Serialization.DefaultSerializers.DateTimeOffsetMessagePackSerializerProvider( ownerContext, false ) );
-#if ( !SILVERLIGHT || WINDOWS_PHONE ) && !XAMIOS && !XAMDROID && !UNITY
+			dictionary.Add( typeof( Timestamp ).TypeHandle, new MsgPack.Serialization.DefaultSerializers.TimestampMessagePackSerializerProvider( ownerContext, false ) );
+#if ( !SILVERLIGHT || WINDOWS_PHONE ) && !UNITY
 			dictionary.Add( typeof( System.Runtime.InteropServices.ComTypes.FILETIME ).TypeHandle, new MsgPack.Serialization.DefaultSerializers.FileTimeMessagePackSerializerProvider( ownerContext, false ) );
-#endif // ( !SILVERLIGHT || WINDOWS_PHONE ) && !XAMIOS && !XAMDROID && !UNITY
+#endif // ( !SILVERLIGHT || WINDOWS_PHONE ) && !UNITY
 			// DateTime, DateTimeOffset, and FILETIME must have nullable providers.
 			dictionary.Add( typeof( DateTime? ).TypeHandle, new MsgPack.Serialization.DefaultSerializers.DateTimeMessagePackSerializerProvider( ownerContext, true ) );
 			dictionary.Add( typeof( DateTimeOffset? ).TypeHandle, new MsgPack.Serialization.DefaultSerializers.DateTimeOffsetMessagePackSerializerProvider( ownerContext, true ) );
-#if ( !SILVERLIGHT || WINDOWS_PHONE ) && !XAMIOS && !XAMDROID && !UNITY
+			dictionary.Add( typeof( Timestamp? ).TypeHandle, new MsgPack.Serialization.DefaultSerializers.TimestampMessagePackSerializerProvider( ownerContext, true ) );
+#if ( !SILVERLIGHT || WINDOWS_PHONE ) && !UNITY
 			dictionary.Add( typeof( System.Runtime.InteropServices.ComTypes.FILETIME? ).TypeHandle, new MsgPack.Serialization.DefaultSerializers.FileTimeMessagePackSerializerProvider( ownerContext, true ) );
-#endif // ( !SILVERLIGHT || WINDOWS_PHONE ) && !XAMIOS && !XAMDROID && !UNITY
-#if UNITY
-			dictionary.Add( typeof( System.Collections.Generic.KeyValuePair<,> ).TypeHandle, typeof( System_Collections_Generic_KeyValuePair_2MessagePackSerializer ) );
-			dictionary.Add( typeof( System.ArraySegment<> ).TypeHandle, typeof( System_ArraySegment_1MessagePackSerializer ) );
-#endif // UNITY
-#if !NETFX_CORE
+#endif // ( !SILVERLIGHT || WINDOWS_PHONE ) && !UNITY
+#if !NETFX_CORE && !NETSTANDARD1_1
 			dictionary.Add( typeof( DBNull ).TypeHandle, new MsgPack.Serialization.DefaultSerializers.System_DBNullMessagePackSerializer( ownerContext ) );
-#endif // !NETFX_CORE
+#endif // !NETFX_CORE && !NETSTANDARD1_1
 <#
-foreach( Type __type in __structTypes )
+foreach( Type type in structTypes )
 {
-	if( __type.IsEnum )
+	if( type.IsEnum )
 	{
 		continue;
 	}
 	
-	if( __notInWPs.Contains( __type ) )
+	if( notInNetStandard1_1.Contains( type ) )
+	{
+#>
+#if !NETSTANDARD1_1
+<#
+	}
+
+	if( notInSLs.Contains( type ) )
+	{
+#>
+#if !SILVERLIGHT
+<#
+	}
+
+	if( notInNet45s.Contains( type ) )
+	{
+#>
+#if !NET35 && !UNITY && !NET40 && !NET45 && !SILVERLIGHT
+<#
+	}
+
+	if( notInNetStandard1_3.Contains( type ) )
+	{
+#>
+#if !NETSTANDARD1_1 && !NETSTANDARD1_3
+<#
+	}
+
+	if( notInWP8SLs.Contains( type ) )
 	{
 #>
 #if !WINDOWS_PHONE
 <#
 	}
 
-	if( __notInSLs.Contains( __type ) )
-	{
-		if(__inWinRTs.Contains( __type ) )
-		{
-#>
-#if !SILVERLIGHT
-<#
-		}
-		else
-		{
-#>
-#if !SILVERLIGHT && !NETFX_CORE
-<#
-		}
-	}
-
-	if( __notInNet35s.Contains( __type ) )
+	if( notInNet35s.Contains( type ) )
 	{
 #>
-#if !NETFX_35 && !UNITY
+#if !NET35 && !UNITY
 <#
 	}
 
-	if ( __type.Assembly.FullName != typeof( object ).Assembly.FullName )
+	if ( type.Assembly.FullName != typeof( object ).Assembly.FullName )
 	{
 #>
 #if !UNITY || MSGPACK_UNITY_FULL
 <#
 	}
 #>
-			dictionary.Add( typeof( <#= __type.FullName #> ).TypeHandle, new MsgPack.Serialization.DefaultSerializers.<#= __type.FullName.Replace( Type.Delimiter, '_' ).Replace( '`', '_' ) #>MessagePackSerializer( ownerContext ) );
+			dictionary.Add( typeof( <#= type.FullName #> ).TypeHandle, new MsgPack.Serialization.DefaultSerializers.<#= type.FullName.Replace( Type.Delimiter, '_' ).Replace( '`', '_' ) #>MessagePackSerializer( ownerContext ) );
 <#
 
-	if ( __type.Assembly.FullName != typeof( object ).Assembly.FullName )
+	if ( type.Assembly.FullName != typeof( object ).Assembly.FullName )
 	{
 #>
 #endif // !UNITY || MSGPACK_UNITY_FULL
 <#
 	}
 
-	if( __notInNet35s.Contains( __type ) )
+	if( notInNet35s.Contains( type ) )
 	{
 #>
-#endif // !NETFX_35 && !UNITY
+#endif // !NET35 && !UNITY
 <#
 	}
 
-	if( __notInSLs.Contains( __type ) )
-	{
-		if(__inWinRTs.Contains( __type ) )
-		{
-#>
-#endif // !SILVERLIGHT
-<#
-		}
-		else
-		{
-#>
-#endif // !SILVERLIGHT && !NETFX_CORE
-<#
-		}
-	}
-
-	if( __notInWPs.Contains( __type ) )
+	if( notInWP8SLs.Contains( type ) )
 	{
 #>
 #endif // !WINDOWS_PHONE
 <#
 	}
+
+	if( notInNetStandard1_3.Contains( type ) )
+	{
+#>
+#endif // !NETSTANDARD1_1 && !NETSTANDARD1_3
+<#
+	}
+
+	if( notInNet45s.Contains( type ) )
+	{
+#>
+#endif // !NET35 && !UNITY && !NET40 && !NET45 && !SILVERLIGHT
+<#
+	}
+
+	if( notInSLs.Contains( type ) )
+	{#>
+#endif // !SILVERLIGHT
+<#
+	}
+
+	if( notInNetStandard1_1.Contains( type ) )
+	{
+#>
+#endif // !NETSTANDARD1_1
+<#
+	}
 }
 
-foreach( Type __type in __classTypes )
+foreach( Type type in classTypes )
 {
-	if( __notInWPs.Contains( __type ) )
+	if( notInNetStandard1_1.Contains( type ) )
+	{
+#>
+#if !NETSTANDARD1_1
+<#
+	}
+
+	if( notInSLs.Contains( type ) )
+	{
+#>
+#if !SILVERLIGHT
+<#
+	}
+
+	if( notInNet45s.Contains( type ) )
+	{
+#>
+#if !NET40 && !NET45
+<#
+	}
+
+	if( notInWP8SLs.Contains( type ) )
 	{
 #>
 #if !WINDOWS_PHONE
 <#
 	}
 
-	if( __notInSLs.Contains( __type ) )
-	{
-		if(__inWinRTs.Contains( __type ) )
-		{
-#>
-#if !SILVERLIGHT
-<#
-		}
-		else
-		{
-#>
-#if !SILVERLIGHT && !NETFX_CORE
-<#
-		}
-	}
-
-	if( __notInNet35s.Contains( __type ) )
+	if( notInNet35s.Contains( type ) )
 	{
 #>
-#if !NETFX_35 && !UNITY
+#if !NET35 && !UNITY
 <#
 	}
 
-	if( __notInUnities.Contains( __type) )
-	{
-#>
-#if !UNITY
-<#
-	}
-
-	if ( __type.Assembly.FullName != typeof( object ).Assembly.FullName )
+	if ( type.Assembly.FullName != typeof( object ).Assembly.FullName )
 	{
 #>
 #if !UNITY || MSGPACK_UNITY_FULL
 <#
 	}
 	
-	if( __type.IsGenericTypeDefinition )
+	if( type.IsGenericTypeDefinition )
 	{
 #>
-			dictionary.Add( typeof( <#= ToCSharpTypeToken( __type ) #> ).TypeHandle, typeof( <#= __type.FullName.Replace( '`', '_' ).Replace( Type.Delimiter, '_' ) #>MessagePackSerializer<#= GetCSharpTypeArguments( __type ) #> ) );
+			dictionary.Add( typeof( <#= ToCSharpTypeToken( type ) #> ).TypeHandle, typeof( <#= type.FullName.Replace( '`', '_' ).Replace( Type.Delimiter, '_' ) #>MessagePackSerializer<#= GetCSharpTypeArguments( type ) #> ) );
 <#
 	}
 	else
 	{
 #>
-			dictionary.Add( typeof( <#= ToCSharpTypeToken( __type ) #> ).TypeHandle, new MsgPack.Serialization.DefaultSerializers.<#= __type.FullName.Replace( Type.Delimiter, '_' ).Replace( '`', '_' ) #>MessagePackSerializer( ownerContext ) );
+			dictionary.Add( typeof( <#= ToCSharpTypeToken( type ) #> ).TypeHandle, new MsgPack.Serialization.DefaultSerializers.<#= type.FullName.Replace( Type.Delimiter, '_' ).Replace( '`', '_' ) #>MessagePackSerializer( ownerContext ) );
 <#
 	}
 	
-	if ( __type.Assembly.FullName != typeof( object ).Assembly.FullName )
+	if ( type.Assembly.FullName != typeof( object ).Assembly.FullName )
 	{
 #>
 #endif // !UNITY || MSGPACK_UNITY_FULL
 <#
 	}
 
-	if( __notInUnities.Contains( __type) )
+	if( notInNet35s.Contains( type ) )
 	{
 #>
-#endif // !UNITY
+#endif // !NET35 && !UNITY
 <#
 	}
 
-	if( __notInNet35s.Contains( __type ) )
-	{
-#>
-#endif // !NETFX_35 && !UNITY
-<#
-	}
-
-	if( __notInSLs.Contains( __type ) )
-	{
-		if(__inWinRTs.Contains( __type ) )
-		{
-#>
-#endif // !SILVERLIGHT
-<#
-		}
-		else
-		{
-#>
-#endif // !SILVERLIGHT && !NETFX_CORE
-<#
-		}
-	}
-
-	if( __notInWPs.Contains( __type ) )
+	if( notInWP8SLs.Contains( type ) )
 	{
 #>
 #endif // !WINDOWS_PHONE
 <#
 	}
-}
-	
-foreach( Type __tuple in __tuples )
-{
+
+	if( notInNet45s.Contains( type ) )
+	{
 #>
-			dictionary.Add( typeof( <#= ToCSharpTypeToken( __tuple ) #> ).TypeHandle, new MsgPack.Serialization.DefaultSerializers.<#= __tuple.FullName.Replace( Type.Delimiter, '_' ).Replace( '`', '_' ) #>MessagePackSerializer( ownerContext ) );
+#endif // !NET40 && !NET45
 <#
+	}
+
+	if( notInSLs.Contains( type ) )
+	{
+#>
+#endif // !SILVERLIGHT
+<#
+	}
+
+	if( notInNetStandard1_1.Contains( type ) )
+	{
+#>
+#endif // !NETSTANDARD1_1
+<#
+	}
 }
 #>
 			return dictionary;

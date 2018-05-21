@@ -21,6 +21,9 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+#if NET35
+using Debug = System.Console; // For missing Debug.WriteLine(String, params Object[])
+#endif // NET35
 using System.IO;
 using System.Text;
 #if !MSTEST
@@ -84,6 +87,7 @@ namespace MsgPack
 			Assert.AreEqual( value, Unpacking.UnpackBoolean( output.ToArray() ).Value );
 		}
 
+#if !SILVERLIGHT
 		[Test]
 		[Explicit] // FIXME : split
 		public void TestString()
@@ -98,7 +102,7 @@ namespace MsgPack
 			var sw = Stopwatch.StartNew();
 			var avg = 0.0;
 			Random random = new Random();
-#if !SKIP_LARGE_TEST && !NETFX_35
+#if !SKIP_LARGE_TEST && !NET35
 			var sb = new StringBuilder( 1000 * 1000 * 200 );
 #else
 			var sb = new StringBuilder( 1000 * 200 );
@@ -116,7 +120,7 @@ namespace MsgPack
 				TestString( sb.ToString() );
 			}
 			sw.Stop();
-			Console.WriteLine( "Small String ({1:#.0}): {0:0.###} msec/object", sw.ElapsedMilliseconds / 100.0, avg );
+			Debug.WriteLine( "Small String ({1:#.0}): {0:0.###} msec/object", sw.ElapsedMilliseconds / 100.0, avg );
 			sw.Reset();
 			sw.Start();
 
@@ -134,9 +138,9 @@ namespace MsgPack
 				TestString( sb.ToString() );
 			}
 			sw.Stop();
-			Console.WriteLine( "Medium String ({1:#.0}): {0:0.###} msec/object", sw.ElapsedMilliseconds / 100.0, avg );
+			Debug.WriteLine( "Medium String ({1:#.0}): {0:0.###} msec/object", sw.ElapsedMilliseconds / 100.0, avg );
 			sw.Reset();
-#if !SKIP_LARGE_TEST && !NETFX_35
+#if !SKIP_LARGE_TEST && !NET35
 			sw.Start();
 
 			avg = 0.0;
@@ -153,7 +157,7 @@ namespace MsgPack
 				TestString( sb.ToString() );
 			}
 			sw.Stop();
-			Console.WriteLine( "Large String ({1:#.0}): {0:0.###} msec/object", sw.ElapsedMilliseconds / 10.0, avg );
+			Debug.WriteLine( "Large String ({1:#.0}): {0:0.###} msec/object", sw.ElapsedMilliseconds / 10.0, avg );
 			sw.Reset();
 #endif
 
@@ -178,7 +182,7 @@ namespace MsgPack
 				TestString( sb.ToString() );
 			}
 			sw.Stop();
-			Console.WriteLine( "Medium String ({1:#.0}): {0:0.###} msec/object", sw.ElapsedMilliseconds / 100.0, avg );
+			Debug.WriteLine( "Medium String ({1:#.0}): {0:0.###} msec/object", sw.ElapsedMilliseconds / 100.0, avg );
 		}
 
 		private static void TestString( String value )
@@ -188,6 +192,7 @@ namespace MsgPack
 			Assert.AreEqual( value, Unpacking.UnpackString( new MemoryStream( output.ToArray() ) ) );
 			Assert.AreEqual( value, Unpacking.UnpackString( output.ToArray() ).Value );
 		}
+#endif // !SILVERLIGHT
 
 		[Test]
 		[Timeout( 30000 )]

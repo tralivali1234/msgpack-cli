@@ -2,7 +2,7 @@
 //
 // MessagePack for CLI
 //
-// Copyright (C) 2010-2014 FUJIWARA, Yusuke
+// Copyright (C) 2010-2016 FUJIWARA, Yusuke
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -27,33 +27,21 @@ namespace MsgPack.Serialization
 	/// </summary>
 	internal enum EmitterFlavor
 	{
-#if !NETFX_CORE
-		/// <summary>
-		///		Uses <see cref="SerializationContext"/> in each case of the members (de)serialization.
-		///		It may cause more contentions but is available in WP7.
-		/// </summary>
-		ContextBased,
-
+#if !SILVERLIGHT
 		/// <summary>
 		///		Caches serializers for the members (de)serialization.
 		///		It is default.
 		/// </summary>
 		FieldBased,
-#endif
-#if !NETFX_35
-		/// <summary>
-		///		Uses expression tree to (de)serialization.
-		///		It may have more overhead but is available in WinRT.
-		/// </summary>
-		ExpressionBased,
-#endif
-#if !NETFX_CORE
+#endif // SILVERLIGHT
+
+#if !NETSTANDARD1_1 && !NETSTANDARD1_3 && !SILVERLIGHT
 		/// <summary>
 		///		Uses code DOM code generation to (de)serialization.
 		///		It requires a long time but prevents runtime code generation at all.
 		/// </summary>
 		CodeDomBased,
-#endif
+#endif // !NETSTANDARD1_1 && !NETSTANDARD1_3 && !SILVERLIGHT
 
 		/// <summary>
 		///		Uses reflection to (de)serialization.

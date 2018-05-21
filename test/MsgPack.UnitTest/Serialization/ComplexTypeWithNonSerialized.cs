@@ -1,8 +1,8 @@
-﻿#region -- License Terms --
+#region -- License Terms --
 //
 // MessagePack for CLI
 //
-// Copyright (C) 2010-2012 FUJIWARA, Yusuke
+// Copyright (C) 2010-2017 FUJIWARA, Yusuke
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -31,6 +31,10 @@ using Assert = NUnit.Framework.Assert;
 using Is = NUnit.Framework.Is;
 #endif
 
+#if SILVERLIGHT || NETFX_CORE || NETSTANDARD1_1 || NETSTANDARD1_3
+using NonSerializedAttribute = MsgPack.Serialization.MessagePackIgnoreAttribute;
+#endif // SILVERLIGHT || NETFX_CORE || NETSTANDARD1_1 || NETSTANDARD1_3
+
 namespace MsgPack.Serialization
 {
 	public class ComplexTypeWithNonSerialized : IVerifiable
@@ -47,7 +51,12 @@ namespace MsgPack.Serialization
 		}
 
 #if !NETFX_CORE && !SILVERLIGHT
+#if !XAMARIN
 		[NonSerialized]
+#else
+#warning Xamarin Workaround
+		[MessagePackIgnore]
+#endif // !XAMARIN
 		public object NonSerialized;
 #endif
 
@@ -62,7 +71,7 @@ namespace MsgPack.Serialization
 				NUnit.Framework.Assert.That( map.ContainsKey( "Source" ) );
 				NUnit.Framework.Assert.That( map[ "Source" ].AsString(), Is.EqualTo( this.Source.ToString() ) );
 				NUnit.Framework.Assert.That( map.ContainsKey( "TimeStamp" ) );
-				NUnit.Framework.Assert.That( DateTime.FromBinary( map[ "TimeStamp" ].AsInt64() ), Is.EqualTo( this.TimeStamp ) );
+				NUnit.Framework.Assert.That( map[ "TimeStamp" ].AsTimestamp().ToDateTime(), Is.EqualTo( this.TimeStamp.ToUniversalTime() ) );
 				NUnit.Framework.Assert.That( map.ContainsKey( "Data" ) );
 				NUnit.Framework.Assert.That( map[ "Data" ].AsBinary(), Is.EqualTo( this.Data ) );
 				NUnit.Framework.Assert.That( map.ContainsKey( "History" ) );
@@ -78,7 +87,7 @@ namespace MsgPack.Serialization
 				NUnit.Framework.Assert.That( array[ 0 ].AsBinary(), Is.EqualTo( this.Data ) );
 				NUnit.Framework.Assert.That( array[ 1 ].AsDictionary().Count, Is.EqualTo( this.History.Count ) );
 				NUnit.Framework.Assert.That( array[ 2 ].AsString(), Is.EqualTo( this.Source.ToString() ) );
-				NUnit.Framework.Assert.That( DateTime.FromBinary( array[ 3 ].AsInt64() ), Is.EqualTo( this.TimeStamp ) );
+				NUnit.Framework.Assert.That( array[ 3 ].AsTimestamp().ToDateTime(), Is.EqualTo( this.TimeStamp.ToUniversalTime() ) );
 			}
 		}
 	}

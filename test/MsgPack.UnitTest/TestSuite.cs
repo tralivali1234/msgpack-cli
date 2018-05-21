@@ -37,7 +37,7 @@ using Is = NUnit.Framework.Is;
 
 namespace MsgPack
 {
-#if !NETFX_CORE && !WINDOWS_PHONE
+#if !NETFX_CORE && !WINDOWS_PHONE && !NETSTANDARD1_1 && !NETSTANDARD1_3
 	[TestFixture]
 	public class TestSuite
 	{
@@ -70,12 +70,12 @@ namespace MsgPack
 				Unpacker pac = Unpacker.Create( pacStream );
 				Unpacker pac_compact = Unpacker.Create( pacCompactStream );
 
-				FeedFile( pacStream, "." + Path.DirectorySeparatorChar + "cases.mpac" );
-				FeedFile( pacCompactStream, "." + Path.DirectorySeparatorChar + "cases_compact.mpac" );
+				FeedFile( pacStream, TestContext.CurrentContext.TestDirectory + Path.DirectorySeparatorChar + "cases.mpac" );
+				FeedFile( pacCompactStream, TestContext.CurrentContext.TestDirectory + Path.DirectorySeparatorChar + "cases_compact.mpac" );
 
 				pac.SequenceEqual( pac_compact, EqualityComparer<MessagePackObject>.Default );
 			}
 		}
 	}
 #endif
-}
+			}

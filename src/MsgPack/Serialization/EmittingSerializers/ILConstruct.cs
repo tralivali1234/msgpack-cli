@@ -2,7 +2,7 @@
 //
 // MessagePack for CLI
 //
-// Copyright (C) 2010-2013 FUJIWARA, Yusuke
+// Copyright (C) 2010-2016 FUJIWARA, Yusuke
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -29,13 +29,13 @@ using MsgPack.Serialization.Reflection;
 namespace MsgPack.Serialization.EmittingSerializers
 {
 	/// <summary>
-	///		Represents code construct for <see cref="ILEmittingSerializerBuilder{TContext,TObject}"/>s.
+	///		Represents code construct for <see cref="AssemblyBuilderSerializerBuilder"/>s.
 	/// </summary>
 	internal abstract class ILConstruct : ICodeConstruct
 	{
 		public static readonly ILConstruct[] NoArguments = new ILConstruct[ 0 ];
 
-		private readonly Type _contextType;
+		private readonly TypeDefinition _contextType;
 
 		/// <summary>
 		///		Gets the context type of this construct.
@@ -47,7 +47,7 @@ namespace MsgPack.Serialization.EmittingSerializers
 		/// <remarks>
 		///		A context type represents the type of the evaluation context.
 		/// </remarks>
-		public Type ContextType
+		public TypeDefinition ContextType
 		{
 			get { return this._contextType; }
 		}
@@ -67,7 +67,7 @@ namespace MsgPack.Serialization.EmittingSerializers
 		///		Initializes a new instance of the <see cref="ILConstruct"/> class.
 		/// </summary>
 		/// <param name="contextType">The type.</param>
-		protected ILConstruct( Type contextType )
+		protected ILConstruct( TypeDefinition contextType )
 		{
 			this._contextType = contextType;
 		}
@@ -147,12 +147,12 @@ namespace MsgPack.Serialization.EmittingSerializers
 			return new StoreVariableILConstruct( variable, value );
 		}
 
-		public static ILConstruct Instruction( string description, Type contextType, bool isTerminating, Action<TracingILGenerator> instructions )
+		public static ILConstruct Instruction( string description, TypeDefinition contextType, bool isTerminating, Action<TracingILGenerator> instructions )
 		{
 			return new SinglelStepILConstruct( contextType, description, isTerminating, instructions );
 		}
 
-		public static ILConstruct Argument( int index, Type type, string name )
+		public static ILConstruct Argument( int index, TypeDefinition type, string name )
 		{
 			return new VariableILConstruct( name, type, index );
 		}
@@ -177,14 +177,19 @@ namespace MsgPack.Serialization.EmittingSerializers
 			return new UnaryOperatorILConstruct( @operator, input, operation, branchOperation );
 		}
 
-		public static ILConstruct BinaryOperator( string @operator, Type resultType, ILConstruct left, ILConstruct right, Action<TracingILGenerator, ILConstruct, ILConstruct> operation, Action<TracingILGenerator, ILConstruct, ILConstruct, Label> branchOperation )
+		public static ILConstruct BinaryOperator( string @operator, TypeDefinition resultType, ILConstruct left, ILConstruct right, Action<TracingILGenerator, ILConstruct, ILConstruct> operation, Action<TracingILGenerator, ILConstruct, ILConstruct, Label> branchOperation )
 		{
 			return new BinaryOperatorILConstruct( @operator, resultType, left, right, operation, branchOperation );
 		}
 
-		public static ILConstruct Invoke( ILConstruct target, MethodInfo method, IEnumerable<ILConstruct> arguments )
+		public static ILConstruct Invoke( ILConstruct target, MethodDefinition method, IEnumerable<ILConstruct> arguments )
 		{
-			return new InvocationILConsruct( method, target, arguments );
+			return new InvocationILConsruct( method.ResolveRuntimeMethod(), method.Interface, target, arguments );
+		}
+
+		public static ILConstruct Invoke( ILConstruct target, MethodInfo runtimeMethod, IEnumerable<ILConstruct> arguments )
+		{
+			return new InvocationILConsruct( runtimeMethod, null, target, arguments );
 		}
 
 		internal static ILConstruct NewObject( ILConstruct variable, ConstructorInfo constructor, IEnumerable<ILConstruct> arguments )
@@ -192,7 +197,7 @@ namespace MsgPack.Serialization.EmittingSerializers
 			return new InvocationILConsruct( constructor, variable, arguments );
 		}
 
-		public static ILConstruct Sequence( Type contextType, IEnumerable<ILConstruct> statements )
+		public static ILConstruct Sequence( TypeDefinition contextType, IEnumerable<ILConstruct> statements )
 		{
 			return new SequenceILConstruct( contextType, statements );
 		}
@@ -202,26 +207,26 @@ namespace MsgPack.Serialization.EmittingSerializers
 			return new StatementExpressionILConstruct( before, context );
 		}
 
-		public static ILConstruct Literal<T>( Type type, T literalValue, Action<TracingILGenerator> instruction )
+		public static ILConstruct Literal<T>( TypeDefinition type, T literalValue, Action<TracingILGenerator> instruction )
 		{
 			// ReSharper disable CompareNonConstrainedGenericWithNull
 			return new SinglelStepILConstruct( type, "literal " + ( literalValue == null ? "(null)" : literalValue.ToString() ), false, instruction );
 			// ReSharper restore CompareNonConstrainedGenericWithNull
 		}
 
-		public static ILConstruct Variable( Type type, string name )
+		public static ILConstruct Variable( TypeDefinition type, string name )
 		{
 			return new VariableILConstruct( name, type );
 		}
 
+		public static ILConstruct MakeRef(ILConstruct variable )
+		{
+			return new SinglelStepILConstruct( variable.ContextType, "mkref", false, il => variable.LoadValue( il, true ) );
+		}
+
 		protected static void ValidateContextTypeMatch( ILConstruct left, ILConstruct right )
 		{
-			//if ( left.ContextType == typeof( Any ) || right.ContextType == typeof( Any ) )
-			//{
-			//	return;
-			//}
-
-			if ( GetNormalizedType( left.ContextType ) != GetNormalizedType( right.ContextType ) )
+			if ( GetNormalizedType( left.ContextType.ResolveRuntimeType() ) != GetNormalizedType( right.ContextType.ResolveRuntimeType() ) )
 			{
 				throw new ArgumentException(
 					String.Format(
@@ -231,17 +236,12 @@ namespace MsgPack.Serialization.EmittingSerializers
 						right.ContextType
 						),
 					"right"
-					);
+				);
 			}
 		}
 
 		private static Type GetNormalizedType( Type type )
 		{
-			if ( !type.IsPrimitive )
-			{
-				return type;
-			}
-
 			if ( type == typeof( sbyte ) || type == typeof( short ) || type == typeof( int ) ||
 				type == typeof( byte ) || type == typeof( ushort ) || type == typeof( uint ) )
 			{
@@ -251,6 +251,11 @@ namespace MsgPack.Serialization.EmittingSerializers
 			if ( type == typeof( float ) )
 			{
 				return typeof( double );
+			}
+
+			if ( type.GetIsEnum() )
+			{
+				return GetNormalizedType( Enum.GetUnderlyingType( type ) );
 			}
 
 			return type;

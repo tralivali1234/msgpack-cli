@@ -20,7 +20,11 @@
 
 using System;
 #if DEBUG
+#if CORE_CLR || NETSTANDARD1_1
+using Contract = MsgPack.MPContract;
+#else
 using System.Diagnostics.Contracts;
+#endif // CORE_CLR || NETSTANDARD1_1
 #endif // DEBUG
 
 namespace MsgPack.Serialization.AbstractSerializers
@@ -37,7 +41,6 @@ namespace MsgPack.Serialization.AbstractSerializers
 		{
 #if DEBUG
 			Contract.Assert( targetType != null, "targetType != null" );
-			Contract.Assert( targetCollectionTraits != null, "targetCollectionTraits != null" );
 			Contract.Assert( serializerTypeName != null, "serializerTypeName != null" );
 			Contract.Assert( serializerTypeNamespace != null, "serializerTypeNamespace != null" );
 #endif // DEBUG 
@@ -49,11 +52,6 @@ namespace MsgPack.Serialization.AbstractSerializers
 				String.IsNullOrEmpty( serializerTypeNamespace )
 				? serializerTypeName
 				: serializerTypeNamespace + "." + serializerTypeName;
-		}
-
-		internal static SerializerSpecification CreateAnonymous( Type targetType, CollectionTraits targetCollectionTraits )
-		{
-			return new SerializerSpecification( targetType, targetCollectionTraits, "Anonymous", "AnonymousGeneratedSerializers" );
 		}
 
 		public override bool Equals( object obj )

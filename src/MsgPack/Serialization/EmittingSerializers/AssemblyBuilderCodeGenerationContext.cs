@@ -2,7 +2,7 @@
 //
 // MessagePack for CLI
 //
-// Copyright (C) 2010-2015 FUJIWARA, Yusuke
+// Copyright (C) 2010-2017 FUJIWARA, Yusuke
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -29,14 +29,21 @@ using MsgPack.Serialization.AbstractSerializers;
 namespace MsgPack.Serialization.EmittingSerializers
 {
 	/// <summary>
-	///		An <see cref="ISerializerCodeGenerationContext"/> for <see cref="AssemblyBuilderSerializerBuilder{TObject}"/>.
+	///		An <see cref="ISerializerCodeGenerationContext"/> for <see cref="AssemblyBuilderSerializerBuilder"/>.
 	/// </summary>
 	internal class AssemblyBuilderCodeGenerationContext : ISerializerCodeGenerationContext
 	{
 		private readonly SerializationContext _context;
+
+		public SerializationContext SerializationContext
+		{
+			get { return this._context; }
+		}
+
 		private readonly SerializationMethodGeneratorManager _generatorManager;
 		private readonly AssemblyBuilder _assemblyBuilder;
 		private readonly string _directory;
+		private readonly string _namespace;
 		private readonly List<SerializerSpecification> _generatedSerializers;
 
 		public AssemblyBuilderCodeGenerationContext( SerializationContext context, AssemblyBuilder assemblyBuilder, SerializerAssemblyGenerationConfiguration configuration )
@@ -44,9 +51,10 @@ namespace MsgPack.Serialization.EmittingSerializers
 			this._context = context;
 			this._assemblyBuilder = assemblyBuilder;
 
-			DefaultSerializationMethodGeneratorManager.SetUpAssemblyBuilderAttributes( assemblyBuilder, false );
+			SerializationMethodGeneratorManager.SetUpAssemblyBuilderAttributes( assemblyBuilder, false );
 			this._generatorManager = SerializationMethodGeneratorManager.Get( assemblyBuilder );
 			this._directory = configuration.OutputDirectory;
+			this._namespace = configuration.Namespace;
 			this._generatedSerializers = new List<SerializerSpecification>();
 		}
 
@@ -63,9 +71,9 @@ namespace MsgPack.Serialization.EmittingSerializers
 			DefaultSerializerNameResolver.ResolveTypeName(
 				this._assemblyBuilder == null,
 				targetType,
-				typeof( AssemblyBuilderCodeGenerationContext ).Namespace,
+				this._namespace,
 				out serializerTypeName,
-				out serializerTypeNamespace 
+				out serializerTypeNamespace
 			);
 			var spec =
 				new SerializerSpecification(
@@ -81,8 +89,9 @@ namespace MsgPack.Serialization.EmittingSerializers
 				new AssemblyBuilderEmittingContext(
 					this._context,
 					targetType,
-					() => this._generatorManager.CreateEmitter( spec, serializerBaseClass, EmitterFlavor.FieldBased ),
-					() => this._generatorManager.CreateEnumEmitter( this._context, spec, EmitterFlavor.FieldBased ) 
+					targetType.GetIsEnum()
+						? new Func<SerializerEmitter>( () => this._generatorManager.CreateEnumEmitter( this._context, spec ) )
+						: () => this._generatorManager.CreateObjectEmitter( spec, serializerBaseClass )
 				);
 		}
 
@@ -92,6 +101,9 @@ namespace MsgPack.Serialization.EmittingSerializers
 		/// <returns>A <see cref="SerializerCodeGenerationResult"/> collection which correspond to genereated codes.</returns>
 		public IEnumerable<SerializerCodeGenerationResult> Generate()
 		{
+#if NETSTANDARD2_0
+			throw new PlatformNotSupportedException( "Assembly generation is not supported in .NET Standard." );
+#else
 			var assemblyFileName = this._assemblyBuilder.GetName().Name + ".dll";
 			this._assemblyBuilder.Save( assemblyFileName );
 			var assemblyFilePath =
@@ -112,6 +124,7 @@ namespace MsgPack.Serialization.EmittingSerializers
 							s.SerializerTypeName
 						) 
 				);
+#endif // NETSTANDARD2_0
 		}
 	}
 }

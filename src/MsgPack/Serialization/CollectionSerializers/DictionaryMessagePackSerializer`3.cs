@@ -2,7 +2,7 @@
 // 
 // MessagePack for CLI
 // 
-// Copyright (C) 2015 FUJIWARA, Yusuke
+// Copyright (C) 2015-2016 FUJIWARA, Yusuke
 // 
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -43,6 +43,7 @@ namespace MsgPack.Serialization.CollectionSerializers
 	public abstract class DictionaryMessagePackSerializer<TDictionary, TKey, TValue> : DictionaryMessagePackSerializerBase<TDictionary, TKey, TValue>
 		where TDictionary : IDictionary<TKey, TValue>
 #if UNITY
+#warning TODO: Remove if possible for maintenancibility.
 		, IEnumerable<KeyValuePair<TKey, TValue>> // This is obvious from IDictionary<TKey, TValue>, but Unity compiler cannot recognize this.
 #endif // UNITY
 	{
@@ -61,20 +62,56 @@ namespace MsgPack.Serialization.CollectionSerializers
 			: base( ownerContext, schema ) { }
 
 		/// <summary>
+		///		Initializes a new instance of the <see cref="DictionaryMessagePackSerializer{TDictionary, TKey, TValue}"/> class.
+		/// </summary>
+		/// <param name="ownerContext">A <see cref="SerializationContext"/> which owns this serializer.</param>
+		/// <param name="schema">
+		///		The schema for collection itself or its items for the member this instance will be used to. 
+		///		<c>null</c> will be considered as <see cref="PolymorphismSchema.Default"/>.
+		/// </param>
+		/// <param name="capabilities">A serializer calability flags represents capabilities of this instance.</param>
+		/// <exception cref="ArgumentNullException">
+		///		<paramref name="ownerContext"/> is <c>null</c>.
+		/// </exception>
+		protected DictionaryMessagePackSerializer( SerializationContext ownerContext, PolymorphismSchema schema, SerializerCapabilities capabilities )
+			: base( ownerContext, schema, capabilities ) { }
+
+		/// <summary>
 		///		Returns count of the dictionary.
 		/// </summary>
 		/// <param name="dictionary">A collection. This value will not be <c>null</c>.</param>
 		/// <returns>The count of the <paramref name="dictionary"/>.</returns>
 		protected override int GetCount( TDictionary dictionary )
 		{
-#if ( !UNITY && !XAMIOS ) || AOT_CHECK
+#if !NETSTANDARD2_0
 			return dictionary.Count;
-#else
+#else // NETSTANDARD2_0
+			if ( SerializerOptions.CanEmit )
+			{
+				return this.GetCountCore( dictionary );
+			}
+			else
+			{
+				return this.GetCountCoreAotSafe( dictionary );
+			}
+#endif // !NETSTANDARD2_0
+		}
+
+#if NETSTANDARD2_0
+
+		private int GetCountCore( TDictionary dictionary )
+		{
+			return dictionary.Count;
+		}
+
+		private int GetCountCoreAotSafe( TDictionary dictionary )
+		{
 			// .constraind call for TDictionary.get_Count/TDictionary.GetEnumerator() causes AOT error.
 			// So use cast and invoke as normal call (it might cause boxing, but most collection should be reference type).
 			return ( dictionary as IDictionary<TKey, TValue> ).Count;
-#endif // ( !UNITY && !XAMIOS ) || AOT_CHECK
 		}
+
+#endif // NETSTANDARD2_0
 
 		/// <summary>
 		///		Adds the deserialized item to the collection on <typeparamref name="TDictionary"/> specific manner
@@ -88,22 +125,45 @@ namespace MsgPack.Serialization.CollectionSerializers
 		/// </exception>
 		protected override void AddItem( TDictionary dictionary, TKey key, TValue value )
 		{
-#if ( !UNITY && !XAMIOS ) || AOT_CHECK
+#if !NETSTANDARD2_0
 			dictionary.Add( key, value );
-#else
+#else // !NETSTANDARD2_0
+			if ( SerializerOptions.CanEmit)
+			{
+				this.AddItemCore( dictionary, key, value );
+			}
+			else
+			{
+				this.AddItemCoreAotSafe( dictionary, key, value );
+			}
+#endif // !NETSTANDARD2_0
+		}
+
+#if NETSTANDARD2_0
+
+		private void AddItemCore( TDictionary dictionary, TKey key, TValue value )
+		{
+			dictionary.Add( key, value );
+		}
+
+		private void AddItemCoreAotSafe( TDictionary dictionary, TKey key, TValue value )
+		{
 			// .constraind call for TDictionary.Add causes AOT error.
 			// So use cast and invoke as normal call (it might cause boxing, but most collection should be reference type).
 			( dictionary as IDictionary<TKey, TValue> ).Add( key, value );
-#endif // ( !UNITY && !XAMIOS ) || AOT_CHECK
 		}
+
+#endif // NETSTANDARD2_0
+
 	}
 
 #if UNITY
+#warning TODO: Remove if possible for maintenancibility.
 	internal abstract class UnityDictionaryMessagePackSerializer : NonGenericMessagePackSerializer,
 		ICollectionInstanceFactory
 	{
-		private readonly IMessagePackSingleObjectSerializer _keySerializer;
-		private readonly IMessagePackSingleObjectSerializer _valueSerializer;
+		private readonly MessagePackSerializer _keySerializer;
+		private readonly MessagePackSerializer _valueSerializer;
 		private readonly MethodInfo _add;
 		private readonly MethodInfo _getCount;
 		private readonly MethodInfo _getKey;
@@ -115,9 +175,10 @@ namespace MsgPack.Serialization.CollectionSerializers
 			Type keyType,
 			Type valueType,
 			CollectionTraits traits,
-			PolymorphismSchema schema
+			PolymorphismSchema schema,
+			SerializerCapabilities capabilities
 		)
-			: base( ownerContext, targetType )
+			: base( ownerContext, targetType, capabilities )
 		{
 			var safeSchema = schema ?? PolymorphismSchema.Default;
 			this._keySerializer = ownerContext.GetSerializer( keyType, safeSchema.KeySchema );
@@ -128,7 +189,7 @@ namespace MsgPack.Serialization.CollectionSerializers
 			this._getValue = traits.ElementType.GetProperty( "Value" ).GetGetMethod();
 		}
 
-		protected internal override sealed void PackToCore( Packer packer, object objectTree )
+		protected internal override void PackToCore( Packer packer, object objectTree )
 		{
 			packer.PackMapHeader( ( int )this._getCount.InvokePreservingExceptionType( objectTree ) );
 			// ReSharper disable once PossibleNullReferenceException
@@ -139,11 +200,11 @@ namespace MsgPack.Serialization.CollectionSerializers
 			}
 		}
 
-		protected internal override sealed object UnpackFromCore( Unpacker unpacker )
+		protected internal override object UnpackFromCore( Unpacker unpacker )
 		{
 			if ( !unpacker.IsMapHeader )
 			{
-				throw SerializationExceptions.NewIsNotArrayHeader();
+				SerializationExceptions.ThrowIsNotArrayHeader( unpacker );
 			}
 
 			return this.InternalUnpackFromCore( unpacker );
@@ -164,11 +225,11 @@ namespace MsgPack.Serialization.CollectionSerializers
 			return this.CreateInstance( initialCapacity );
 		}
 
-		protected internal override sealed void UnpackToCore( Unpacker unpacker, object collection )
+		protected internal override void UnpackToCore( Unpacker unpacker, object collection )
 		{
 			if ( !unpacker.IsMapHeader )
 			{
-				throw SerializationExceptions.NewIsNotArrayHeader();
+				SerializationExceptions.ThrowIsNotArrayHeader( unpacker );
 			}
 
 			this.UnpackToCore( unpacker, collection, UnpackHelpers.GetItemsCount( unpacker ) );
@@ -180,7 +241,7 @@ namespace MsgPack.Serialization.CollectionSerializers
 			{
 				if ( !unpacker.Read() )
 				{
-					throw SerializationExceptions.NewMissingItem( i );
+					SerializationExceptions.ThrowMissingItem( i, unpacker );
 				}
 
 				object key;
@@ -198,7 +259,7 @@ namespace MsgPack.Serialization.CollectionSerializers
 
 				if ( !unpacker.Read() )
 				{
-					throw SerializationExceptions.NewMissingItem( i );
+					SerializationExceptions.ThrowMissingItem( i, ( key ?? String.Empty ).ToString(), unpacker );
 				}
 
 

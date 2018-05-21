@@ -26,6 +26,10 @@ using System;
 #if !UNITY
 using System.Collections.Generic;
 #endif // !UNITY
+#if FEATURE_TAP
+using System.Threading;
+using System.Threading.Tasks;
+#endif // FEATURE_TAP
 
 using MsgPack.Serialization.CollectionSerializers;
 using MsgPack.Serialization.Polymorphic;
@@ -36,6 +40,7 @@ namespace MsgPack.Serialization.DefaultSerializers
 	internal sealed class AbstractDictionaryMessagePackSerializer<TDictionary, TKey, TValue> : DictionaryMessagePackSerializer<TDictionary, TKey, TValue>
 		where TDictionary : IDictionary<TKey, TValue>
 #else
+#warning TODO: Use generic collection if possible for maintenancibility.
 	internal sealed class AbstractDictionaryMessagePackSerializer : UnityDictionaryMessagePackSerializer
 #endif // !UNITY
 	{
@@ -56,12 +61,12 @@ namespace MsgPack.Serialization.DefaultSerializers
 			PolymorphismSchema schema
 		)
 #if !UNITY
-			: base( ownerContext, schema )
+			: base( ownerContext, schema, SerializerCapabilities.PackTo | SerializerCapabilities.UnpackFrom | SerializerCapabilities.UnpackTo )
 #else
-			: base( ownerContext, abstractType, keyType, valueType, traits, schema )
+			: base( ownerContext, abstractType, keyType, valueType, traits, schema, SerializerCapabilities.PackTo | SerializerCapabilities.UnpackFrom | SerializerCapabilities.UnpackTo )
 #endif // !UNITY
 		{
-			IMessagePackSingleObjectSerializer serializer;
+			MessagePackSerializer serializer;
 			AbstractCollectionSerializerHelper.GetConcreteSerializer( 
 				ownerContext,
 				schema,
@@ -99,6 +104,29 @@ namespace MsgPack.Serialization.DefaultSerializers
 				return base.InternalUnpackFromCore( unpacker );
 			}
 		}
+
+#if FEATURE_TAP
+
+		internal override Task<TDictionary> InternalUnpackFromAsyncCore( Unpacker unpacker, CancellationToken cancellationToken )
+		{
+			if ( this._polymorphicDeserializer != null )
+			{
+				return
+					this._polymorphicDeserializer.PolymorphicUnpackFromAsync( unpacker, cancellationToken )
+						.ContinueWith( 
+							t => ( TDictionary )t.Result,
+							cancellationToken,
+							TaskContinuationOptions.ExecuteSynchronously,
+							TaskScheduler.Current
+						);
+			}
+			else
+			{
+				return base.InternalUnpackFromAsyncCore( unpacker, cancellationToken );
+			}
+		}
+
+#endif // FEATURE_TAP
 
 #if !UNITY
 		protected override TDictionary CreateInstance( int initialCapacity )

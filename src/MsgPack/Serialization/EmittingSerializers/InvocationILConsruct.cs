@@ -2,7 +2,7 @@
 //
 // MessagePack for CLI
 //
-// Copyright (C) 2010-2013 FUJIWARA, Yusuke
+// Copyright (C) 2010-2016 FUJIWARA, Yusuke
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Reflection;
 
 using MsgPack.Serialization.Reflection;
@@ -31,9 +32,10 @@ namespace MsgPack.Serialization.EmittingSerializers
 	{
 		private readonly ILConstruct _target;
 		private readonly MethodBase _method;
+		private readonly Type _interface;
 		private readonly IEnumerable<ILConstruct> _arguments;
 
-		public InvocationILConsruct( MethodInfo method, ILConstruct target, IEnumerable<ILConstruct> arguments )
+		public InvocationILConsruct( MethodInfo method, Type @interface, ILConstruct target, IEnumerable<ILConstruct> arguments )
 			: base( method.ReturnType )
 		{
 			if ( method.IsStatic )
@@ -42,7 +44,7 @@ namespace MsgPack.Serialization.EmittingSerializers
 				{
 					throw new ArgumentException(
 						String.Format( CultureInfo.CurrentCulture, "target must be null for static method '{0}'", method )
-						);
+					);
 				}
 			}
 			else
@@ -51,13 +53,14 @@ namespace MsgPack.Serialization.EmittingSerializers
 				{
 					throw new ArgumentException(
 						String.Format( CultureInfo.CurrentCulture, "target must not be null for instance method '{0}'", method )
-						);
+					);
 				}
 			}
 
 			this._method = method;
 			this._target = target;
 			this._arguments = arguments;
+			this._interface = @interface;
 		}
 
 		public InvocationILConsruct( ConstructorInfo ctor, ILConstruct target, IEnumerable<ILConstruct> arguments )
@@ -69,7 +72,7 @@ namespace MsgPack.Serialization.EmittingSerializers
 				{
 					throw new ArgumentException(
 						String.Format( CultureInfo.CurrentCulture, "target must not be null for expression type constructor '{0}'", ctor )
-						);
+					);
 				}
 			}
 
@@ -132,7 +135,7 @@ namespace MsgPack.Serialization.EmittingSerializers
 				// method
 				if ( !this._method.IsStatic )
 				{
-					this._target.LoadValue( il, this._target.ContextType.GetIsValueType() );
+					this._target.LoadValue( il, this._target.ContextType.ResolveRuntimeType().GetIsValueType() );
 				}
 
 				foreach ( var argument in this._arguments )
@@ -140,9 +143,19 @@ namespace MsgPack.Serialization.EmittingSerializers
 					argument.LoadValue( il, false );
 				}
 
-				if ( this._method.IsStatic || this._target.ContextType.GetIsValueType() )
+				if ( this._method.IsStatic || this._target.ContextType.ResolveRuntimeType().GetIsValueType() )
 				{
 					il.EmitCall( this._method as MethodInfo );
+				}
+				else if ( this._interface != null )
+				{
+					// Explicit interface impl
+					il.EmitCallvirt(
+						this._interface.GetRuntimeMethod(
+							this._method.Name.Substring( this._method.Name.LastIndexOf( '.' ) + 1 ),
+							this._method.GetParameterTypes()
+						)
+					);
 				}
 				else
 				{

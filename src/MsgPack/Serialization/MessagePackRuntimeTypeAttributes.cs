@@ -49,12 +49,46 @@ namespace MsgPack.Serialization
 	///			It mitigate chance of potential exploits.
 	///		</note>
 	/// </remarks>
-	[AttributeUsage( AttributeTargets.Field | AttributeTargets.Property )]
+	[AttributeUsage( AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface | AttributeTargets.Field | AttributeTargets.Property )]
 	public sealed class MessagePackRuntimeTypeAttribute : Attribute, IPolymorphicRuntimeTypeAttribute
 	{
 		PolymorphismTarget IPolymorphicHelperAttribute.Target
 		{
 			get { return PolymorphismTarget.Member; }
+		}
+
+		/// <summary>
+		///		Gets or sets the type which implement type verfier method.
+		/// </summary>
+		/// <value>
+		///		The type which implement type verfier method.
+		///		The default is <c>null</c>, which indicates that no type verification will be processed.
+		/// </value>
+		public Type VerifierType
+		{
+			get;
+			set;
+		}
+
+		/// <summary>
+		///		Gets or sets the name of the method which implement type verification.
+		/// </summary>
+		/// <value>
+		///		The name of the method which implement type verification
+		///		The default is <c>null</c>, which indicates that no type verification will be processed.
+		/// </value>
+		/// <remarks>
+		///		The type verfication method must be following:
+		///		<list type="bullet">
+		///			<item>The method has just only one parameter, which type must be <see cref="PolymorphicTypeVerificationContext" />.</item>
+		///			<item>The method must return <see cref="Boolean" />. <c>true</c> indicates the verification result is OK; <c>false</c> indicates not OK.</item>
+		///			<item>The method can be static method or instance method. The accessibility is not limited.</item>
+		///		</list>
+		/// </remarks>
+		public string VerifierMethodName
+		{
+			get;
+			set;
 		}
 
 		/// <summary>
@@ -88,12 +122,46 @@ namespace MsgPack.Serialization
 	///			It mitigate chance of potential exploits.
 	///		</note>
 	/// </remarks>
-	[AttributeUsage( AttributeTargets.Field | AttributeTargets.Property )]
+	[AttributeUsage( AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface | AttributeTargets.Field | AttributeTargets.Property )]
 	public sealed class MessagePackRuntimeCollectionItemTypeAttribute : Attribute, IPolymorphicRuntimeTypeAttribute
 	{
 		PolymorphismTarget IPolymorphicHelperAttribute.Target
 		{
 			get { return PolymorphismTarget.CollectionItem; }
+		}
+
+		/// <summary>
+		///		Gets or sets the type which implement type verfier method.
+		/// </summary>
+		/// <value>
+		///		The type which implement type verfier method.
+		///		The default is <c>null</c>, which indicates that no type verification will be processed.
+		/// </value>
+		public Type VerifierType
+		{
+			get;
+			set;
+		}
+
+		/// <summary>
+		///		Gets or sets the name of the method which implement type verification.
+		/// </summary>
+		/// <value>
+		///		The name of the method which implement type verification
+		///		The default is <c>null</c>, which indicates that no type verification will be processed.
+		/// </value>
+		/// <remarks>
+		///		The type verfication method must be following:
+		///		<list type="bullet">
+		///			<item>The method has just only one parameter, which type must be <see cref="PolymorphicTypeVerificationContext" />.</item>
+		///			<item>The method must return <see cref="Boolean" />. <c>true</c> indicates the verification result is OK; <c>false</c> indicates not OK.</item>
+		///			<item>The method can be static method or instance method. The accessibility is not limited.</item>
+		///		</list>
+		/// </remarks>
+		public string VerifierMethodName
+		{
+			get;
+			set;
 		}
 
 		/// <summary>
@@ -127,12 +195,46 @@ namespace MsgPack.Serialization
 	///			It mitigate chance of potential exploits.
 	///		</note>
 	/// </remarks>
-	[AttributeUsage( AttributeTargets.Field | AttributeTargets.Property )]
+	[AttributeUsage( AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface | AttributeTargets.Field | AttributeTargets.Property )]
 	public sealed class MessagePackRuntimeDictionaryKeyTypeAttribute : Attribute, IPolymorphicRuntimeTypeAttribute
 	{
 		PolymorphismTarget IPolymorphicHelperAttribute.Target
 		{
 			get { return PolymorphismTarget.DictionaryKey; }
+		}
+
+		/// <summary>
+		///		Gets or sets the type which implement type verfier method.
+		/// </summary>
+		/// <value>
+		///		The type which implement type verfier method.
+		///		The default is <c>null</c>, which indicates that no type verification will be processed.
+		/// </value>
+		public Type VerifierType
+		{
+			get;
+			set;
+		}
+
+		/// <summary>
+		///		Gets or sets the name of the method which implement type verification.
+		/// </summary>
+		/// <value>
+		///		The name of the method which implement type verification
+		///		The default is <c>null</c>, which indicates that no type verification will be processed.
+		/// </value>
+		/// <remarks>
+		///		The type verfication method must be following:
+		///		<list type="bullet">
+		///			<item>The method has just only one parameter, which type must be <see cref="PolymorphicTypeVerificationContext" />.</item>
+		///			<item>The method must return <see cref="Boolean" />. <c>true</c> indicates the verification result is OK; <c>false</c> indicates not OK.</item>
+		///			<item>The method can be static method or instance method. The accessibility is not limited.</item>
+		///		</list>
+		/// </remarks>
+		public string VerifierMethodName
+		{
+			get;
+			set;
 		}
 
 		/// <summary>
@@ -172,6 +274,40 @@ namespace MsgPack.Serialization
 		PolymorphismTarget IPolymorphicHelperAttribute.Target
 		{
 			get { return PolymorphismTarget.TupleItem; }
+		}
+
+		/// <summary>
+		///		Gets or sets the type which implement type verfier method.
+		/// </summary>
+		/// <value>
+		///		The type which implement type verfier method.
+		///		The default is <c>null</c>, which indicates that no type verification will be processed.
+		/// </value>
+		public Type VerifierType
+		{
+			get;
+			set;
+		}
+
+		/// <summary>
+		///		Gets or sets the name of the method which implement type verification.
+		/// </summary>
+		/// <value>
+		///		The name of the method which implement type verification
+		///		The default is <c>null</c>, which indicates that no type verification will be processed.
+		/// </value>
+		/// <remarks>
+		///		The type verfication method must be following:
+		///		<list type="bullet">
+		///			<item>The method has just only one parameter, which type must be <see cref="PolymorphicTypeVerificationContext" />.</item>
+		///			<item>The method must return <see cref="Boolean" />. <c>true</c> indicates the verification result is OK; <c>false</c> indicates not OK.</item>
+		///			<item>The method can be static method or instance method. The accessibility is not limited.</item>
+		///		</list>
+		/// </remarks>
+		public string VerifierMethodName
+		{
+			get;
+			set;
 		}
 
 	}

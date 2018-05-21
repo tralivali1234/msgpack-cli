@@ -23,13 +23,13 @@
 #endif
 
 using System;
-#if !UNITY
-#if XAMIOS || XAMDROID
+#if FEATURE_MPCONTRACT
 using Contract = MsgPack.MPContract;
 #else
 using System.Diagnostics.Contracts;
-#endif // XAMIOS || XAMDROID
-#endif // !UNITY
+#endif // FEATURE_MPCONTRACT
+using System.Reflection;
+using System.Text;
 
 namespace MsgPack.Serialization.Reflection
 {
@@ -52,9 +52,7 @@ namespace MsgPack.Serialization.Reflection
 		/// </returns>
 		public static bool IsAssignableTo( this Type source, Type target )
 		{
-#if !UNITY && DEBUG
 			Contract.Assert( source != null, "source != null" );
-#endif // !UNITY && DEBUG
 
 			if ( target == null )
 			{
@@ -63,5 +61,203 @@ namespace MsgPack.Serialization.Reflection
 
 			return target.IsAssignableFrom( source );
 		}
+
+#if DEBUG
+		/// <summary>
+		///		Get IL friendly attributes string.
+		/// </summary>
+		/// <param name="source"><see cref="MethodAttributes"/>.</param>
+		/// <returns>IL friendly attributes string delimited by ASCII whitespace.</returns>
+		public static string ToILString( this MethodAttributes source )
+		{
+			var result = new StringBuilder();
+
+			var memberAccess = source & MethodAttributes.MemberAccessMask;
+			switch ( memberAccess )
+			{
+				case MethodAttributes.PrivateScope:
+				{
+					result.Append( "privatescope" );
+					break;
+				}
+				case MethodAttributes.Private:
+				{
+					result.Append( "private" );
+					break;
+				}
+				case MethodAttributes.FamANDAssem:
+				{
+					result.Append( "famandassem" );
+					break;
+				}
+				case MethodAttributes.Assembly:
+				{
+					result.Append( "assembly" );
+					break;
+				}
+				case MethodAttributes.Family:
+				{
+					result.Append( "family" );
+					break;
+				}
+				case MethodAttributes.FamORAssem:
+				{
+					result.Append( "famorassem" );
+					break;
+				}
+				case MethodAttributes.Public:
+				{
+					result.Append( "public" );
+					break;
+				}
+			}
+			AddString( result, source, MethodAttributes.HideBySig, "hidebysig" );
+			result.Append( ( source & MethodAttributes.VtableLayoutMask ) == 0 ? " reuseslot" : " newslot" );
+			AddString( result, source, MethodAttributes.SpecialName, "specialname" );
+			AddString( result, source, MethodAttributes.RTSpecialName, "rtspecialname" );
+			AddString( result, source, MethodAttributes.Static, "static" );
+			AddString( result, source, MethodAttributes.Abstract, "abstract" );
+			AddString( result, source, MethodAttributes.Virtual, "virtual" );
+			AddString( result, source, MethodAttributes.Final, "final" );
+			AddString( result, source, MethodAttributes.CheckAccessOnOverride, "checkaccessonoverride" );
+			AddString( result, source, MethodAttributes.HasSecurity, "hassecurity" );
+			AddString( result, source, MethodAttributes.RequireSecObject, "recsecobj" );
+			AddString( result, source, MethodAttributes.UnmanagedExport, "unmanagedexp" );
+			AddString( result, source, MethodAttributes.PinvokeImpl, "pinvokeimpl" );
+
+			return result.ToString();
+		}
+
+		private static void AddString( StringBuilder buffer, MethodAttributes source, MethodAttributes flag, string stringified )
+		{
+			if ( ( source & flag ) != 0 )
+			{
+				buffer.Append( ' ' ).Append( stringified );
+			}
+		}
+
+		/// <summary>
+		///		Get IL friendly attributes string.
+		/// </summary>
+		/// <param name="source"><see cref="CallingConventions"/>.</param>
+		/// <returns>IL friendly attributes string delimited by ASCII whitespace.</returns>
+		public static string ToILString( this CallingConventions source )
+		{
+			var result = new StringBuilder();
+
+			if ( ( source & CallingConventions.HasThis ) != 0 )
+			{
+				result.Append( "instance" );
+			}
+
+			if ( ( source & CallingConventions.ExplicitThis ) != 0 )
+			{
+				if ( result.Length > 0 )
+				{
+					result.Append( ' ' );
+				}
+	
+				result.Append( "explicit" );
+			}
+
+			switch ( (source & CallingConventions.Any) )
+			{
+				case CallingConventions.Standard:
+				{
+					if ( result.Length > 0 )
+					{
+						result.Append( ' ' );
+					}
+
+					result.Append( "standard" );
+					break;
+				}
+				case CallingConventions.VarArgs:
+				{
+					if ( result.Length > 0 )
+					{
+						result.Append( ' ' );
+					}
+
+					result.Append( "vararg" );
+					break;
+				}
+				case CallingConventions.Any:
+				{
+					if ( result.Length > 0 )
+					{
+						result.Append( ' ' );
+					}
+
+					result.Append( "any" );
+					break;
+				}
+			}
+
+			return result.ToString();
+		}
+
+		/// <summary>
+		///		Get IL friendly attributes string.
+		/// </summary>
+		/// <param name="source"><see cref="CallingConventions"/>.</param>
+		/// <returns>IL friendly attributes string delimited by ASCII whitespace.</returns>
+		public static string ToILString( this MethodImplAttributes source )
+		{
+			var result = new StringBuilder();
+
+			// ReSharper disable once BitwiseOperatorOnEnumWithoutFlags
+			var codeType = source & MethodImplAttributes.CodeTypeMask;
+			switch ( codeType )
+			{
+				case MethodImplAttributes.IL:
+				{
+					result.Append( "cil" );
+					break;
+				}
+				case MethodImplAttributes.Native:
+				{
+					result.Append( "native" );
+					break;
+				}
+				case MethodImplAttributes.OPTIL:
+				{
+					result.Append( "optil" );
+					break;
+				}
+				case MethodImplAttributes.Runtime:
+				{
+					result.Append( "runtime" );
+					break;
+				}
+			}
+
+			// ReSharper disable once BitwiseOperatorOnEnumWithoutFlags
+			result.Append( ( source & MethodImplAttributes.ManagedMask ) == 0 ? " managed" : " unmanaged" );
+
+			AddString( result, source, MethodImplAttributes.PreserveSig, "preservesig" );
+			AddString( result, source, MethodImplAttributes.ForwardRef, "forwardref" );
+			AddString( result, source, MethodImplAttributes.InternalCall, "internalcall" );
+			AddString( result, source, MethodImplAttributes.Synchronized, "synchronized" );
+			AddString( result, source, MethodImplAttributes.NoInlining, "noinlining" );
+#if !UNITY
+			AddString( result, source, MethodImplAttributes.NoOptimization, "nooptimization" );
+#if !NET35 && !NET40
+			AddString( result, source, MethodImplAttributes.AggressiveInlining, "aggressiveinlining" );
+#endif // !NET35 && !NET40
+#endif // !UNITY
+
+			return result.ToString();
+		}
+
+		private static void AddString( StringBuilder buffer, MethodImplAttributes source, MethodImplAttributes flag, string stringified )
+		{
+			// ReSharper disable once BitwiseOperatorOnEnumWithoutFlags
+			if ( ( source & flag ) != 0 )
+			{
+				buffer.Append( ' ' ).Append( stringified );
+			}
+		}
+#endif // DEBUG
 	}
 }

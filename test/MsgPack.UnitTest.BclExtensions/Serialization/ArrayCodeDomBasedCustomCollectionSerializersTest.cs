@@ -1,9 +1,8 @@
-﻿ 
-#region -- License Terms --
+﻿#region -- License Terms --
 //
 // MessagePack for CLI
 //
-// Copyright (C) 2010-2015 FUJIWARA, Yusuke
+// Copyright (C) 2010-2017 FUJIWARA, Yusuke
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -29,16 +28,22 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-#if !NETFX_CORE
+#if !SILVERLIGHT && !AOT && !NETSTANDARD1_1 && !NETSTANDARD1_3 && !XAMARIN
 using MsgPack.Serialization.CodeDomSerializers;
+#endif // !SILVERLIGHT && !AOT && !NETSTANDARD1_1 && !NETSTANDARD1_3 && !XAMARIN
+#if !SILVERLIGHT && !AOT && !NETSTANDARD1_1
 using MsgPack.Serialization.EmittingSerializers;
-#endif
-using MsgPack.Serialization.ExpressionSerializers;
+#endif // !SILVERLIGHT && !AOT && !NETSTANDARD1_1
+#if !NETFX_CORE
+using Microsoft.FSharp.Collections;
+#endif // !NETFX_CORE
 #if !MSTEST
 using NUnit.Framework;
 #else
 using TestFixtureAttribute = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestClassAttribute;
 using TestAttribute = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestMethodAttribute;
+using SetUpAttribute = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestInitializeAttribute;
+using TearDownAttribute = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestCleanupAttribute;
 using TimeoutAttribute = NUnit.Framework.TimeoutAttribute;
 using Assert = NUnit.Framework.Assert;
 using Is = NUnit.Framework.Is;
@@ -51,7 +56,8 @@ namespace MsgPack.Serialization
 	{
 		private MessagePackSerializer<T> CreateTarget<T>()
 		{
-			var context = new SerializationContext { SerializationMethod = SerializationMethod.Array, EmitterFlavor = EmitterFlavor.CodeDomBased };
+			var context = new SerializationContext { SerializationMethod = SerializationMethod.Array };
+			context.SerializerOptions.EmitterFlavor = EmitterFlavor.CodeDomBased;
 			return context.GetSerializer<T>( PolymorphismSchema.Default );
 		}
 		
@@ -60,29 +66,46 @@ namespace MsgPack.Serialization
 			get { return true; }
 		}
 
-#if !NETFX_CORE
+#if !NETFX_CORE && !SILVERLIGHT && !AOT && !XAMARIN
 		[SetUp]
 		public void SetUp()
 		{
-			SerializerDebugging.DeletePastTemporaries();
+#if !NETSTANDARD1_1 && !NETSTANDARD1_3 && !NETSTANDARD1_6
 			//SerializerDebugging.TraceEnabled = true;
 			//SerializerDebugging.DumpEnabled = true;
 			if ( SerializerDebugging.TraceEnabled )
 			{
 				Tracer.Emit.Listeners.Clear();
 				Tracer.Emit.Switch.Level = SourceLevels.All;
+#if NETSTANDARD2_0
+				Tracer.Emit.Listeners.Add( new TextWriterTraceListener( Console.Out ) );
+#else // NETSTANDRD2_0
 				Tracer.Emit.Listeners.Add( new ConsoleTraceListener() );
+#endif // NETSTANDRD2_0
 			}
 
-			SerializerDebugging.OnTheFlyCodeDomEnabled = true;
+			SerializerDebugging.DependentAssemblyManager = new TempFileDependentAssemblyManager( TestContext.CurrentContext.TestDirectory );
+			SerializerDebugging.DeletePastTemporaries();
+			SerializerDebugging.OnTheFlyCodeGenerationEnabled = true;
+
+#if NET35
+			SerializerDebugging.SetCodeCompiler( CodeDomCodeGeneration.Compile );
+#else
+			SerializerDebugging.SetCodeCompiler( RoslynCodeGeneration.Compile );
+#endif // NET35
+
+			SerializerDebugging.DumpDirectory = TestContext.CurrentContext.TestDirectory;
 			SerializerDebugging.AddRuntimeAssembly( typeof( ImmutableList ).Assembly.Location );
+#endif // !NETSTANDARD1_1 && !NETSTANDARD1_3 && !NETSTANDARD1_6
 		}
 
 		[TearDown]
 		public void TearDown()
 		{
+#if !NETSTANDARD1_1 && !NETSTANDARD1_3 && !NETSTANDARD1_6
 			if ( SerializerDebugging.DumpEnabled && this.CanDump )
 			{
+#if !NETSTANDARD2_0
 				try
 				{
 					SerializerDebugging.Dump();
@@ -93,14 +116,18 @@ namespace MsgPack.Serialization
 				}
 				finally
 				{
-					DefaultSerializationMethodGeneratorManager.Refresh();
+					SerializationMethodGeneratorManager.Refresh();
 				}
+#else // !NETSTANDARD2_0
+				SerializationMethodGeneratorManager.Refresh();
+#endif // !NETSTANDARD2_0
 			}
 
 			SerializerDebugging.Reset();
-			SerializerDebugging.OnTheFlyCodeDomEnabled = false;
+			SerializerDebugging.OnTheFlyCodeGenerationEnabled = false;
+#endif // !NETSTANDARD1_1 && !NETSTANDARD1_3 && !NETSTANDARD1_6
 		}
-#endif
+#endif // !NETFX_CORE && !SDILVERLIGHT && !AOT && !XAMARIN
 
 		[Test]
 		public void QueueSerializationTest()
@@ -556,5 +583,155 @@ namespace MsgPack.Serialization
 				Assert.That( unpacked.ToArray(), Is.EqualTo( collection.ToArray() ) );
 			}
 		}
+
+#if !NETFX_CORE
+
+
+		[Test]
+		public void FSharpListTest_0_Success()
+		{
+			var collection = FSharpList<int>.Empty;
+			var target = this.CreateTarget<FSharpList<int>>();
+			using ( var buffer = new MemoryStream() )
+			{
+				target.Pack( buffer, collection );
+				buffer.Position = 0;
+				var unpacked = target.Unpack( buffer );
+				buffer.Position = 0;
+				Assert.That( unpacked.ToArray(), Is.EqualTo( collection.ToArray() ) );
+			}
+		}
+
+		[Test]
+		public void FSharpListTest_1_Success()
+		{
+			var collection = FSharpList<int>.Empty;
+			collection = new FSharpList<int>( 0, collection );
+			var target = this.CreateTarget<FSharpList<int>>();
+			using ( var buffer = new MemoryStream() )
+			{
+				target.Pack( buffer, collection );
+				buffer.Position = 0;
+				var unpacked = target.Unpack( buffer );
+				buffer.Position = 0;
+				Assert.That( unpacked.ToArray(), Is.EqualTo( collection.ToArray() ) );
+			}
+		}
+
+		[Test]
+		public void FSharpListTest_2_Success()
+		{
+			var collection = FSharpList<int>.Empty;
+			collection = new FSharpList<int>( 0, collection );
+			collection = new FSharpList<int>( 1, collection );
+			var target = this.CreateTarget<FSharpList<int>>();
+			using ( var buffer = new MemoryStream() )
+			{
+				target.Pack( buffer, collection );
+				buffer.Position = 0;
+				var unpacked = target.Unpack( buffer );
+				buffer.Position = 0;
+				Assert.That( unpacked.ToArray(), Is.EqualTo( collection.ToArray() ) );
+			}
+		}
+
+		[Test]
+		public void FSharpSetTest_0_Success()
+		{
+			var collection = new FSharpSet<int>( Enumerable.Empty<int>() );
+			var target = this.CreateTarget<FSharpSet<int>>();
+			using ( var buffer = new MemoryStream() )
+			{
+				target.Pack( buffer, collection );
+				buffer.Position = 0;
+				var unpacked = target.Unpack( buffer );
+				buffer.Position = 0;
+				Assert.That( unpacked.ToArray(), Is.EqualTo( collection.ToArray() ) );
+			}
+		}
+
+		[Test]
+		public void FSharpSetTest_1_Success()
+		{
+			var collection = new FSharpSet<int>( Enumerable.Empty<int>() );
+			collection = collection.Add( 0 );
+			var target = this.CreateTarget<FSharpSet<int>>();
+			using ( var buffer = new MemoryStream() )
+			{
+				target.Pack( buffer, collection );
+				buffer.Position = 0;
+				var unpacked = target.Unpack( buffer );
+				buffer.Position = 0;
+				Assert.That( unpacked.ToArray(), Is.EqualTo( collection.ToArray() ) );
+			}
+		}
+
+		[Test]
+		public void FSharpSetTest_2_Success()
+		{
+			var collection = new FSharpSet<int>( Enumerable.Empty<int>() );
+			collection = collection.Add( 0 );
+			collection = collection.Add( 1 );
+			var target = this.CreateTarget<FSharpSet<int>>();
+			using ( var buffer = new MemoryStream() )
+			{
+				target.Pack( buffer, collection );
+				buffer.Position = 0;
+				var unpacked = target.Unpack( buffer );
+				buffer.Position = 0;
+				Assert.That( unpacked.ToArray(), Is.EqualTo( collection.ToArray() ) );
+			}
+		}
+
+		[Test]
+		public void FSharpMapTest_0_Success()
+		{
+			var collection = new FSharpMap<int, int>( Enumerable.Empty<Tuple<int, int>>() );
+			var target = this.CreateTarget<FSharpMap<int, int>>();
+			using ( var buffer = new MemoryStream() )
+			{
+				target.Pack( buffer, collection );
+				buffer.Position = 0;
+				var unpacked = target.Unpack( buffer );
+				buffer.Position = 0;
+				Assert.That( unpacked.ToArray(), Is.EqualTo( collection.ToArray() ) );
+			}
+		}
+
+		[Test]
+		public void FSharpMapTest_1_Success()
+		{
+			var collection = new FSharpMap<int, int>( Enumerable.Empty<Tuple<int, int>>() );
+			collection = collection.Add( 0, 0 );
+			var target = this.CreateTarget<FSharpMap<int, int>>();
+			using ( var buffer = new MemoryStream() )
+			{
+				target.Pack( buffer, collection );
+				buffer.Position = 0;
+				var unpacked = target.Unpack( buffer );
+				buffer.Position = 0;
+				Assert.That( unpacked.ToArray(), Is.EqualTo( collection.ToArray() ) );
+			}
+		}
+
+		[Test]
+		public void FSharpMapTest_2_Success()
+		{
+			var collection = new FSharpMap<int, int>( Enumerable.Empty<Tuple<int, int>>() );
+			collection = collection.Add( 0, 0 );
+			collection = collection.Add( 1, 1 );
+			var target = this.CreateTarget<FSharpMap<int, int>>();
+			using ( var buffer = new MemoryStream() )
+			{
+				target.Pack( buffer, collection );
+				buffer.Position = 0;
+				var unpacked = target.Unpack( buffer );
+				buffer.Position = 0;
+				Assert.That( unpacked.ToArray(), Is.EqualTo( collection.ToArray() ) );
+			}
+		}
+
+#endif // !NETFX_CORE
+
 	}
 }

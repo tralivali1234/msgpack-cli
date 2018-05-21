@@ -24,6 +24,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 using MsgPack.Serialization.DefaultSerializers;
 using MsgPack.Serialization.Polymorphic;
@@ -134,13 +135,13 @@ namespace MsgPack.Serialization
 			return ( asProvider != null ? asProvider.Get( context, providerParameter ) : result ) as MessagePackSerializer<T>;
 #else
 			var asSerializer =
-				( asProvider != null ? asProvider.Get( context, providerParameter ) : result ) as IMessagePackSingleObjectSerializer;
+				( asProvider != null ? asProvider.Get( context, providerParameter ) : result ) as MessagePackSerializer;
 			return asSerializer != null ? MessagePackSerializer.Wrap<T>( context, asSerializer ) : null;
 #endif // !UNITY
 		}
 
-#if UNITY || XAMIOS || XAMDROID
-		internal IMessagePackSingleObjectSerializer Get( SerializationContext context, Type targetType, object providerParameter )
+#if UNITY
+		internal MessagePackSerializer Get( SerializationContext context, Type targetType, object providerParameter )
 		{
 			if ( context == null )
 			{
@@ -154,9 +155,9 @@ namespace MsgPack.Serialization
 
 			var result = this._repository.Get( context, targetType );
 			var asProvider = result as MessagePackSerializerProvider;
-			return ( asProvider != null ? asProvider.Get( context, providerParameter ) : result ) as IMessagePackSingleObjectSerializer;
+			return ( asProvider != null ? asProvider.Get( context, providerParameter ) : result ) as MessagePackSerializer;
 		}
-#endif // UNITY || XAMIOS || XAMDROID
+#endif // UNITY
 
 		/// <summary>
 		///		Registers a <see cref="MessagePackSerializer{T}"/>.
@@ -345,9 +346,39 @@ namespace MsgPack.Serialization
 			return new SerializerRepository( InitializeDefaultTable( ownerContext ) );
 		}
 
-		internal bool Contains( Type rootType )
+		/// <summary>
+		///		Determines whether this repository contains serializer for the specified target type.
+		/// </summary>
+		/// <param name="targetType">Type of the target.</param>
+		/// <returns>
+		///		<c>true</c> if this repository contains serializer for the specified target type; otherwise, <c>false</c>.
+		///		This method returns <c>false</c> for <c>null</c>.
+		/// </returns>
+		public bool ContainsFor( Type targetType )
 		{
-			return this._repository.Contains( rootType );
+			return this._repository.Contains( targetType );
+		}
+
+		/// <summary>
+		///		Gets the copy of registered serializer entries.
+		/// </summary>
+		/// <returns>
+		///		The copy of registered serializer entries.
+		///		This value will not be <c>null</c> and consistent in the invoked timing.
+		/// </returns>
+		/// <remarks>
+		///		This method returns snapshot of the invoked timing, so the result may not reflect latest status.
+		///		You should use the result for debugging or tooling purpose only.
+		///		Use <c>Get()</c> overloads to get proper serializer.
+		/// </remarks>
+		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1024:UsePropertiesWhereAppropriate", Justification = "This method causes collection copying." )]
+		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1006:DoNotNestGenericTypesInMemberSignatures", Justification = "By design" )]
+		public IEnumerable<KeyValuePair<Type, MessagePackSerializer>> GetRegisteredSerializers()
+		{
+			return
+				this._repository.GetEntries()
+					.Select( kv => new KeyValuePair<Type, MessagePackSerializer>( kv.Key, kv.Value as MessagePackSerializer ) )
+					.Where( kV => kV.Value != null );
 		}
 	}
 }

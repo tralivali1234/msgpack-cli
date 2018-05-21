@@ -2,7 +2,7 @@
 //
 // MessagePack for CLI
 //
-// Copyright (C) 2010-2015 FUJIWARA, Yusuke
+// Copyright (C) 2010-2016 FUJIWARA, Yusuke
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -56,6 +56,7 @@ namespace MsgPack.Serialization
 		/// A value of <see cref="SerializationMethod" />.
 		/// </value>
 		/// <exception cref="ArgumentOutOfRangeException">Specified value is not valid  <see cref="SerializationMethod"/>.</exception>
+		[Obsolete( "Generated assembly now recognizes SerializationContext.SerializationMethod on demand. This property does not affect anything." )]
 		public SerializationMethod SerializationMethod
 		{
 			get { return this._serializationMethod; }
@@ -140,6 +141,56 @@ namespace MsgPack.Serialization
 		/// </value>
 		public bool WithNullableSerializers { get; set; }
 
+		private const string DefaultNamespace = "MsgPack.Serialization.EmittingSerializers.Generated";
+		private string _namespace;
+
+		/// <summary>
+		///		Gets or sets the namespace of generated classes.
+		/// </summary>
+		/// <value>
+		///		The namespace of generated classes.
+		///		The default is <c>"MsgPack.Serialization.GeneratedSerializers"</c>.
+		/// </value>
+		/// <exception cref="ArgumentException">Specified value is not valid for namespace.</exception>
+		public string Namespace
+		{
+			get { return this._namespace; }
+			set
+			{
+				if ( value == null )
+				{
+					this._namespace = DefaultNamespace;
+				}
+				else
+				{
+					Validation.ValidateNamespace( value, "value" );
+					this._namespace = value;
+				}
+			}
+		}
+
+		private readonly SerializationCompatibilityOptions _compatibilityOptions = new SerializationCompatibilityOptions();
+
+		/// <summary>
+		///		Gets the compatibility options for generating serializers.
+		/// </summary>
+		/// <value>
+		///		The <see cref="SerializationCompatibilityOptions"/> which stores compatibility options for generating serializers. This value will not be <c>null</c>.
+		/// </value>
+		public SerializationCompatibilityOptions CompatibilityOptions
+		{
+			get { return this._compatibilityOptions; }
+		}
+
+		/// <summary>
+		///		Gets or sets a value indicating whether generated serializers will override async methods or not.
+		/// </summary>
+		/// <value>
+		///		<c>true</c> if generated serializers will override async methods; otherwise, <c>false</c>.
+		///		Default is <c>true</c>.
+		/// </value>
+		public bool WithAsync { get; set; }
+
 		/// <summary>
 		///		Initializes a new instance of the <see cref="SerializerAssemblyGenerationConfiguration"/> class.
 		/// </summary>
@@ -147,10 +198,16 @@ namespace MsgPack.Serialization
 		{
 			this.OutputDirectory = null;
 			this._serializationMethod = SerializationMethod.Array;
+			this._namespace = DefaultNamespace;
 		}
 
 		void ISerializerGeneratorConfiguration.Validate()
 		{
+			if ( this.AssemblyName == null )
+			{
+				throw new InvalidOperationException( "AssemblyName property is required." );
+			}
+
 			try
 			{
 				// ReSharper disable ReturnValueOfPureMethodIsNotUsed
@@ -173,9 +230,9 @@ namespace MsgPack.Serialization
 				new InvalidOperationException(
 					String.Format(
 						CultureInfo.CurrentCulture, "AssemblyName property is not set correctly. Detail: {0}", innerException.Message
-						),
+					),
 					innerException
-					);
+				);
 		}
 	}
 }

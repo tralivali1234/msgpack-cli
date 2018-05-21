@@ -2,7 +2,7 @@
 //
 // MessagePack for CLI
 //
-// Copyright (C) 2010-2015 FUJIWARA, Yusuke
+// Copyright (C) 2010-2016 FUJIWARA, Yusuke
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -24,13 +24,12 @@
 
 using System;
 using System.Collections.Generic;
-#if !UNITY
-#if XAMIOS || XAMDROID
+using System.Linq;
+#if FEATURE_MPCONTRACT
 using Contract = MsgPack.MPContract;
 #else
 using System.Diagnostics.Contracts;
-#endif // XAMIOS || XAMDROID
-#endif // !UNITY
+#endif // FEATURE_MPCONTRACT
 #if NETFX_CORE
 using System.Reflection;
 #endif
@@ -44,7 +43,7 @@ namespace MsgPack.Serialization
 	///		Repository for key type with RWlock scheme.
 	/// </summary>
 	[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1001:TypesThatOwnDisposableFieldsShouldBeDisposable", Justification = "Repository should not be disposable because it may be shared so it is difficult to determine disposition timing" )]
-#if !NETFX_35 && !UNITY
+#if !NET35 && !UNITY
 	[SecuritySafeCritical]
 #endif
 	internal class TypeKeyRepository
@@ -75,23 +74,23 @@ namespace MsgPack.Serialization
 			this._table = table;
 		}
 
-#if !NETFX_35 && !UNITY
+#if !NET35 && !UNITY
 		[SecuritySafeCritical]
 #endif
-#if NETFX_35 || UNITY
+#if NET35 || UNITY
 		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Security", "CA2122:DoNotIndirectlyExposeMethodsWithLinkDemands", Justification = "CER is OK" )]
-#endif // NETFX_35 || UNITY
+#endif // NET35 || UNITY
 		private Dictionary<RuntimeTypeHandle, object> GetClonedTable()
 		{
 			bool holdsReadLock = false;
-#if !SILVERLIGHT && !NETFX_CORE
+#if !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 			RuntimeHelpers.PrepareConstrainedRegions();
-#endif
+#endif // !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 			try
 			{
-#if !SILVERLIGHT && !NETFX_CORE
+#if !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 				RuntimeHelpers.PrepareConstrainedRegions();
-#endif
+#endif // !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 				try { }
 				finally
 				{
@@ -114,23 +113,23 @@ namespace MsgPack.Serialization
 			return this.GetCore( type, out matched, out genericDefinitionMatched );
 		}
 
-#if !NETFX_35 && !UNITY
+#if !NET35 && !UNITY
 		[SecuritySafeCritical]
 #endif
-#if NETFX_35 || UNITY
+#if NET35 || UNITY
 		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Security", "CA2122:DoNotIndirectlyExposeMethodsWithLinkDemands", Justification = "CER is OK" )]
-#endif // NETFX_35 || UNITY
+#endif // NET35 || UNITY
 		private bool GetCore( Type type, out object matched, out object genericDefinitionMatched )
 		{
 			bool holdsReadLock = false;
-#if !SILVERLIGHT && !NETFX_CORE
+#if !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 			RuntimeHelpers.PrepareConstrainedRegions();
-#endif
+#endif // !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 			try
 			{
-#if !SILVERLIGHT && !NETFX_CORE
+#if !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 				RuntimeHelpers.PrepareConstrainedRegions();
-#endif
+#endif // !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 				try { }
 				finally
 				{
@@ -170,19 +169,17 @@ namespace MsgPack.Serialization
 
 		public bool Register( Type type, object entry, Type nullableType, object nullableValue, SerializerRegistrationOptions options )
 		{
-#if !UNITY && DEBUG
 			Contract.Assert( entry != null, "entry != null" );
-#endif // !UNITY && DEBUG
 
 			return this.RegisterCore( type, entry, nullableType, nullableValue, options );
 		}
 
-#if !NETFX_35 && !UNITY
+#if !NET35 && !UNITY
 		[SecuritySafeCritical]
 #endif
-#if NETFX_35 || UNITY
+#if NET35 || UNITY
 		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Security", "CA2122:DoNotIndirectlyExposeMethodsWithLinkDemands", Justification = "CER is OK" )]
-#endif // NETFX_35 || UNITY
+#endif // NET35 || UNITY
 		private bool RegisterCore( Type key, object value, Type nullableType, object nullableValue, SerializerRegistrationOptions options )
 		{
 			var allowOverwrite = ( options & SerializerRegistrationOptions.AllowOverride ) != 0;
@@ -190,14 +187,14 @@ namespace MsgPack.Serialization
 			if ( allowOverwrite || !this.ContainsType( key, nullableType ) )
 			{
 				bool holdsWriteLock = false;
-#if !SILVERLIGHT && !NETFX_CORE
+#if !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 				RuntimeHelpers.PrepareConstrainedRegions();
-#endif
+#endif // !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 				try
 				{
-#if !SILVERLIGHT && !NETFX_CORE
+#if !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 					RuntimeHelpers.PrepareConstrainedRegions();
-#endif
+#endif // !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 					try { }
 					finally
 					{
@@ -246,25 +243,25 @@ namespace MsgPack.Serialization
 			return this.UnregisterCore( type );
 		}
 
-#if !NETFX_35 && !UNITY
+#if !NET35 && !UNITY
 		[SecuritySafeCritical]
 #endif
-#if NETFX_35 || UNITY
+#if NET35 || UNITY
 		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Security", "CA2122:DoNotIndirectlyExposeMethodsWithLinkDemands", Justification = "CER is OK" )]
-#endif // NETFX_35 || UNITY
+#endif // NET35 || UNITY
 		private bool UnregisterCore( Type key )
 		{
 			if ( this._table.ContainsKey( key.TypeHandle ) )
 			{
 				bool holdsWriteLock = false;
-#if !SILVERLIGHT && !NETFX_CORE
+#if !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 				RuntimeHelpers.PrepareConstrainedRegions();
-#endif
+#endif // !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 				try
 				{
-#if !SILVERLIGHT && !NETFX_CORE
+#if !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 					RuntimeHelpers.PrepareConstrainedRegions();
-#endif
+#endif // !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 					try { }
 					finally
 					{
@@ -285,20 +282,20 @@ namespace MsgPack.Serialization
 			return false;
 		}
 
-#if !NETFX_35 && !UNITY
+#if !NET35 && !UNITY
 		[SecuritySafeCritical]
 #endif
 		internal bool Contains( Type type )
 		{
 			bool holdsReadLock = false;
-#if !SILVERLIGHT && !NETFX_CORE
+#if !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 			RuntimeHelpers.PrepareConstrainedRegions();
-#endif
+#endif // !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 			try
 			{
-#if !SILVERLIGHT && !NETFX_CORE
+#if !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 				RuntimeHelpers.PrepareConstrainedRegions();
-#endif
+#endif // !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 				try { }
 				finally
 				{
@@ -306,6 +303,37 @@ namespace MsgPack.Serialization
 					holdsReadLock = true;
 				}
 				return this._table.ContainsKey( type.TypeHandle );
+			}
+			finally
+			{
+				if ( holdsReadLock )
+				{
+					this._lock.ExitReadLock();
+				}
+			}
+		}
+
+#if !NET35 && !UNITY
+		[SecuritySafeCritical]
+#endif
+		internal IEnumerable<KeyValuePair<Type, object>> GetEntries()
+		{
+			bool holdsReadLock = false;
+#if !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
+			RuntimeHelpers.PrepareConstrainedRegions();
+#endif // !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
+			try
+			{
+#if !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
+				RuntimeHelpers.PrepareConstrainedRegions();
+#endif // !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
+				try { }
+				finally
+				{
+					this._lock.EnterReadLock();
+					holdsReadLock = true;
+				}
+				return this._table.Select( kv => new KeyValuePair<Type, object>( Type.GetTypeFromHandle( kv.Key ), kv.Value ) ).ToArray();
 			}
 			finally
 			{

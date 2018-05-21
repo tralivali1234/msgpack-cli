@@ -1,8 +1,8 @@
-﻿#region -- License Terms --
+#region -- License Terms --
 //
 // MessagePack for CLI
 //
-// Copyright (C) 2010-2015 FUJIWARA, Yusuke
+// Copyright (C) 2010-2017 FUJIWARA, Yusuke and contributors
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -16,6 +16,9 @@
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
 //
+// Contributors:
+//    Samuel Cragg
+//
 #endregion -- License Terms --
 
 using System;
@@ -23,13 +26,10 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using MsgPack.Serialization.AbstractSerializers;
-#if !NETFX_CORE && !WINDOWS_PHONE
+#if !NETSTANDARD1_3
 using MsgPack.Serialization.CodeDomSerializers;
+#endif // !NETSTANDARD1_3
 using MsgPack.Serialization.EmittingSerializers;
-#endif // if !NETFX_CORE && !WINDOWS_PHONE
-#if !NETFX_35
-using MsgPack.Serialization.ExpressionSerializers;
-#endif // if !NETFX_35
 #if !MSTEST
 using NUnit.Framework;
 #else
@@ -45,8 +45,7 @@ namespace MsgPack.Serialization
 	[TestFixture]
 	public class CompositeTest
 	{
-#if !NETFX_CORE && !WINDOWS_PHONE
-
+#if !NETSTANDARD1_3
 		[SetUp]
 		public void SetUp()
 		{
@@ -57,10 +56,20 @@ namespace MsgPack.Serialization
 			{
 				Tracer.Emit.Listeners.Clear();
 				Tracer.Emit.Switch.Level = SourceLevels.All;
+#if NETSTANDARD2_0
+				Tracer.Emit.Listeners.Add( new TextWriterTraceListener( Console.Out ) );
+#else // NETSTANDRD2_0
 				Tracer.Emit.Listeners.Add( new ConsoleTraceListener() );
+#endif // NETSTANDRD2_0
 			}
-	
-			SerializerDebugging.OnTheFlyCodeDomEnabled = true;
+
+			SerializerDebugging.DependentAssemblyManager = new TempFileDependentAssemblyManager( TestContext.CurrentContext.TestDirectory );
+			SerializerDebugging.OnTheFlyCodeGenerationEnabled = true;
+#if NET35
+			SerializerDebugging.SetCodeCompiler( CodeDomCodeGeneration.Compile );
+#else
+			SerializerDebugging.SetCodeCompiler( RoslynCodeGeneration.Compile );
+#endif // NET35
 			SerializerDebugging.AddRuntimeAssembly( this.GetType().Assembly.Location );
 		}
 
@@ -69,74 +78,56 @@ namespace MsgPack.Serialization
 		{
 			if ( SerializerDebugging.DumpEnabled )
 			{
+#if !NETSTANDARD2_0
 				try
 				{
 					SerializerDebugging.Dump();
 				}
+				catch ( NotSupportedException ex )
+				{
+					Console.Error.WriteLine( ex );
+				}
 				finally
 				{
-					DefaultSerializationMethodGeneratorManager.Refresh();
+					SerializationMethodGeneratorManager.Refresh();
 				}
+#else // !NETSTANDARD2_0
+				SerializationMethodGeneratorManager.Refresh();
+#endif // !NETSTANDARD2_0
 			}
 
 			SerializerDebugging.Reset();
-			SerializerDebugging.OnTheFlyCodeDomEnabled = false;
+			SerializerDebugging.OnTheFlyCodeGenerationEnabled = false;
 		}
+#endif // !NETSTANDARD1_3
 
 		[Test]
 		public void TestArrayFieldBased()
 		{
-			TestCore( EmitterFlavor.FieldBased, SerializationMethod.Array, new AssemblyBuilderSerializerBuilder<DirectoryItem>() );
+			TestCore( EmitterFlavor.FieldBased, SerializationMethod.Array, new AssemblyBuilderSerializerBuilder( typeof( DirectoryItem ), typeof( DirectoryItem ).GetCollectionTraits( CollectionTraitOptions.Full, allowNonCollectionEnumerableTypes: false ) ) );
 		}
 
 		[Test]
 		public void TestMapFieldBased()
 		{
-			TestCore( EmitterFlavor.FieldBased, SerializationMethod.Map, new AssemblyBuilderSerializerBuilder<DirectoryItem>( ) );
+			TestCore( EmitterFlavor.FieldBased, SerializationMethod.Map, new AssemblyBuilderSerializerBuilder( typeof( DirectoryItem ), typeof( DirectoryItem ).GetCollectionTraits( CollectionTraitOptions.Full, allowNonCollectionEnumerableTypes: false ) ) );
 		}
 
-		[Test]
-		public void TestArrayContextBased()
-		{
-			TestCore( EmitterFlavor.ContextBased, SerializationMethod.Array, new DynamicMethodSerializerBuilder<DirectoryItem>() );
-		}
-
+#if !NETSTANDARD1_3
 		[Test]
 		public void TestArrayCodeDomBased()
 		{
-			TestCore( EmitterFlavor.CodeDomBased, SerializationMethod.Array, new CodeDomSerializerBuilder<DirectoryItem>() );
-		}
-#endif // !NETFX_CORE && !WINDOWS_PHONE
-
-#if !NETFX_35
-		[Test]
-		public void TestArrayExpressionBased()
-		{
-			TestCore( EmitterFlavor.ExpressionBased, SerializationMethod.Array, new ExpressionTreeSerializerBuilder<DirectoryItem>() );
-		}
-
-		[Test]
-		public void TestMapExpressionBased()
-		{
-			TestCore( EmitterFlavor.ExpressionBased, SerializationMethod.Map, new ExpressionTreeSerializerBuilder<DirectoryItem>() );
-		}
-
-#if !NETFX_CORE && !WINDOWS_PHONE
-		[Test]
-		public void TestMapContextBased()
-		{
-			TestCore( EmitterFlavor.ContextBased, SerializationMethod.Map, new DynamicMethodSerializerBuilder<DirectoryItem>() );
+			TestCore( EmitterFlavor.CodeDomBased, SerializationMethod.Array, new CodeDomSerializerBuilder( typeof( DirectoryItem ), typeof( DirectoryItem ).GetCollectionTraits( CollectionTraitOptions.Full, allowNonCollectionEnumerableTypes: false ) ) );
 		}
 
 		[Test]
 		public void TestMapCodeDomBased()
 		{
-			TestCore( EmitterFlavor.CodeDomBased, SerializationMethod.Map, new CodeDomSerializerBuilder<DirectoryItem>() );
+			TestCore( EmitterFlavor.CodeDomBased, SerializationMethod.Map, new CodeDomSerializerBuilder( typeof( DirectoryItem ), typeof( DirectoryItem ).GetCollectionTraits( CollectionTraitOptions.Full, allowNonCollectionEnumerableTypes: false ) ) );
 		}
-#endif // !NETFX_CORE && !WINDOWS_PHONE
-#endif // !NETFX_35
+#endif // !NETSTANDARD1_3
 
-		private static void TestCore( EmitterFlavor emittingFlavor, SerializationMethod serializationMethod, ISerializerBuilder<DirectoryItem> generator )
+		private static void TestCore( EmitterFlavor emittingFlavor, SerializationMethod serializationMethod, ISerializerBuilder generator )
 		{
 			var root = new DirectoryItem() { Name = "/" };
 			root.Directories =
@@ -152,18 +143,22 @@ namespace MsgPack.Serialization
 				};
 			root.Files = new FileItem[ 0 ];
 
-			var serializer = 
-				generator.BuildSerializerInstance(
-					new SerializationContext
+			var context =
+				new SerializationContext
+				{
+					SerializationMethod = serializationMethod,
+					SerializerOptions =
 					{
-						EmitterFlavor = emittingFlavor, 
-						SerializationMethod = serializationMethod, 
-#if SILVERLIGHT
-						GeneratorOption = SerializationMethodGeneratorOption.Fast
-#else
-						GeneratorOption = SerializationMethodGeneratorOption.CanDump
-#endif
-					}, 
+#if !NETSTANDARD1_3
+						GeneratorOption = SerializationMethodGeneratorOption.CanDump,
+#endif // !NETSTANDARD1_3
+						EmitterFlavor = emittingFlavor
+					}
+				};
+
+			var serializer =
+				( MessagePackSerializer<DirectoryItem> ) generator.BuildSerializerInstance(
+					context,
 					typeof( DirectoryItem ),
 					PolymorphismSchema.Default
 				);
@@ -189,7 +184,6 @@ namespace MsgPack.Serialization
 			}
 		}
 	}
-
 	public abstract class FileSystemItem
 	{
 		public string Name { get; set; }

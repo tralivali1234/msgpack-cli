@@ -18,19 +18,20 @@
 //
 #endregion -- License Terms --
 
+#pragma warning disable 0618
+
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.Serialization;
+#if FEATURE_TAP
+using System.Threading.Tasks;
+#endif // FEATURE_TAP
 using MsgPack.Serialization.DefaultSerializers;
-#if !XAMIOS && !XAMDROID && !UNITY
-#if !NETFX_CORE && !SILVERLIGHT
+#if !AOT && !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 using MsgPack.Serialization.EmittingSerializers;
-#else
-using MsgPack.Serialization.ExpressionSerializers;
-#endif // !NETFX_CORE && !WINDOWS_PHONE
-#endif // !XAMIOS && !XAMDROID && !UNITY
+#endif // !AOT && !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 #if !MSTEST
 using NUnit.Framework;
 #else
@@ -49,13 +50,17 @@ namespace MsgPack.Serialization
 	{
 		private static MessagePackSerializer<T> CreateTarget<T>()
 		{
-#if XAMIOS || XAMDROID || UNITY_ANDROID || UNITY_IPHONE
+#if AOT
 			return PreGeneratedSerializerActivator.CreateContext( SerializationMethod.Array, SerializationContext.Default.CompatibilityOptions.PackerCompatibilityOptions ).GetSerializer<T>();
-#elif !NETFX_CORE && !SILVERLIGHT
-			return new SerializationContext { EmitterFlavor = EmitterFlavor.FieldBased }.GetSerializer<T>();
+#elif !SILVERLIGHT
+			var context = new SerializationContext();
+			context.SerializerOptions.EmitterFlavor = EmitterFlavor.FieldBased;
+			return context.GetSerializer<T>();
 #else
-			return new SerializationContext { EmitterFlavor = EmitterFlavor.ExpressionBased }.GetSerializer<T>();
-#endif
+			var context = new SerializationContext();
+			context.SerializerOptions.EmitterFlavor = EmitterFlavor.ReflectionBased;
+			return context.GetSerializer<T>();
+#endif // AOT
 		}
 
 		[Test]
@@ -72,6 +77,51 @@ namespace MsgPack.Serialization
 			var target = CreateTarget<int>();
 			Assert.Throws<ArgumentNullException>( () => target.PackTo( null, 0 ) );
 		}
+
+#if FEATURE_TAP
+
+		// Issue 201
+		[Test]
+		public async Task TestPackAsync_BufferIsFlushed()
+		{
+			PackerUnpackerStreamOptions.AlwaysWrap = true;
+			try
+			{
+				var target = CreateTarget<string>();
+				using ( var stream = new MemoryStream() )
+				{
+					await target.PackAsync( stream, null );
+					Assert.That( stream.Position, Is.EqualTo( 1 ) );
+				}
+			}
+			finally
+			{
+				PackerUnpackerStreamOptions.AlwaysWrap = false;
+			}
+		}
+
+		[Test]
+		public async Task TestUnpackAsync_BufferingIsHarmless()
+		{
+			PackerUnpackerStreamOptions.AlwaysWrap = true;
+			try
+			{
+				var target = CreateTarget<string>();
+				using ( var stream = new MemoryStream() )
+				{
+					await target.PackAsync( stream, "a" );
+					stream.Position = 0;
+					var result = await target.UnpackAsync( stream );
+					Assert.That( result, Is.EqualTo( "a" ) );
+				}
+			}
+			finally
+			{
+				PackerUnpackerStreamOptions.AlwaysWrap = false;
+			}
+		}
+
+#endif // FEATURE_TAP
 
 
 		[Test]
@@ -527,7 +577,6 @@ namespace MsgPack.Serialization
 		}
 
 		[Test]
-		[Ignore] // Ignore until PR-30 is completed.
 		public void TestIssue28()
 		{
 			var target = CreateTarget<WithReadOnlyProperty>();

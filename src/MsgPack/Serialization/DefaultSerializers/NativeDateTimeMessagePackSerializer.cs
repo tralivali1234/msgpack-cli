@@ -2,7 +2,7 @@
 //
 // MessagePack for CLI
 //
-// Copyright (C) 2015 FUJIWARA, Yusuke
+// Copyright (C) 2015-2016 FUJIWARA, Yusuke
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -19,6 +19,10 @@
 #endregion -- License Terms --
 
 using System;
+#if FEATURE_TAP
+using System.Threading;
+using System.Threading.Tasks;
+#endif // FEATURE_TAP
 
 namespace MsgPack.Serialization.DefaultSerializers
 {
@@ -27,7 +31,7 @@ namespace MsgPack.Serialization.DefaultSerializers
 	/// </summary>
 	internal class NativeDateTimeMessagePackSerializer : MessagePackSerializer<DateTime>
 	{
-		public NativeDateTimeMessagePackSerializer( SerializationContext ownerContext ) : base( ownerContext ) { }
+		public NativeDateTimeMessagePackSerializer( SerializationContext ownerContext ) : base( ownerContext, SerializerCapabilities.PackTo | SerializerCapabilities.UnpackFrom ) { }
 
 		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "Validated by caller in base class" )]
 		protected internal override void PackToCore( Packer packer, DateTime objectTree )
@@ -38,7 +42,34 @@ namespace MsgPack.Serialization.DefaultSerializers
 		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "Validated by caller in base class" )]
 		protected internal override DateTime UnpackFromCore( Unpacker unpacker )
 		{
-			return DateTime.FromBinary( unpacker.LastReadData.AsInt64() );
+			return DateTime.FromBinary( unpacker.LastReadData.DeserializeAsInt64() );
 		}
+
+#if FEATURE_TAP
+
+		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "Validated by caller in base class" )]
+		protected internal override Task PackToAsyncCore( Packer packer, DateTime objectTree, CancellationToken cancellationToken )
+		{
+			return packer.PackAsync( objectTree.ToBinary(), cancellationToken );
+		}
+
+		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes", Justification = "Transfers all catched exceptions." )]
+		protected internal override Task<DateTime> UnpackFromAsyncCore( Unpacker unpacker, CancellationToken cancellationToken )
+		{
+			var tcs = new TaskCompletionSource<DateTime>();
+			try
+			{
+				tcs.SetResult( this.UnpackFromCore( unpacker ) );
+			}
+			catch ( Exception ex )
+			{
+				tcs.SetException( ex );
+			}
+
+			return tcs.Task;
+		}
+
+#endif // FEATURE_TAP
+
 	}
 }

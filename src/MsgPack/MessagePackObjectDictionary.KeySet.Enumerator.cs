@@ -25,13 +25,11 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-#if !UNITY
-#if XAMIOS || XAMDROID
+#if FEATURE_MPCONTRACT
 using Contract = MsgPack.MPContract;
 #else
 using System.Diagnostics.Contracts;
-#endif // XAMIOS || XAMDROID
-#endif // !UNITY
+#endif // FEATURE_MPCONTRACT
 
 namespace MsgPack
 {
@@ -87,9 +85,7 @@ namespace MsgPack
 
 				internal Enumerator( MessagePackObjectDictionary dictionary )
 				{
-#if !UNITY
 					Contract.Assert( dictionary != null, "dictionary != null" );
-#endif // !UNITY
 
 					this._underlying = dictionary.GetEnumerator();
 				}

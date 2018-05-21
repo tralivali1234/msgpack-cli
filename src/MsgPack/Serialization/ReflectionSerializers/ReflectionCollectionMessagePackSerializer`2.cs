@@ -2,7 +2,7 @@
 // 
 // MessagePack for CLI
 // 
-// Copyright (C) 2015 FUJIWARA, Yusuke
+// Copyright (C) 2015-2016 FUJIWARA, Yusuke
 // 
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -26,12 +26,18 @@ using System;
 #if !UNITY
 using System.Collections.Generic;
 #endif // !UNITY
+#if FEATURE_TAP
+using System.Threading;
+using System.Threading.Tasks;
+#endif // FEATURE_TAP
 
 using MsgPack.Serialization.CollectionSerializers;
 
 namespace MsgPack.Serialization.ReflectionSerializers
 {
+	[Preserve( AllMembers = true )]
 #if !UNITY
+	[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Maintainability", "CA1501:AvoidExcessiveInheritance", Justification = "By design." )]
 	internal sealed class ReflectionCollectionMessagePackSerializer<TCollection, TItem> : CollectionMessagePackSerializer<TCollection, TItem>
 		where TCollection : ICollection<TItem>
 #else
@@ -44,27 +50,125 @@ namespace MsgPack.Serialization.ReflectionSerializers
 		private readonly Func<int, object> _factory;
 #endif // !UNITY
 
+		private readonly bool _isPackable;
+		private readonly bool _isUnpackable;
+#if FEATURE_TAP
+		private readonly bool _isAsyncPackable;
+		private readonly bool _isAsyncUnpackable;
+#endif // FEATURE_TAP
+
 #if !UNITY
 		public ReflectionCollectionMessagePackSerializer(
 			SerializationContext ownerContext,
 			Type targetType,
-			PolymorphismSchema itemsSchema )
-			: base( ownerContext, itemsSchema )
+			CollectionTraits collectionTraits,
+			PolymorphismSchema itemsSchema,
+			SerializationTarget targetInfo
+		)
+			: base( ownerContext, itemsSchema, targetInfo.GetCapabilitiesForCollection( collectionTraits ) )
 		{
-			this._factory = ReflectionSerializerHelper.CreateCollectionInstanceFactory<TCollection, TItem>( targetType );
+			if ( targetInfo.CanDeserialize )
+			{
+				this._factory = ReflectionSerializerHelper.CreateCollectionInstanceFactory<TCollection, TItem>( targetInfo.DeserializationConstructor );
+			}
+			else
+			{
+				this._factory = _ => { throw SerializationExceptions.NewCreateInstanceIsNotSupported( targetType ); };
+			}
+
+			this._isPackable = typeof( IPackable ).IsAssignableFrom( targetType ?? typeof( TCollection ) );
+			this._isUnpackable = typeof( IUnpackable ).IsAssignableFrom( targetType ?? typeof( TCollection ) );
+#if FEATURE_TAP
+			this._isAsyncPackable = typeof( IAsyncPackable ).IsAssignableFrom( targetType ?? typeof( TCollection ) );
+			this._isAsyncUnpackable = typeof( IAsyncUnpackable ).IsAssignableFrom( targetType ?? typeof( TCollection ) );
+#endif // FEATURE_TAP
 		}
 #else
 		public ReflectionCollectionMessagePackSerializer(
 			SerializationContext ownerContext,
 			Type abstractType,
 			Type concreteType,
-			CollectionTraits traits,
-			PolymorphismSchema itemsSchema )
-			: base( ownerContext, abstractType, traits, itemsSchema )
+			CollectionTraits concreteTypeCollectionTraits,
+			PolymorphismSchema itemsSchema,
+			SerializationTarget targetInfo
+		)
+			: base( ownerContext, abstractType, concreteTypeCollectionTraits, itemsSchema, targetInfo.GetCapabilitiesForCollection( concreteTypeCollectionTraits ) )
 		{
-			this._factory = ReflectionSerializerHelper.CreateCollectionInstanceFactory( abstractType, concreteType, traits.ElementType );
+			if ( targetInfo.CanDeserialize )
+			{
+				this._factory = ReflectionSerializerHelper.CreateCollectionInstanceFactory( abstractType, concreteType, concreteTypeCollectionTraits.ElementType, targetInfo.DeserializationConstructor );
+			}
+			else
+			{
+				this._factory = _ => { throw SerializationExceptions.NewCreateInstanceIsNotSupported( concreteType ); };
+			}
+
+			this._isPackable = typeof( IPackable ).IsAssignableFrom( concreteType ?? abstractType );
+			this._isUnpackable = typeof( IUnpackable ).IsAssignableFrom( concreteType ?? abstractType );
 		}
 #endif // !UNITY
+
+#if !UNITY
+		protected internal override void PackToCore( Packer packer, TCollection objectTree )
+#else
+		protected internal override void PackToCore( Packer packer, object objectTree )
+#endif // !UNITY
+		{
+			if ( this._isPackable )
+			{
+				( ( IPackable ) objectTree ).PackToMessage( packer, null );
+				return;
+			}
+
+			base.PackToCore( packer, objectTree );
+		}
+
+#if !UNITY
+		protected internal override TCollection UnpackFromCore( Unpacker unpacker )
+#else
+		protected internal override object UnpackFromCore( Unpacker unpacker )
+#endif
+		{
+			if ( this._isUnpackable )
+			{
+				var result = this.CreateInstance( 0 );
+				( ( IUnpackable ) result ).UnpackFromMessage( unpacker );
+				return result;
+			}
+
+			return base.UnpackFromCore( unpacker );
+		}
+
+#if FEATURE_TAP
+
+		protected internal override Task PackToAsyncCore( Packer packer, TCollection objectTree, CancellationToken cancellationToken )
+		{
+			if ( this._isAsyncPackable )
+			{
+				return ( ( IAsyncPackable )objectTree ).PackToMessageAsync( packer, null, cancellationToken );
+			}
+
+			return base.PackToAsyncCore( packer, objectTree, cancellationToken );
+		}
+
+		protected internal override Task<TCollection> UnpackFromAsyncCore( Unpacker unpacker, CancellationToken cancellationToken )
+		{
+			if ( this._isAsyncUnpackable )
+			{
+				return this.UnpackFromMessageAsync( unpacker, cancellationToken );
+			}
+
+			return base.UnpackFromAsyncCore( unpacker, cancellationToken );
+		}
+
+		private async Task<TCollection> UnpackFromMessageAsync( Unpacker unpacker, CancellationToken cancellationToken )
+		{
+			var result = this.CreateInstance( 0 );
+			await ( ( IAsyncUnpackable ) result ).UnpackFromMessageAsync( unpacker, cancellationToken ).ConfigureAwait( false );
+			return result;
+		}
+
+#endif // FEATURE_TAP
 
 #if !UNITY
 		protected override TCollection CreateInstance( int initialCapacity )

@@ -2,7 +2,7 @@
 //
 // MessagePack for CLI
 //
-// Copyright (C) 2010-2015 FUJIWARA, Yusuke
+// Copyright (C) 2010-2017 FUJIWARA, Yusuke
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -19,7 +19,16 @@
 #endregion -- License Terms --
 
 using System;
+using System.Collections.Generic;
+#if !NETFX_CORE && !WINDOWS_PHONE && !UNITY_IPHONE && !UNITY_ANDROID
+using System.Diagnostics;
+#endif // !NETFX_CORE && !WINDOWS_PHONE && !UNITY_IPHONE && !UNITY_ANDROID
 using System.IO;
+
+#if !SILVERLIGHT && !AOT && !NETSTANDARD1_1 && !NETSTANDARD1_3
+using MsgPack.Serialization.EmittingSerializers;
+#endif // !SILVERLIGHT && !AOT && !NETSTANDARD1_1 && !NETSTANDARD1_3
+
 #if !MSTEST
 using NUnit.Framework;
 #else
@@ -36,19 +45,81 @@ namespace MsgPack.Serialization
 	[TestFixture]
 	public partial class VersioningTest
 	{
+#if !SILVERLIGHT && !AOT && !NETSTANDARD1_1 && !NETSTANDARD1_3 && !XAMARIN
+		[SetUp]
+		public void SetUp()
+		{
+			SerializerDebugging.DeletePastTemporaries();
+			//SerializerDebugging.TraceEnabled = true;
+			//SerializerDebugging.DumpEnabled = true;
+			if ( SerializerDebugging.TraceEnabled )
+			{
+				Tracer.Emit.Listeners.Clear();
+				Tracer.Emit.Switch.Level = SourceLevels.All;
+#if NETSTANDARD2_0
+				Tracer.Emit.Listeners.Add( new TextWriterTraceListener( Console.Out ) );
+#else // NETSTANDRD2_0
+				Tracer.Emit.Listeners.Add( new ConsoleTraceListener() );
+#endif // NETSTANDRD2_0
+			}
+
+			SerializerDebugging.DependentAssemblyManager = new TempFileDependentAssemblyManager( TestContext.CurrentContext.TestDirectory );
+			SerializerDebugging.OnTheFlyCodeGenerationEnabled = true;
+#if NET35
+			SerializerDebugging.SetCodeCompiler( CodeDomCodeGeneration.Compile );
+#else
+			SerializerDebugging.SetCodeCompiler( RoslynCodeGeneration.Compile );
+#endif // NET35
+
+			SerializerDebugging.AddRuntimeAssembly( typeof( AddOnlyCollection<> ).Assembly.Location );
+			if ( typeof( AddOnlyCollection<> ).Assembly != this.GetType().Assembly )
+			{
+				SerializerDebugging.AddRuntimeAssembly( this.GetType().Assembly.Location );
+			}
+		}
+
+		[TearDown]
+		public void TearDown()
+		{
+			if ( SerializerDebugging.DumpEnabled )
+			{
+#if !NETSTANDARD2_0
+				try
+				{
+					SerializerDebugging.Dump();
+				}
+				catch ( NotSupportedException ex )
+				{
+					Console.Error.WriteLine( ex );
+				}
+				finally
+				{
+					SerializationMethodGeneratorManager.Refresh();
+				}
+#else // !NETSTANDARD2_0
+				SerializationMethodGeneratorManager.Refresh();
+#endif // !NETSTANDARD2_0
+			}
+
+			SerializerDebugging.Reset();
+			SerializerDebugging.OnTheFlyCodeGenerationEnabled = false;
+		}
+#endif // !SILVERLIGHT && !AOT && !NETSTANDARD1_1 && !NETSTANDARD1_3 && !XAMARIN
+
 		private static MessagePackSerializer<T> CreateSerializer<T>( EmitterFlavor flavor )
 		{
-#if NETFX_35 || NETFX_CORE || SILVERLIGHT
-			var context = new SerializationContext();
-#else
-			var context = PreGeneratedSerializerActivator.CreateContext( SerializationMethod.Array, SerializationContext.Default.CompatibilityOptions.PackerCompatibilityOptions );
-#endif
-#if !XAMIOS && !UNITY_IPHONE
-			context.EmitterFlavor = flavor;
+			var context =
+#if AOT
+				flavor != EmitterFlavor.ReflectionBased
+				? PreGeneratedSerializerActivator.CreateContext( SerializationMethod.Array, SerializationContext.Default.CompatibilityOptions.PackerCompatibilityOptions ) :
+#endif // AOT
+				new SerializationContext();
+#if !AOT
+			context.SerializerOptions.EmitterFlavor = flavor;
 			return MessagePackSerializer.CreateInternal<T>( context, PolymorphismSchema.Default );
 #else
 			return context.GetSerializer<T>();
-#endif // !XAMIOS && !UNITY_IPHONE
+#endif // !AOT
 		}
 
 		private static void TestExtraFieldCore( SerializationMethod method, EmitterFlavor flavor, PackerCompatibilityOptions compat )
@@ -59,7 +130,7 @@ namespace MsgPack.Serialization
 			{
 				if ( method == SerializationMethod.Array )
 				{
-					stream.Write( new byte[] { 0x94, 0x1, 0xFF, 0xA1, ( byte )'a', 0xC0 } );
+					stream.Write( new byte[] { 0x94, 0x1, 0xFF, 0xA1, ( byte )'a', 0xA1, 0xC0 } );
 				}
 				else
 				{
@@ -80,6 +151,7 @@ namespace MsgPack.Serialization
 					packer.PackString( "Field3" );
 					packer.PackString( "a" );
 					packer.PackString( "Extra4" );
+					packer.PackArrayHeader( 1 );
 					packer.PackNull();
 				}
 
@@ -178,8 +250,45 @@ namespace MsgPack.Serialization
 				Assert.That( result.Field3, Is.Null );
 			}
 		}
-	}
 
+		[Test]
+		public void Issue199()
+		{
+
+			using ( var memStream = new MemoryStream() )
+			{
+				SerializationContext.Default.GetSerializer<Obj1>().Pack( memStream, new Obj1
+				{
+					Id = "1",
+					Items = new List<string> { "a", "b" }
+				} );
+
+				memStream.Seek( 0, SeekOrigin.Begin );
+
+				var serializer2 = SerializationContext.Default.GetSerializer<Obj2>();
+
+				// this call throws
+				Obj2 obj = serializer2.Unpack(memStream);
+			}
+		}
+
+		public class Obj1
+		{
+			[MessagePackMember( 0 )]
+			public string Id { get; set; }
+
+			[MessagePackMember( 1 )]
+			public List<string> Items { get; set; }
+		}
+
+		public class Obj2
+		{
+			[MessagePackMember( 0 )]
+			public string Id { get; set; }
+
+			// doesn't know about Items
+		}
+	}
 
 	public class VersioningTestTarget {
 		[MessagePackMember(0)]

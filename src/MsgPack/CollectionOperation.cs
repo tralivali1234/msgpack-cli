@@ -1,8 +1,8 @@
-﻿#region -- License Terms --
+#region -- License Terms --
 //
 // MessagePack for CLI
 //
-// Copyright (C) 2010-2015 FUJIWARA, Yusuke
+// Copyright (C) 2010-2016 FUJIWARA, Yusuke
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -24,13 +24,11 @@
 
 using System;
 using System.Collections.Generic;
-#if !UNITY
-#if XAMIOS || XAMDROID
+#if FEATURE_MPCONTRACT
 using Contract = MsgPack.MPContract;
 #else
 using System.Diagnostics.Contracts;
-#endif // XAMIOS || XAMDROID
-#endif // !UNITY
+#endif // FEATURE_MPCONTRACT
 using System.Linq;
 
 namespace MsgPack
@@ -52,9 +50,7 @@ namespace MsgPack
 		public static void CopyTo<TSource, TDestination>( IEnumerable<TSource> source, int sourceCount, int index, TDestination[] array, int arrayIndex, int count, Func<TSource, TDestination> converter )
 		{
 			ValidateCopyToArguments( sourceCount, index, array, arrayIndex, count );
-#if !UNITY
 			Contract.Assert( converter != null, "converter != null" );
-#endif // !UNITY
 
 			int i = 0;
 			foreach ( var item in source.Skip( index ).Take( count ) )

@@ -2,7 +2,7 @@
 //
 // MessagePack for CLI
 //
-// Copyright (C) 2010-2015 FUJIWARA, Yusuke
+// Copyright (C) 2010-2016 FUJIWARA, Yusuke
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -35,6 +35,7 @@ namespace MsgPack.Serialization
 	public enum SerializationMethodGeneratorOption
 	{
 #if !SILVERLIGHT
+#if !NETSTANDARD1_1 && !NETSTANDARD1_3
 		/// <summary>
 		///		The generated method IL can be dumped to the current directory.
 		///		It is intended for the runtime, you cannot use this option.
@@ -43,12 +44,13 @@ namespace MsgPack.Serialization
 		[EditorBrowsable( EditorBrowsableState.Never )]
 #endif // !UNITY || MSGPACK_UNITY_FULL
 		CanDump,
+#endif // !NETSTANDARD1_1 && !NETSTANDARD1_3
 
 		/// <summary>
 		///		The entire generated method can be collected by GC when it is no longer used.
 		/// </summary>
 		CanCollect,
-#endif
+#endif // !SILVERLIGHT
 
 		/// <summary>
 		///		Prefer performance. This options is default.

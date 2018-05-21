@@ -1,8 +1,8 @@
-﻿#region -- License Terms --
+#region -- License Terms --
 //
 // MessagePack for CLI
 //
-// Copyright (C) 2010-2015 FUJIWARA, Yusuke
+// Copyright (C) 2010-2016 FUJIWARA, Yusuke
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -23,13 +23,11 @@
 #endif
 
 using System;
-#if !UNITY
-#if XAMIOS || XAMDROID
+#if FEATURE_MPCONTRACT
 using Contract = MsgPack.MPContract;
 #else
 using System.Diagnostics.Contracts;
-#endif // XAMIOS || XAMDROID
-#endif // !UNITY
+#endif // FEATURE_MPCONTRACT
 using System.Runtime.InteropServices;
 
 namespace MsgPack
@@ -89,10 +87,10 @@ namespace MsgPack
 		/// <param name="offset">Offset to read.</param>
 		public Float32Bits( byte[] bigEndianBytes, int offset )
 		{
-#if !UNITY && DEBUG
+#if DEBUG
 			Contract.Assert( bigEndianBytes != null, "bigEndianBytes != null" );
 			Contract.Assert( bigEndianBytes.Length - offset >= 4, bigEndianBytes.Length + "-" + offset + ">= 4" );
-#endif // !UNITY && DEBUG
+#endif // DEBUG
 
 			this = default( Float32Bits );
 

@@ -2,7 +2,7 @@
 //
 // MessagePack for CLI
 //
-// Copyright (C) 2010-2015 FUJIWARA, Yusuke
+// Copyright (C) 2010-2016 FUJIWARA, Yusuke
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -23,14 +23,15 @@
 #endif
 
 using System;
-#if !UNITY
 using System.Collections.Generic;
-#endif // !UNITY
-using System.Reflection;
+#if FEATURE_TAP
+using System.Threading;
+using System.Threading.Tasks;
+#endif // FEATURE_TAP
 
 namespace MsgPack.Serialization.DefaultSerializers
 {
-#if !UNITY
+	[Preserve( AllMembers = true )]
 	// ReSharper disable once InconsistentNaming
 	internal sealed class System_Collections_Generic_KeyValuePair_2MessagePackSerializer<TKey, TValue> : MessagePackSerializer<KeyValuePair<TKey, TValue>>
 	{
@@ -38,13 +39,13 @@ namespace MsgPack.Serialization.DefaultSerializers
 		private readonly MessagePackSerializer<TValue> _valueSerializer;
 
 		public System_Collections_Generic_KeyValuePair_2MessagePackSerializer( SerializationContext ownerContext )
-			: base( ownerContext )
+			: base( ownerContext, SerializerCapabilities.PackTo | SerializerCapabilities.UnpackFrom )
 		{
 			this._keySerializer = ownerContext.GetSerializer<TKey>();
 			this._valueSerializer = ownerContext.GetSerializer<TValue>();
 		}
 
-		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "Asserted internally" )]
+		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "Validated internally" )]
 		protected internal override void PackToCore( Packer packer, KeyValuePair<TKey, TValue> objectTree )
 		{
 			packer.PackArrayHeader( 2 );
@@ -52,73 +53,55 @@ namespace MsgPack.Serialization.DefaultSerializers
 			this._valueSerializer.PackTo( packer, objectTree.Value );
 		}
 
-		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "Asserted internally" )]
+		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "Validated internally" )]
 		protected internal override KeyValuePair<TKey, TValue> UnpackFromCore( Unpacker unpacker )
 		{
 			if ( !unpacker.Read() )
 			{
-				throw SerializationExceptions.NewUnexpectedEndOfStream();
+				SerializationExceptions.ThrowUnexpectedEndOfStream( unpacker );
 			}
 
 			var key = unpacker.LastReadData.IsNil ? default( TKey ) : this._keySerializer.UnpackFrom( unpacker );
 
 			if ( !unpacker.Read() )
 			{
-				throw SerializationExceptions.NewUnexpectedEndOfStream();
+				SerializationExceptions.ThrowUnexpectedEndOfStream( unpacker );
 			}
 
 			var value = unpacker.LastReadData.IsNil ? default( TValue ) : this._valueSerializer.UnpackFrom( unpacker );
 
 			return new KeyValuePair<TKey, TValue>( key, value );
 		}
-	}
-#else
-	// ReSharper disable once InconsistentNaming
-	internal sealed class System_Collections_Generic_KeyValuePair_2MessagePackSerializer : NonGenericMessagePackSerializer
-	{
-		private readonly IMessagePackSingleObjectSerializer _keySerializer;
-		private readonly IMessagePackSingleObjectSerializer _valueSerializer;
-		private readonly MethodInfo _getKey;
-		private readonly MethodInfo _getValue;
 
-		public System_Collections_Generic_KeyValuePair_2MessagePackSerializer( SerializationContext ownerContext, Type targetType )
-			: base( ownerContext, targetType )
+#if FEATURE_TAP
+
+		protected internal override async Task PackToAsyncCore( Packer packer, KeyValuePair<TKey, TValue> objectTree, CancellationToken cancellationToken )
 		{
-			var genericArguments = targetType.GetGenericArguments();
-			this._keySerializer = ownerContext.GetSerializer( genericArguments[ 0 ] );
-			this._valueSerializer = ownerContext.GetSerializer( genericArguments[ 1 ] );
-			this._getKey = targetType.GetProperty( "Key" ).GetGetMethod();
-			this._getValue = targetType.GetProperty( "Value" ).GetGetMethod();
+			await packer.PackArrayHeaderAsync( 2, cancellationToken ).ConfigureAwait( false );
+			await this._keySerializer.PackToAsync( packer, objectTree.Key, cancellationToken ).ConfigureAwait( false );
+			await this._valueSerializer.PackToAsync( packer, objectTree.Value, cancellationToken ).ConfigureAwait( false );
 		}
 
-		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "Asserted internally" )]
-		protected internal override void PackToCore( Packer packer, object objectTree )
+		protected internal override async Task<KeyValuePair<TKey, TValue>> UnpackFromAsyncCore( Unpacker unpacker, CancellationToken cancellationToken )
 		{
-			packer.PackArrayHeader( 2 );
-			this._keySerializer.PackTo( packer, this._getKey.InvokePreservingExceptionType( objectTree ) );
-			this._valueSerializer.PackTo( packer, this._getValue.InvokePreservingExceptionType( objectTree ) );
-		}
-
-		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Design", "CA1062:ValidateArgumentsOfPublicMethods", MessageId = "0", Justification = "Asserted internally" )]
-		protected internal override object UnpackFromCore( Unpacker unpacker )
-		{
-			if ( !unpacker.Read() )
+			if ( !await unpacker.ReadAsync( cancellationToken ).ConfigureAwait( false ) )
 			{
-				throw SerializationExceptions.NewUnexpectedEndOfStream();
+				SerializationExceptions.ThrowUnexpectedEndOfStream( unpacker );
 			}
 
-			var key =
-				unpacker.LastReadData.IsNil ? null : this._keySerializer.UnpackFrom( unpacker );
+			var key = unpacker.LastReadData.IsNil ? default( TKey ) : await this._keySerializer.UnpackFromAsync( unpacker, cancellationToken ).ConfigureAwait( false );
 
-			if ( !unpacker.Read() )
+			if ( !await unpacker.ReadAsync( cancellationToken ).ConfigureAwait( false ) )
 			{
-				throw SerializationExceptions.NewUnexpectedEndOfStream();
+				SerializationExceptions.ThrowUnexpectedEndOfStream( unpacker );
 			}
 
-			var value = unpacker.LastReadData.IsNil ? null : this._valueSerializer.UnpackFrom( unpacker );
+			var value = unpacker.LastReadData.IsNil ? default( TValue ) : await this._valueSerializer.UnpackFromAsync( unpacker, cancellationToken ).ConfigureAwait( false );
 
-			return ReflectionExtensions.CreateInstancePreservingExceptionType( this.TargetType, key, value );
+			return new KeyValuePair<TKey, TValue>( key, value );
 		}
+
+#endif // FEATURE_TAP
+
 	}
-#endif // !UNITY
 }

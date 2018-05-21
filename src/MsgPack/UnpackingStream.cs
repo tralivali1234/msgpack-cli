@@ -23,13 +23,11 @@
 #endif
 
 using System;
-#if !UNITY
-#if XAMIOS || XAMDROID
+#if FEATURE_MPCONTRACT
 using Contract = MsgPack.MPContract;
 #else
 using System.Diagnostics.Contracts;
-#endif // XAMIOS || XAMDROID
-#endif // !UNITY
+#endif // FEATURE_MPCONTRACT
 using System.IO;
 
 namespace MsgPack
@@ -154,10 +152,7 @@ namespace MsgPack
 				throw new ArgumentOutOfRangeException( "count" );
 			}
 
-#if !UNITY
 			Contract.EndContractBlock();
-#endif // !UNITY
-
 
 			if ( this.CurrentOffset == this.RawLength )
 			{

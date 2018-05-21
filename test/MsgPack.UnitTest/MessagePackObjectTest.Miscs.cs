@@ -2,7 +2,7 @@
 //
 // MessagePack for CLI
 //
-// Copyright (C) 2010-2012 FUJIWARA, Yusuke
+// Copyright (C) 2010-2017 FUJIWARA, Yusuke
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -18,6 +18,14 @@
 //
 #endregion -- License Terms --
 
+#if UNITY_5 || UNITY_STANDALONE || UNITY_WEBPLAYER || UNITY_WII || UNITY_IPHONE || UNITY_ANDROID || UNITY_PS3 || UNITY_XBOX360 || UNITY_FLASH || UNITY_BKACKBERRY || UNITY_WINRT
+#define UNITY
+#endif
+
+#if AOT
+#define NUNITLITE
+#endif // AOT
+
 using System;
 using System.Linq;
 #if !MSTEST
@@ -28,6 +36,7 @@ using TestAttribute = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.Test
 using TimeoutAttribute = NUnit.Framework.TimeoutAttribute;
 using Assert = NUnit.Framework.Assert;
 using Is = NUnit.Framework.Is;
+using Does = NUnit.Framework.Does;
 #endif
 
 namespace MsgPack
@@ -140,13 +149,17 @@ namespace MsgPack
 				Int64.MinValue,
 				UInt64.MaxValue,
 				Single.MaxValue,
+#if UNITY_WORKAROUND // Epsilon is 0 in Unity
 				Single.Epsilon,
+#endif // UNITY_WORKAROUND
 				Single.MinValue,
 				Single.NaN,
 				Single.PositiveInfinity,
 				Single.NegativeInfinity,
 				Double.MaxValue,
+#if UNITY_WORKAROUND // Epsilon is 0 in Unity
 				Double.Epsilon,
+#endif // UNITY_WORKAROUND
 				Double.MinValue,
 				Double.NaN,
 				Double.PositiveInfinity,
@@ -186,7 +199,7 @@ namespace MsgPack
 			{
 				index++;
 				var result = target.ToString();
-				var indicator = String.Format( "Index:{0}, Next to \"{1}\"", index, previous );
+				var indicator = String.Format( "Index:{0}, Next to \"{1}\", '{2}'", index, previous, target.DebugDump() );
 				previous = result;
 				if ( target.IsNil )
 				{
@@ -201,29 +214,39 @@ namespace MsgPack
 					}
 					catch ( InvalidOperationException ) { }
 
-					Assert.That( result, Is.StringMatching( "^(0x[0-9A-F]+)?$" ), indicator );
+					Assert.That( result, Does.Match( "^(0x[0-9A-F]+)?$" ), indicator );
 				}
 				else if ( target.IsArray )
 				{
-					Assert.That( result, Is.StringMatching( @"^\[\s*([0-9]+(,\s*[0-9]+)*)?\s*\]$" ), indicator );
+					Assert.That( result, Does.Match( @"^\[\s*([0-9]+(,\s*[0-9]+)*)?\s*\]$" ), indicator );
 				}
 				else if ( target.IsDictionary )
 				{
-					Assert.That( result, Is.StringMatching( @"^\{\s*([0-9]+\s*:\s*[0-9]+(,\s*[0-9]+\s*:\s*[0-9]+)*)?\s*\}$" ), indicator );
+					Assert.That( result, Does.Match( @"^\{\s*([0-9]+\s*:\s*[0-9]+(,\s*[0-9]+\s*:\s*[0-9]+)*)?\s*\}$" ), indicator );
 				}
 				else if ( target.IsTypeOf<float>().GetValueOrDefault() || target.IsTypeOf<double>().GetValueOrDefault() )
 				{
-					Assert.That( result, Is.StringMatching( "^(NaN|Infinity|-Infinity|(-?[0-9]+\\.[0-9]+(E(\\+|-)[0-9]+)?))$" ), indicator );
+					Assert.That( result, Does.Match( "^(NaN|Infinity|-Infinity|(-?[0-9]+\\.[0-9]+(E(\\+|-)[0-9]+)?))$" ), indicator );
 				}
 				else if ( target.IsTypeOf<bool>().GetValueOrDefault() )
 				{
-					Assert.That( result, Is.StringMatching( "^(True|False)$" ), indicator );
+					Assert.That( result, Does.Match( "^(True|False)$" ), indicator );
 				}
 				else
 				{
-					Assert.That( result, Is.StringMatching( "^-?[0-9]+$" ), indicator );
+					Assert.That( result, Does.Match( "^-?[0-9]+$" ), indicator );
 				}
 			}
 		}
-	}
+
+#if NUNITLITE
+		private static class Does
+		{
+			public static NUnit.Framework.Constraints.Constraint Match( string regex )
+			{
+				return Is.StringMatching( regex );
+			}
+		}
+#endif // NUNITLITE && !NETFX_CORE
+    }
 }

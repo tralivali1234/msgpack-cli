@@ -23,7 +23,11 @@
 
 using System;
 using System.Diagnostics.CodeAnalysis;
+#if NETSTANDARD1_1
+using Contract = MsgPack.MPContract;
+#else
 using System.Diagnostics.Contracts;
+#endif // NETSTANDARD1_1
 using System.Linq;
 using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
@@ -1035,7 +1039,6 @@ namespace MsgPack.Serialization.Reflection
 
 			this._underlying.Emit( OpCodes.Ble, target );
 		}
-#endif // DEBUG
 
 		///	<summary>
 		///		Emit 'blt' instruction with specified arguments.
@@ -1054,7 +1057,6 @@ namespace MsgPack.Serialization.Reflection
 			this._underlying.Emit( OpCodes.Blt, target );
 		}
 
-#if DEBUG
 		///	<summary>
 		///		Emit 'bne.un' instruction with specified arguments.
 		///	</summary>
@@ -1815,6 +1817,7 @@ namespace MsgPack.Serialization.Reflection
 
 			this._underlying.Emit( OpCodes.Cpobj, type );
 		}
+#endif // DEBUG
 
 		///	<summary>
 		///		Emit 'ldobj' instruction with specified arguments.
@@ -1833,7 +1836,6 @@ namespace MsgPack.Serialization.Reflection
 
 			this._underlying.Emit( OpCodes.Ldobj, type );
 		}
-#endif // DEBUG
 
 		///	<summary>
 		///		Emit 'ldstr' instruction with specified arguments.
@@ -1967,7 +1969,7 @@ namespace MsgPack.Serialization.Reflection
 			Contract.Assert( field != null );
 
 			// TODO: NLiblet
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 			if ( !( field is FieldBuilder ) )
 			{
 				if ( field.GetRequiredCustomModifiers().Any( item => typeof( IsVolatile ).Equals( item ) ) )
@@ -1977,7 +1979,7 @@ namespace MsgPack.Serialization.Reflection
 					this.TraceWriteLine();
 				}
 			}
-#endif
+#endif // !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 
 			this.TraceStart();
 			this.TraceOpCode( OpCodes.Ldfld );
@@ -1998,7 +2000,7 @@ namespace MsgPack.Serialization.Reflection
 			Contract.Assert( field != null );
 
 			// TODO: NLiblet
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 			if ( !( field is FieldBuilder ) )
 			{
 				if ( field.GetRequiredCustomModifiers().Any( item => typeof( IsVolatile ).Equals( item ) ) )
@@ -2008,7 +2010,7 @@ namespace MsgPack.Serialization.Reflection
 					this.TraceWriteLine();
 				}
 			}
-#endif
+#endif // !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 
 			this.TraceStart();
 			this.TraceOpCode( OpCodes.Ldflda );
@@ -2029,7 +2031,7 @@ namespace MsgPack.Serialization.Reflection
 			Contract.Assert( field != null );
 
 			// TODO: NLiblet
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 			if ( !( field is FieldBuilder ) )
 			{
 				if ( field.GetRequiredCustomModifiers().Any( item => typeof( IsVolatile ).Equals( item ) ) )
@@ -2039,7 +2041,7 @@ namespace MsgPack.Serialization.Reflection
 					this.TraceWriteLine();
 				}
 			}
-#endif
+#endif // !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 
 			this.TraceStart();
 			this.TraceOpCode( OpCodes.Stfld );
@@ -2061,7 +2063,7 @@ namespace MsgPack.Serialization.Reflection
 			Contract.Assert( field != null );
 
 			// TODO: NLiblet
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 			if ( !( field is FieldBuilder ) )
 			{
 				if ( field.GetRequiredCustomModifiers().Any( item => typeof( IsVolatile ).Equals( item ) ) )
@@ -2071,7 +2073,7 @@ namespace MsgPack.Serialization.Reflection
 					this.TraceWriteLine();
 				}
 			}
-#endif
+#endif // !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 
 			this.TraceStart();
 			this.TraceOpCode( OpCodes.Ldsfld );
@@ -2092,7 +2094,7 @@ namespace MsgPack.Serialization.Reflection
 			Contract.Assert( field != null );
 
 			// TODO: NLiblet
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 			if ( !( field is FieldBuilder ) )
 			{
 				if ( field.GetRequiredCustomModifiers().Any( item => typeof( IsVolatile ).Equals( item ) ) )
@@ -2102,7 +2104,7 @@ namespace MsgPack.Serialization.Reflection
 					this.TraceWriteLine();
 				}
 			}
-#endif
+#endif // !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 
 			this.TraceStart();
 			this.TraceOpCode( OpCodes.Ldsflda );
@@ -2122,7 +2124,7 @@ namespace MsgPack.Serialization.Reflection
 			Contract.Assert( !this.IsEnded );
 			Contract.Assert( field != null );
 
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 			// TODO: NLiblet
 			if ( !( field is FieldBuilder ) )
 			{
@@ -2133,7 +2135,7 @@ namespace MsgPack.Serialization.Reflection
 					this.TraceWriteLine();
 				}
 			}
-#endif
+#endif // !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 
 			this.TraceStart();
 			this.TraceOpCode( OpCodes.Stsfld );
@@ -2395,7 +2397,6 @@ namespace MsgPack.Serialization.Reflection
 			this._underlying.Emit( OpCodes.Ldelema, type );
 		}
 
-#if DEBUG
 		///	<summary>
 		///		Emit 'ldelem.i1' instruction with specified arguments.
 		///	</summary>
@@ -2501,6 +2502,7 @@ namespace MsgPack.Serialization.Reflection
 			this._underlying.Emit( OpCodes.Ldelem_I8 );
 		}
 
+#if DEBUG
 		///	<summary>
 		///		Emit 'ldelem.i' instruction with specified arguments.
 		///	</summary>
@@ -2515,6 +2517,7 @@ namespace MsgPack.Serialization.Reflection
 
 			this._underlying.Emit( OpCodes.Ldelem_I );
 		}
+#endif // DEBUG
 
 		///	<summary>
 		///		Emit 'ldelem.r4' instruction with specified arguments.
@@ -2561,6 +2564,7 @@ namespace MsgPack.Serialization.Reflection
 			this._underlying.Emit( OpCodes.Ldelem_Ref );
 		}
 
+#if DEBUG
 		///	<summary>
 		///		Emit 'stelem.i' instruction with specified arguments.
 		///	</summary>
@@ -2682,7 +2686,6 @@ namespace MsgPack.Serialization.Reflection
 			this._underlying.Emit( OpCodes.Stelem_Ref );
 		}
 
-#if DEBUG
 		///	<summary>
 		///		Emit 'ldelem' instruction with specified arguments.
 		///	</summary>
@@ -2700,7 +2703,6 @@ namespace MsgPack.Serialization.Reflection
 
 			this._underlying.Emit( OpCodes.Ldelem, type );
 		}
-#endif // DEBUG
 
 		///	<summary>
 		///		Emit 'stelem' instruction with specified arguments.
@@ -2966,7 +2968,7 @@ namespace MsgPack.Serialization.Reflection
 			Contract.Assert( target != null );
 
 			// TODO: NLiblet
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 			if ( !( target is FieldBuilder ) )
 			{
 				if ( target.GetRequiredCustomModifiers().Any( item => typeof( IsVolatile ).Equals( item ) ) )
@@ -2976,7 +2978,7 @@ namespace MsgPack.Serialization.Reflection
 					this.TraceWriteLine();
 				}
 			}
-#endif
+#endif // !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 
 			this.TraceStart();
 			this.TraceOpCode( OpCodes.Ldtoken );
@@ -3326,6 +3328,7 @@ namespace MsgPack.Serialization.Reflection
 
 			this._underlying.Emit( OpCodes.Clt_Un );
 		}
+#endif // DEBUG
 
 		///	<summary>
 		///		Emit 'ldftn' instruction with specified arguments.
@@ -3345,6 +3348,7 @@ namespace MsgPack.Serialization.Reflection
 			this._underlying.Emit( OpCodes.Ldftn, method );
 		}
 
+#if DEBUG
 		///	<summary>
 		///		Emit 'ldvirtftn' instruction with specified arguments.
 		///	</summary>

@@ -1,8 +1,8 @@
-﻿#region -- License Terms --
+#region -- License Terms --
 //
 // MessagePack for CLI
 //
-// Copyright (C) 2010-2015 FUJIWARA, Yusuke
+// Copyright (C) 2010-2016 FUJIWARA, Yusuke
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -23,13 +23,11 @@
 #endif
 
 using System;
-#if !UNITY
-#if XAMIOS || XAMDROID
+#if FEATURE_MPCONTRACT
 using Contract = MsgPack.MPContract;
 #else
 using System.Diagnostics.Contracts;
-#endif // XAMIOS || XAMDROID
-#endif // !UNITY
+#endif // FEATURE_MPCONTRACT
 using System.IO;
 
 namespace MsgPack
@@ -101,9 +99,7 @@ namespace MsgPack
 		public static UnpackingResult<Byte> UnpackByte( byte[] source, int offset )
 		{
 			ValidateByteArray( source, offset );
-#if !UNITY
 			Contract.EndContractBlock();
-#endif // !UNITY
 
 			using( var stream = new MemoryStream( source ) )
 			{
@@ -145,9 +141,7 @@ namespace MsgPack
 		public static Byte UnpackByte( Stream source )
 		{
 			ValidateStream( source );
-#if !UNITY
 			Contract.EndContractBlock();
-#endif // !UNITY
 
 			return UnpackByteCore( source );
 		}
@@ -195,9 +189,7 @@ namespace MsgPack
 		///			When the type of packed value is not known, use <see cref="UnpackObject(byte[])"/> instead.
 		///		</para>
 		///	</remarks>
-#if !UNITY
 		[CLSCompliant( false )]
-#endif // !UNITY
 		public static UnpackingResult<SByte> UnpackSByte( byte[] source )
 		{
 			return UnpackSByte( source, 0 );
@@ -230,15 +222,11 @@ namespace MsgPack
 		/// <remarks>
 		///		When the type of packed value is not known, use <see cref="UnpackObject(byte[], int)"/> instead.
 		///	</remarks>
-#if !UNITY
 		[CLSCompliant( false )]
-#endif // !UNITY
 		public static UnpackingResult<SByte> UnpackSByte( byte[] source, int offset )
 		{
 			ValidateByteArray( source, offset );
-#if !UNITY
 			Contract.EndContractBlock();
-#endif // !UNITY
 
 			using( var stream = new MemoryStream( source ) )
 			{
@@ -277,15 +265,11 @@ namespace MsgPack
 		///			When the type of packed value is not known, use <see cref="UnpackObject(Stream)"/> instead.
 		///		</para>
 		///	</remarks>
-#if !UNITY
 		[CLSCompliant( false )]
-#endif // !UNITY
 		public static SByte UnpackSByte( Stream source )
 		{
 			ValidateStream( source );
-#if !UNITY
 			Contract.EndContractBlock();
-#endif // !UNITY
 
 			return UnpackSByteCore( source );
 		}
@@ -368,9 +352,7 @@ namespace MsgPack
 		public static UnpackingResult<Int16> UnpackInt16( byte[] source, int offset )
 		{
 			ValidateByteArray( source, offset );
-#if !UNITY
 			Contract.EndContractBlock();
-#endif // !UNITY
 
 			using( var stream = new MemoryStream( source ) )
 			{
@@ -412,9 +394,7 @@ namespace MsgPack
 		public static Int16 UnpackInt16( Stream source )
 		{
 			ValidateStream( source );
-#if !UNITY
 			Contract.EndContractBlock();
-#endif // !UNITY
 
 			return UnpackInt16Core( source );
 		}
@@ -462,9 +442,7 @@ namespace MsgPack
 		///			When the type of packed value is not known, use <see cref="UnpackObject(byte[])"/> instead.
 		///		</para>
 		///	</remarks>
-#if !UNITY
 		[CLSCompliant( false )]
-#endif // !UNITY
 		public static UnpackingResult<UInt16> UnpackUInt16( byte[] source )
 		{
 			return UnpackUInt16( source, 0 );
@@ -497,15 +475,11 @@ namespace MsgPack
 		/// <remarks>
 		///		When the type of packed value is not known, use <see cref="UnpackObject(byte[], int)"/> instead.
 		///	</remarks>
-#if !UNITY
 		[CLSCompliant( false )]
-#endif // !UNITY
 		public static UnpackingResult<UInt16> UnpackUInt16( byte[] source, int offset )
 		{
 			ValidateByteArray( source, offset );
-#if !UNITY
 			Contract.EndContractBlock();
-#endif // !UNITY
 
 			using( var stream = new MemoryStream( source ) )
 			{
@@ -544,15 +518,11 @@ namespace MsgPack
 		///			When the type of packed value is not known, use <see cref="UnpackObject(Stream)"/> instead.
 		///		</para>
 		///	</remarks>
-#if !UNITY
 		[CLSCompliant( false )]
-#endif // !UNITY
 		public static UInt16 UnpackUInt16( Stream source )
 		{
 			ValidateStream( source );
-#if !UNITY
 			Contract.EndContractBlock();
-#endif // !UNITY
 
 			return UnpackUInt16Core( source );
 		}
@@ -635,9 +605,7 @@ namespace MsgPack
 		public static UnpackingResult<Int32> UnpackInt32( byte[] source, int offset )
 		{
 			ValidateByteArray( source, offset );
-#if !UNITY
 			Contract.EndContractBlock();
-#endif // !UNITY
 
 			using( var stream = new MemoryStream( source ) )
 			{
@@ -679,9 +647,7 @@ namespace MsgPack
 		public static Int32 UnpackInt32( Stream source )
 		{
 			ValidateStream( source );
-#if !UNITY
 			Contract.EndContractBlock();
-#endif // !UNITY
 
 			return UnpackInt32Core( source );
 		}
@@ -729,9 +695,7 @@ namespace MsgPack
 		///			When the type of packed value is not known, use <see cref="UnpackObject(byte[])"/> instead.
 		///		</para>
 		///	</remarks>
-#if !UNITY
 		[CLSCompliant( false )]
-#endif // !UNITY
 		public static UnpackingResult<UInt32> UnpackUInt32( byte[] source )
 		{
 			return UnpackUInt32( source, 0 );
@@ -764,15 +728,11 @@ namespace MsgPack
 		/// <remarks>
 		///		When the type of packed value is not known, use <see cref="UnpackObject(byte[], int)"/> instead.
 		///	</remarks>
-#if !UNITY
 		[CLSCompliant( false )]
-#endif // !UNITY
 		public static UnpackingResult<UInt32> UnpackUInt32( byte[] source, int offset )
 		{
 			ValidateByteArray( source, offset );
-#if !UNITY
 			Contract.EndContractBlock();
-#endif // !UNITY
 
 			using( var stream = new MemoryStream( source ) )
 			{
@@ -811,15 +771,11 @@ namespace MsgPack
 		///			When the type of packed value is not known, use <see cref="UnpackObject(Stream)"/> instead.
 		///		</para>
 		///	</remarks>
-#if !UNITY
 		[CLSCompliant( false )]
-#endif // !UNITY
 		public static UInt32 UnpackUInt32( Stream source )
 		{
 			ValidateStream( source );
-#if !UNITY
 			Contract.EndContractBlock();
-#endif // !UNITY
 
 			return UnpackUInt32Core( source );
 		}
@@ -902,9 +858,7 @@ namespace MsgPack
 		public static UnpackingResult<Int64> UnpackInt64( byte[] source, int offset )
 		{
 			ValidateByteArray( source, offset );
-#if !UNITY
 			Contract.EndContractBlock();
-#endif // !UNITY
 
 			using( var stream = new MemoryStream( source ) )
 			{
@@ -946,9 +900,7 @@ namespace MsgPack
 		public static Int64 UnpackInt64( Stream source )
 		{
 			ValidateStream( source );
-#if !UNITY
 			Contract.EndContractBlock();
-#endif // !UNITY
 
 			return UnpackInt64Core( source );
 		}
@@ -996,9 +948,7 @@ namespace MsgPack
 		///			When the type of packed value is not known, use <see cref="UnpackObject(byte[])"/> instead.
 		///		</para>
 		///	</remarks>
-#if !UNITY
 		[CLSCompliant( false )]
-#endif // !UNITY
 		public static UnpackingResult<UInt64> UnpackUInt64( byte[] source )
 		{
 			return UnpackUInt64( source, 0 );
@@ -1031,15 +981,11 @@ namespace MsgPack
 		/// <remarks>
 		///		When the type of packed value is not known, use <see cref="UnpackObject(byte[], int)"/> instead.
 		///	</remarks>
-#if !UNITY
 		[CLSCompliant( false )]
-#endif // !UNITY
 		public static UnpackingResult<UInt64> UnpackUInt64( byte[] source, int offset )
 		{
 			ValidateByteArray( source, offset );
-#if !UNITY
 			Contract.EndContractBlock();
-#endif // !UNITY
 
 			using( var stream = new MemoryStream( source ) )
 			{
@@ -1078,15 +1024,11 @@ namespace MsgPack
 		///			When the type of packed value is not known, use <see cref="UnpackObject(Stream)"/> instead.
 		///		</para>
 		///	</remarks>
-#if !UNITY
 		[CLSCompliant( false )]
-#endif // !UNITY
 		public static UInt64 UnpackUInt64( Stream source )
 		{
 			ValidateStream( source );
-#if !UNITY
 			Contract.EndContractBlock();
-#endif // !UNITY
 
 			return UnpackUInt64Core( source );
 		}
@@ -1169,9 +1111,7 @@ namespace MsgPack
 		public static UnpackingResult<Single> UnpackSingle( byte[] source, int offset )
 		{
 			ValidateByteArray( source, offset );
-#if !UNITY
 			Contract.EndContractBlock();
-#endif // !UNITY
 
 			using( var stream = new MemoryStream( source ) )
 			{
@@ -1213,9 +1153,7 @@ namespace MsgPack
 		public static Single UnpackSingle( Stream source )
 		{
 			ValidateStream( source );
-#if !UNITY
 			Contract.EndContractBlock();
-#endif // !UNITY
 
 			return UnpackSingleCore( source );
 		}
@@ -1298,9 +1236,7 @@ namespace MsgPack
 		public static UnpackingResult<Double> UnpackDouble( byte[] source, int offset )
 		{
 			ValidateByteArray( source, offset );
-#if !UNITY
 			Contract.EndContractBlock();
-#endif // !UNITY
 
 			using( var stream = new MemoryStream( source ) )
 			{
@@ -1342,9 +1278,7 @@ namespace MsgPack
 		public static Double UnpackDouble( Stream source )
 		{
 			ValidateStream( source );
-#if !UNITY
 			Contract.EndContractBlock();
-#endif // !UNITY
 
 			return UnpackDoubleCore( source );
 		}

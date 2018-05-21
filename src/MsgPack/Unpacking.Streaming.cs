@@ -23,13 +23,11 @@
 #endif
 
 using System;
-#if !UNITY
-#if XAMIOS || XAMDROID
+#if FEATURE_MPCONTRACT
 using Contract = MsgPack.MPContract;
 #else
 using System.Diagnostics.Contracts;
-#endif // XAMIOS || XAMDROID
-#endif // !UNITY
+#endif // FEATURE_MPCONTRACT
 using System.IO;
 using System.Text;
 
@@ -69,10 +67,7 @@ namespace MsgPack
 		public static UnpackingStream UnpackByteStream( Stream source )
 		{
 			ValidateStream( source );
-#if !UNITY
 			Contract.EndContractBlock();
-#endif // !UNITY
-
 
 			return UnpackByteStreamCore( source );
 		}
@@ -174,10 +169,7 @@ namespace MsgPack
 				throw new ArgumentNullException( "encoding" );
 			}
 
-#if !UNITY
 			Contract.EndContractBlock();
-#endif // !UNITY
-
 
 			var stream = UnpackByteStreamCore( source );
 			return new DefaultUnpackingStreamReader( stream, encoding, stream.RawLength );
@@ -202,9 +194,9 @@ namespace MsgPack
 			public SeekableUnpackingStream( Stream underlying, long rawLength )
 				: base( underlying, rawLength )
 			{
-#if !UNITY
+#if DEBUG
 				Contract.Assert( underlying.CanSeek, "underlying.CanSeek" );
-#endif // !UNITY
+#endif // DEBUG
 				this._initialPosition = underlying.Position;
 			}
 

@@ -2,7 +2,7 @@
 //
 // MessagePack for CLI
 //
-// Copyright (C) 2010-2012 FUJIWARA, Yusuke
+// Copyright (C) 2010-2017 FUJIWARA, Yusuke
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -20,13 +20,17 @@
 
 using System;
 using System.Reflection;
+#if FEATURE_TAP
+using System.Threading;
+#endif // FEATURE_TAP
 
 namespace MsgPack.Serialization.Metadata
 {
 	internal static class _Packer
 	{
-		public static readonly MethodInfo PackArrayHeader = FromExpression.ToMethod( ( Packer packer, int count ) => packer.PackArrayHeader( count ) );
-		public static readonly MethodInfo PackMapHeader = FromExpression.ToMethod( ( Packer packer, int count ) => packer.PackMapHeader( count ) );
-		public static readonly MethodInfo PackNull = FromExpression.ToMethod( ( Packer packer ) => packer.PackNull() );
+		public static readonly MethodInfo PackNull = typeof( Packer ).GetMethod( nameof( Packer.PackNull ), ReflectionAbstractions.EmptyTypes );
+#if FEATURE_TAP
+		public static readonly MethodInfo PackNullAsync = typeof( Packer ).GetMethod( nameof( Packer.PackNullAsync ), new[] { typeof( CancellationToken ) } );
+#endif // FEATURE_TAP
 	}
 }

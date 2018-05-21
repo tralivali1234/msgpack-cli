@@ -1,8 +1,8 @@
-﻿#region -- License Terms --
+#region -- License Terms --
 //
 // MessagePack for CLI
 //
-// Copyright (C) 2012-2015 FUJIWARA, Yusuke
+// Copyright (C) 2012-2016 FUJIWARA, Yusuke and contributors
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -16,6 +16,9 @@
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
 //
+// Contributors:
+//    Samuel Cragg
+//
 #endregion -- License Terms --
 
 #if UNITY_5 || UNITY_STANDALONE || UNITY_WEBPLAYER || UNITY_WII || UNITY_IPHONE || UNITY_ANDROID || UNITY_PS3 || UNITY_XBOX360 || UNITY_FLASH || UNITY_BKACKBERRY || UNITY_WINRT
@@ -27,13 +30,11 @@ using System;
 using System.Collections;
 #endif // !UNITY
 using System.Collections.Generic;
-#if !UNITY
-#if XAMIOS || XAMDROID
+#if FEATURE_MPCONTRACT
 using Contract = MsgPack.MPContract;
 #else
 using System.Diagnostics.Contracts;
-#endif // XAMIOS || XAMDROID
-#endif // !UNITY
+#endif // FEATURE_MPCONTRACT
 
 namespace MsgPack.Serialization.DefaultSerializers
 {
@@ -51,7 +52,7 @@ namespace MsgPack.Serialization.DefaultSerializers
 #endif // !UNITY
 		}
 
-		public static IMessagePackSingleObjectSerializer Create( SerializationContext context, Type targetType, PolymorphismSchema schema )
+		public static MessagePackSerializer Create( SerializationContext context, Type targetType, PolymorphismSchema schema )
 		{
 			if ( targetType.IsArray )
 			{
@@ -76,7 +77,7 @@ namespace MsgPack.Serialization.DefaultSerializers
 #if !UNITY
 					return CreateListSerializer( context, targetType.GetGenericArguments()[ 0 ], schema );
 #else
-					return CreateListSerializer( context, targetType, targetType.GetCollectionTraits(), schema );
+					return CreateListSerializer( context, targetType, targetType.GetCollectionTraits( CollectionTraitOptions.WithAddMethod, context.CompatibilityOptions.AllowNonCollectionEnumerableTypes ), schema );
 #endif // !UNITY
 				}
 
@@ -86,7 +87,7 @@ namespace MsgPack.Serialization.DefaultSerializers
 #if !UNITY
 					return CreateDictionarySerializer( context, genericTypeArguments[ 0 ], genericTypeArguments[ 1 ], schema );
 #else
-					return CreateDictionarySerializer( context, targetType, targetType.GetCollectionTraits(), genericTypeArguments[ 0 ], genericTypeArguments[ 1 ], schema );
+					return CreateDictionarySerializer( context, targetType, targetType.GetCollectionTraits( CollectionTraitOptions.WithAddMethod, context.CompatibilityOptions.AllowNonCollectionEnumerableTypes ), genericTypeArguments[ 0 ], genericTypeArguments[ 1 ], schema );
 #endif // !UNITY
 				}
 			}
@@ -98,16 +99,16 @@ namespace MsgPack.Serialization.DefaultSerializers
 #endif // !UNITY
 		}
 
-		private static IMessagePackSingleObjectSerializer CreateArraySerializer( SerializationContext context, Type targetType, PolymorphismSchema itemsSchema )
+		private static MessagePackSerializer CreateArraySerializer( SerializationContext context, Type targetType, PolymorphismSchema itemsSchema )
 		{
-#if DEBUG && !UNITY
+#if DEBUG
 			Contract.Assert( targetType.IsArray, "targetType.IsArray" );
-#endif // DEBUG && !UNITY
+#endif // DEBUG
 			return ArraySerializer.Create( context, targetType, itemsSchema );
 		}
 
 #if !UNITY
-		private static IMessagePackSingleObjectSerializer CreateNullableSerializer( SerializationContext context, Type underlyingType, PolymorphismSchema schema )
+		private static MessagePackSerializer CreateNullableSerializer( SerializationContext context, Type underlyingType, PolymorphismSchema schema )
 		{
 			return
 				ReflectionExtensions.CreateInstancePreservingExceptionType<IGenericBuiltInSerializerFactory>(
@@ -115,49 +116,49 @@ namespace MsgPack.Serialization.DefaultSerializers
 				).Create( context, schema );
 		}
 #else
-		private static IMessagePackSingleObjectSerializer CreateNullableSerializer( SerializationContext context, Type nullableType, Type underlyingType )
+		private static MessagePackSerializer CreateNullableSerializer( SerializationContext context, Type nullableType, Type underlyingType )
 		{
 			return new NullableMessagePackSerializer( context, nullableType, underlyingType );
 		}
 #endif // !UNITY
 
 #if !UNITY
-		private static IMessagePackSingleObjectSerializer CreateListSerializer( SerializationContext context, Type itemType, PolymorphismSchema schema )
+		private static MessagePackSerializer CreateListSerializer( SerializationContext context, Type itemType, PolymorphismSchema schema )
 		{
-#if DEBUG && !XAMIOS && !XAMDROID && !UNITY_IPHONE && !UNITY_ANDROID
+#if DEBUG
 			if ( SerializerDebugging.AvoidsGenericSerializer )
 			{
 				return null;
 			}
-#endif // DEBUG && !XAMIOS && !XAMDROID && !UNITY_IPHONE && !UNITY_ANDROID
+#endif // DEBUG
 			return
 				ReflectionExtensions.CreateInstancePreservingExceptionType<IGenericBuiltInSerializerFactory>(
 					typeof( ListInstanceFactory<> ).MakeGenericType( itemType )
 				).Create( context, schema );
 		}
 #else
-		private static IMessagePackSingleObjectSerializer CreateListSerializer( SerializationContext context, Type targetType, CollectionTraits traits, PolymorphismSchema schema )
+		private static MessagePackSerializer CreateListSerializer( SerializationContext context, Type targetType, CollectionTraits traits, PolymorphismSchema schema )
 		{
 			return new System_Collections_Generic_List_1MessagePackSerializer( context, targetType, traits, ( schema ?? PolymorphismSchema.Default ).ItemSchema );
 		}
 #endif // !UNITY
 
 #if !UNITY
-		private static IMessagePackSingleObjectSerializer CreateDictionarySerializer( SerializationContext context, Type keyType, Type valueType, PolymorphismSchema schema )
+		private static MessagePackSerializer CreateDictionarySerializer( SerializationContext context, Type keyType, Type valueType, PolymorphismSchema schema )
 		{
-#if DEBUG && !XAMIOS && !XAMDROID && !UNITY_IPHONE && !UNITY_ANDROID
+#if DEBUG
 			if ( SerializerDebugging.AvoidsGenericSerializer )
 			{
 				return null;
 			}
-#endif // DEBUG && !XAMIOS && !XAMDROID && !UNITY_IPHONE && !UNITY_ANDROID
+#endif // DEBUG
 			return
 				ReflectionExtensions.CreateInstancePreservingExceptionType<IGenericBuiltInSerializerFactory>(
 					typeof( DictionaryInstanceFactory<,> ).MakeGenericType( keyType, valueType )
 				).Create( context, schema );
 		}
 #else
-		private static IMessagePackSingleObjectSerializer CreateDictionarySerializer( SerializationContext context, Type targetType, CollectionTraits traits, Type keyType, Type valueType, PolymorphismSchema schema )
+		private static MessagePackSerializer CreateDictionarySerializer( SerializationContext context, Type targetType, CollectionTraits traits, Type keyType, Type valueType, PolymorphismSchema schema )
 		{
 			var itemSchema = schema ?? PolymorphismSchema.Default;
 			return
@@ -174,18 +175,19 @@ namespace MsgPack.Serialization.DefaultSerializers
 #endif // !UNITY
 
 #if !UNITY
-#if SILVERLIGHT || NETFX_35 || NETFX_40
+#if SILVERLIGHT || NET35 || NET40
 		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Usage", "CA1801:ReviewUnusedParameters", MessageId = "context", Justification = "Used in other platform" )]
 		[System.Diagnostics.CodeAnalysis.SuppressMessage( "Microsoft.Usage", "CA1801:ReviewUnusedParameters", MessageId = "targetType", Justification = "Used in other platform" )]
 #endif // SILVERLIGHT
 		// ReSharper disable UnusedParameter.Local
-		private static IMessagePackSingleObjectSerializer TryCreateImmutableCollectionSerializer( SerializationContext context, Type targetType, PolymorphismSchema schema )
+		private static MessagePackSerializer TryCreateImmutableCollectionSerializer( SerializationContext context, Type targetType, PolymorphismSchema schema )
 		{
-#if NETFX_35 || NETFX_40 || SILVERLIGHT
+#if NET35 || NET40 || SILVERLIGHT
 			// ImmutableCollections does not support above platforms.
 			return null;
 #else
-			if ( targetType.Namespace != "System.Collections.Immutable" )
+			if ( targetType.Namespace != "System.Collections.Immutable"
+				&& targetType.Namespace != "Microsoft.FSharp.Collections" )
 			{
 				return null;
 			}
@@ -196,7 +198,7 @@ namespace MsgPack.Serialization.DefaultSerializers
 			}
 
 			var itemSchema = ( schema ?? PolymorphismSchema.Default );
-			switch ( DetermineImmutableCollectionType(targetType) )
+			switch ( DetermineImmutableCollectionType( targetType ) )
 			{
 				case ImmutableCollectionType.ImmutableArray:
 				case ImmutableCollectionType.ImmutableList:
@@ -224,23 +226,47 @@ namespace MsgPack.Serialization.DefaultSerializers
 							typeof( ImmutableDictionarySerializerFactory<,,> ).MakeGenericType( targetType, targetType.GetGenericArguments()[ 0 ], targetType.GetGenericArguments()[ 1 ] )
 						).Create( context, itemSchema );
 				}
+				case ImmutableCollectionType.FSharpList:
+				{
+					return
+						ReflectionExtensions.CreateInstancePreservingExceptionType<IGenericBuiltInSerializerFactory>(
+							typeof( FSharpCollectionSerializerFactory<,> ).MakeGenericType( targetType, targetType.GetGenericArguments()[ 0 ] ),
+							"ListModule"
+						).Create( context, itemSchema );
+				}
+				case ImmutableCollectionType.FSharpSet:
+				{
+					return
+						ReflectionExtensions.CreateInstancePreservingExceptionType<IGenericBuiltInSerializerFactory>(
+							typeof( FSharpCollectionSerializerFactory<,> ).MakeGenericType( targetType, targetType.GetGenericArguments()[ 0 ] ),
+							"SetModule"
+						).Create( context, itemSchema );
+				}
+				case ImmutableCollectionType.FSharpMap:
+				{
+					return
+						ReflectionExtensions.CreateInstancePreservingExceptionType<IGenericBuiltInSerializerFactory>(
+							typeof( FSharpMapSerializerFactory<,,> ).MakeGenericType( targetType, targetType.GetGenericArguments()[ 0 ], targetType.GetGenericArguments()[ 1 ] )
+						).Create( context, itemSchema );
+				}
 				default:
 				{
-#if DEBUG && !UNITY
+#if DEBUG
 					Contract.Assert( false, "Unknown type:" + targetType );
-#endif // DEBUG && !UNITY
+#endif // DEBUG
 					// ReSharper disable HeuristicUnreachableCode
 					return null;
 					// ReSharper restore HeuristicUnreachableCode
 				}
 			}
-#endif // NETFX_35 || NETFX_40 || SILVERLIGHT
+#endif // NET35 || NET40 || SILVERLIGHT
 		}
 
-#if !NETFX_35 && !NETFX_40 && !SILVERLIGHT
+#if !NET35 && !NET40 && !SILVERLIGHT
 		private static ImmutableCollectionType DetermineImmutableCollectionType( Type targetType )
 		{
-			if ( targetType.Namespace != "System.Collections.Immutable" )
+			if ( targetType.Namespace != "System.Collections.Immutable" 
+				&& targetType.Namespace != "Microsoft.FSharp.Collections" )
 			{
 				return ImmutableCollectionType.Unknown;
 			}
@@ -284,21 +310,33 @@ namespace MsgPack.Serialization.DefaultSerializers
 				{
 					return ImmutableCollectionType.ImmutableSortedDictionary;
 				}
+				case "FSharpList`1":
+				{
+					return ImmutableCollectionType.FSharpList;
+				}
+				case "FSharpSet`1":
+				{
+					return ImmutableCollectionType.FSharpSet;
+				}
+				case "FSharpMap`2":
+				{
+					return ImmutableCollectionType.FSharpMap;
+				}
 				default:
 				{
-#if DEBUG && !UNITY
+#if DEBUG
 					Contract.Assert( false, "Unknown type:" + targetType );
-#endif // DEBUG && !UNITY
+#endif // DEBUG
 					// ReSharper disable HeuristicUnreachableCode
 					return ImmutableCollectionType.Unknown;
 					// ReSharper restore HeuristicUnreachableCode
 				}
 			}
 		}
-#endif // !NETFX_35 && !NETFX_40 && !SILVERLIGHT
+#endif // !NET35 && !NET40 && !SILVERLIGHT
 #endif // !UNITY
 
-		public static IMessagePackSingleObjectSerializer TryCreateAbstractCollectionSerializer( SerializationContext context, Type abstractType, Type concreteType, PolymorphismSchema schema )
+		public static MessagePackSerializer TryCreateAbstractCollectionSerializer( SerializationContext context, Type abstractType, Type concreteType, PolymorphismSchema schema )
 		{
 			if ( concreteType == null )
 			{
@@ -311,18 +349,18 @@ namespace MsgPack.Serialization.DefaultSerializers
 					abstractType,
 					concreteType,
 					schema,
-					abstractType.GetCollectionTraits()
+					abstractType.GetCollectionTraits( CollectionTraitOptions.None, context.CompatibilityOptions.AllowNonCollectionEnumerableTypes )
 				);
 		}
 
-		internal static IMessagePackSingleObjectSerializer TryCreateAbstractCollectionSerializer( SerializationContext context, Type abstractType, Type concreteType, PolymorphismSchema schema, CollectionTraits traits )
+		internal static MessagePackSerializer TryCreateAbstractCollectionSerializer( SerializationContext context, Type abstractType, Type concreteType, PolymorphismSchema schema, CollectionTraits traits )
 		{
 			switch ( traits.DetailedCollectionType )
 			{
 				case CollectionDetailedKind.GenericList:
-#if !NETFX_35 && !UNITY
+#if !NET35 && !UNITY
 				case CollectionDetailedKind.GenericSet:
-#endif // !NETFX_35 && !UNITY
+#endif // !NET35 && !UNITY
 				case CollectionDetailedKind.GenericCollection:
 				{
 #if !UNITY
@@ -334,7 +372,7 @@ namespace MsgPack.Serialization.DefaultSerializers
 					return new AbstractCollectionMessagePackSerializer( context, abstractType, concreteType, traits, schema );
 #endif
 				}
-#if !NETFX_35 && !UNITY && !NETFX_40 && !( SILVERLIGHT && !WINDOWS_PHONE )
+#if !NET35 && !UNITY && !NET40 && !( SILVERLIGHT && !WINDOWS_PHONE )
 				case CollectionDetailedKind.GenericReadOnlyList:
 				case CollectionDetailedKind.GenericReadOnlyCollection:
 				{
@@ -347,7 +385,7 @@ namespace MsgPack.Serialization.DefaultSerializers
 					return new AbstractCollectionMessagePackSerializer( context, abstractType, concreteType, traits, schema );
 #endif
 				}
-#endif // !NETFX_35 && !UNITY && !NETFX_40 && !( SILVERLIGHT && !WINDOWS_PHONE )
+#endif // !NET35 && !UNITY && !NET40 && !( SILVERLIGHT && !WINDOWS_PHONE )
 				case CollectionDetailedKind.GenericEnumerable:
 				{
 #if !UNITY
@@ -375,7 +413,7 @@ namespace MsgPack.Serialization.DefaultSerializers
 					return new AbstractDictionaryMessagePackSerializer( context, abstractType, concreteType, genericArgumentOfKeyValuePair[ 0 ], genericArgumentOfKeyValuePair[ 1 ], traits, schema );
 #endif
 				}
-#if !NETFX_35 && !UNITY && !NETFX_40 && !( SILVERLIGHT && !WINDOWS_PHONE )
+#if !NET35 && !UNITY && !NET40 && !( SILVERLIGHT && !WINDOWS_PHONE )
 				case CollectionDetailedKind.GenericReadOnlyDictionary:
 				{
 					var genericArgumentOfKeyValuePair = traits.ElementType.GetGenericArguments();
@@ -392,7 +430,7 @@ namespace MsgPack.Serialization.DefaultSerializers
 					return new AbstractDictionaryMessagePackSerializer( context, abstractType, concreteType, genericArgumentOfKeyValuePair[ 0 ], genericArgumentOfKeyValuePair[ 1 ], traits, schema );
 #endif
 				}
-#endif // !NETFX_35 && !UNITY && !NETFX_40 && !( SILVERLIGHT && !WINDOWS_PHONE )
+#endif // !NET35 && !UNITY && !NET40 && !( SILVERLIGHT && !WINDOWS_PHONE )
 				case CollectionDetailedKind.NonGenericList:
 				{
 #if !UNITY
@@ -478,13 +516,13 @@ namespace MsgPack.Serialization.DefaultSerializers
 				}
 			}
 
-#if !UNITY && !NETFX_35 && !NETFX_40 && !SILVERLIGHT
+#if !UNITY && !NET35 && !NET40 && !SILVERLIGHT
 			// ImmutableCollections does not support above platforms.
 			if ( DetermineImmutableCollectionType( type ) != ImmutableCollectionType.Unknown )
 			{
 				return true;
 			}
-#endif // !UNITY && !NETFX_35 && !NETFX_40 && !SILVERLIGHT
+#endif // !UNITY && !NET35 && !NET40 && !SILVERLIGHT
 
 			if ( preferReflectionBasedSerializer )
 			{
@@ -500,199 +538,305 @@ namespace MsgPack.Serialization.DefaultSerializers
 		/// <summary>
 		///		Defines non-generic factory method for built-in serializers which require generic type argument.
 		/// </summary>
-		private interface IGenericBuiltInSerializerFactory
+#if SILVERLIGHT
+		internal
+#else
+		private
+#endif // SILVERLIGHT
+		interface IGenericBuiltInSerializerFactory
 		{
-			IMessagePackSingleObjectSerializer Create( SerializationContext context, PolymorphismSchema schema );
+			MessagePackSerializer Create( SerializationContext context, PolymorphismSchema schema );
 		}
 
-		private sealed class NullableInstanceFactory<T> : IGenericBuiltInSerializerFactory
+		[Preserve( AllMembers = true )]
+#if SILVERLIGHT
+		internal
+#else
+		private
+#endif // SILVERLIGHT
+		sealed class NullableInstanceFactory<T> : IGenericBuiltInSerializerFactory
 			where T : struct
 		{
 			public NullableInstanceFactory() { }
 
-			public IMessagePackSingleObjectSerializer Create( SerializationContext context, PolymorphismSchema schema )
+			public MessagePackSerializer Create( SerializationContext context, PolymorphismSchema schema )
 			{
 				return new NullableMessagePackSerializer<T>( context );
 			}
 		}
 
-		private sealed class ListInstanceFactory<T> : IGenericBuiltInSerializerFactory
+		[Preserve( AllMembers = true )]
+#if SILVERLIGHT
+		internal
+#else
+		private
+#endif // SILVERLIGHT
+		sealed class ListInstanceFactory<T> : IGenericBuiltInSerializerFactory
 		{
 			public ListInstanceFactory() { }
 
-			public IMessagePackSingleObjectSerializer Create( SerializationContext context, PolymorphismSchema schema )
+			public MessagePackSerializer Create( SerializationContext context, PolymorphismSchema schema )
 			{
 				var itemSchema = schema ?? PolymorphismSchema.Default;
 				return new System_Collections_Generic_List_1MessagePackSerializer<T>( context, itemSchema.ItemSchema );
 			}
 		}
 
-		private sealed class DictionaryInstanceFactory<TKey, TValue> : IGenericBuiltInSerializerFactory
+		[Preserve( AllMembers = true )]
+#if SILVERLIGHT
+		internal
+#else
+		private
+#endif // SILVERLIGHT
+		sealed class DictionaryInstanceFactory<TKey, TValue> : IGenericBuiltInSerializerFactory
 		{
 			public DictionaryInstanceFactory() { }
 
-			public IMessagePackSingleObjectSerializer Create( SerializationContext context, PolymorphismSchema schema )
+			public MessagePackSerializer Create( SerializationContext context, PolymorphismSchema schema )
 			{
 				var itemSchema = schema ?? PolymorphismSchema.Default;
 				return new System_Collections_Generic_Dictionary_2MessagePackSerializer<TKey, TValue>( context, itemSchema.KeySchema, itemSchema.ItemSchema );
 			}
 		}
 
-#if !NETFX_35 && !NETFX_40 && !SILVERLIGHT
+#if !NET35 && !NET40 && !SILVERLIGHT
 
+		[Preserve( AllMembers = true )]
 		private sealed class ImmutableCollectionSerializerFactory<T, TItem> : IGenericBuiltInSerializerFactory
 			where T : IEnumerable<TItem>
 		{
 			public ImmutableCollectionSerializerFactory() { }
 
-			public IMessagePackSingleObjectSerializer Create( SerializationContext context, PolymorphismSchema schema )
+			public MessagePackSerializer Create( SerializationContext context, PolymorphismSchema schema )
 			{
 				var itemSchema = schema ?? PolymorphismSchema.Default;
 				return new ImmutableCollectionSerializer<T, TItem>( context, itemSchema.ItemSchema );
 			}
 		}
 
+		[Preserve( AllMembers = true )]
 		private sealed class ImmutableStackSerializerFactory<T, TItem> : IGenericBuiltInSerializerFactory
 			where T : IEnumerable<TItem>
 		{
 			public ImmutableStackSerializerFactory() { }
 
-			public IMessagePackSingleObjectSerializer Create( SerializationContext context, PolymorphismSchema schema )
+			public MessagePackSerializer Create( SerializationContext context, PolymorphismSchema schema )
 			{
 				var itemSchema = schema ?? PolymorphismSchema.Default;
 				return new ImmutableStackSerializer<T, TItem>( context, itemSchema.ItemSchema );
 			}
 		}
 
+		[Preserve( AllMembers = true )]
 		private sealed class ImmutableDictionarySerializerFactory<T, TKey, TValue> : IGenericBuiltInSerializerFactory
 			where T : IDictionary<TKey, TValue>
 		{
 			public ImmutableDictionarySerializerFactory() { }
 
-			public IMessagePackSingleObjectSerializer Create( SerializationContext context, PolymorphismSchema schema )
+			public MessagePackSerializer Create( SerializationContext context, PolymorphismSchema schema )
 			{
 				var itemSchema = schema ?? PolymorphismSchema.Default;
 				return new ImmutableDictionarySerializer<T, TKey, TValue>( context, itemSchema.KeySchema, itemSchema.ItemSchema );
 			}
 		}
 
+
+		[Preserve( AllMembers = true )]
+		private sealed class FSharpCollectionSerializerFactory<T, TItem> : IGenericBuiltInSerializerFactory
+			where T : IEnumerable<TItem>
+		{
+			private readonly string _factoryTypeName;
+
+			public FSharpCollectionSerializerFactory( string factoryTypeName )
+			{
+				this._factoryTypeName = factoryTypeName;
+			}
+
+			public MessagePackSerializer Create( SerializationContext context, PolymorphismSchema schema )
+			{
+				var itemSchema = schema ?? PolymorphismSchema.Default;
+				return new FSharpCollectionSerializer<T, TItem>( context, itemSchema.ItemSchema, this._factoryTypeName );
+			}
+		}
+
+		[Preserve( AllMembers = true )]
+		private sealed class FSharpMapSerializerFactory<T, TKey, TValue> : IGenericBuiltInSerializerFactory
+			where T : IDictionary<TKey, TValue>
+		{
+			public FSharpMapSerializerFactory() { }
+
+			public MessagePackSerializer Create( SerializationContext context, PolymorphismSchema schema )
+			{
+				var itemSchema = schema ?? PolymorphismSchema.Default;
+				return new FSharpMapSerializer<T, TKey, TValue>( context, itemSchema.KeySchema, itemSchema.ItemSchema );
+			}
+		}
 #endif
 
 		/// <summary>
 		///		Defines non-generic factory method for 'universal' serializers which use general collection features.
 		/// </summary>
-		private interface IVariantSerializerFactory
+#if SILVERLIGHT
+		internal
+#else
+		private
+#endif // SILVERLIGHT
+		interface IVariantSerializerFactory
 		{
-			IMessagePackSingleObjectSerializer Create( SerializationContext context, Type targetType, PolymorphismSchema schema );
+			MessagePackSerializer Create( SerializationContext context, Type targetType, PolymorphismSchema schema );
 		}
 
 		// ReSharper disable MemberHidesStaticFromOuterClass
-		private sealed class NonGenericEnumerableSerializerFactory<T> : IVariantSerializerFactory
+		[Preserve( AllMembers = true )]
+#if SILVERLIGHT
+		internal
+#else
+		private
+#endif // SILVERLIGHT
+		sealed class NonGenericEnumerableSerializerFactory<T> : IVariantSerializerFactory
 			where T : IEnumerable
 		{
 			public NonGenericEnumerableSerializerFactory() { }
 
-			public IMessagePackSingleObjectSerializer Create( SerializationContext context, Type targetType, PolymorphismSchema schema )
+			public MessagePackSerializer Create( SerializationContext context, Type targetType, PolymorphismSchema schema )
 			{
 				return new AbstractNonGenericEnumerableMessagePackSerializer<T>( context, targetType, schema );
 			}
 		}
 
-		private sealed class NonGenericCollectionSerializerFactory<T> : IVariantSerializerFactory
+		[Preserve( AllMembers = true )]
+#if SILVERLIGHT
+		internal
+#else
+		private
+#endif // SILVERLIGHT
+		sealed class NonGenericCollectionSerializerFactory<T> : IVariantSerializerFactory
 			where T : ICollection
 		{
 			public NonGenericCollectionSerializerFactory() { }
 
-			public IMessagePackSingleObjectSerializer Create( SerializationContext context, Type targetType, PolymorphismSchema schema )
+			public MessagePackSerializer Create( SerializationContext context, Type targetType, PolymorphismSchema schema )
 			{
 				return new AbstractNonGenericCollectionMessagePackSerializer<T>( context, targetType, schema );
 			}
 		}
 
-		private sealed class NonGenericListSerializerFactory<T> : IVariantSerializerFactory
+		[Preserve( AllMembers = true )]
+#if SILVERLIGHT
+		internal
+#else
+		private
+#endif // SILVERLIGHT
+		sealed class NonGenericListSerializerFactory<T> : IVariantSerializerFactory
 			where T : IList
 		{
 			public NonGenericListSerializerFactory() { }
 
-			public IMessagePackSingleObjectSerializer Create( SerializationContext context, Type targetType, PolymorphismSchema schema )
+			public MessagePackSerializer Create( SerializationContext context, Type targetType, PolymorphismSchema schema )
 			{
 				return new AbstractNonGenericListMessagePackSerializer<T>( context, targetType, schema );
 			}
 		}
 
-		private sealed class NonGenericDictionarySerializerFactory<T> : IVariantSerializerFactory
+		[Preserve( AllMembers = true )]
+#if SILVERLIGHT
+		internal
+#else
+		private
+#endif // SILVERLIGHT
+		sealed class NonGenericDictionarySerializerFactory<T> : IVariantSerializerFactory
 			where T : IDictionary
 		{
 			public NonGenericDictionarySerializerFactory() { }
 
-			public IMessagePackSingleObjectSerializer Create( SerializationContext context, Type targetType, PolymorphismSchema schema )
+			public MessagePackSerializer Create( SerializationContext context, Type targetType, PolymorphismSchema schema )
 			{
 				return new AbstractNonGenericDictionaryMessagePackSerializer<T>( context, targetType, schema );
 			}
 		}
 
-		private sealed class EnumerableSerializerFactory<TCollection, TItem> : IVariantSerializerFactory
+		[Preserve( AllMembers = true )]
+#if SILVERLIGHT
+		internal
+#else
+		private
+#endif // SILVERLIGHT
+		sealed class EnumerableSerializerFactory<TCollection, TItem> : IVariantSerializerFactory
 			where TCollection : IEnumerable<TItem>
 		{
 			public EnumerableSerializerFactory() { }
 
-			public IMessagePackSingleObjectSerializer Create( SerializationContext context, Type targetType, PolymorphismSchema schema )
+			public MessagePackSerializer Create( SerializationContext context, Type targetType, PolymorphismSchema schema )
 			{
 				return new AbstractEnumerableMessagePackSerializer<TCollection, TItem>( context, targetType, schema );
 			}
 		}
 
-		private sealed class CollectionSerializerFactory<TCollection, TItem> : IVariantSerializerFactory
+		[Preserve( AllMembers = true )]
+#if SILVERLIGHT
+		internal
+#else
+		private
+#endif // SILVERLIGHT
+		sealed class CollectionSerializerFactory<TCollection, TItem> : IVariantSerializerFactory
 			where TCollection : ICollection<TItem>
 		{
 			public CollectionSerializerFactory() { }
 
-			public IMessagePackSingleObjectSerializer Create( SerializationContext context, Type targetType, PolymorphismSchema schema )
+			public MessagePackSerializer Create( SerializationContext context, Type targetType, PolymorphismSchema schema )
 			{
 				return new AbstractCollectionMessagePackSerializer<TCollection, TItem>( context, targetType, schema );
 			}
 		}
 
-#if !NETFX_35 && !UNITY && !NETFX_40 && !( SILVERLIGHT && !WINDOWS_PHONE )
+#if !NET35 && !UNITY && !NET40 && !( SILVERLIGHT && !WINDOWS_PHONE )
+		[Preserve( AllMembers = true )]
 		private sealed class ReadOnlyCollectionSerializerFactory<TCollection, TItem> : IVariantSerializerFactory
 			where TCollection : IReadOnlyCollection<TItem>
 		{
 			public ReadOnlyCollectionSerializerFactory() { }
 
-			public IMessagePackSingleObjectSerializer Create( SerializationContext context, Type targetType, PolymorphismSchema schema )
+			public MessagePackSerializer Create( SerializationContext context, Type targetType, PolymorphismSchema schema )
 			{
 				return new AbstractReadOnlyCollectionMessagePackSerializer<TCollection, TItem>( context, targetType, schema );
 			}
 		}
-#endif // !NETFX_35 && !UNITY && !NETFX_40 && !( SILVERLIGHT && !WINDOWS_PHONE )
+#endif // !NET35 && !UNITY && !NET40 && !( SILVERLIGHT && !WINDOWS_PHONE )
 
-		private sealed class DictionarySerializerFactory<TDictionary, TKey, TValue> : IVariantSerializerFactory
+		[Preserve( AllMembers = true )]
+#if SILVERLIGHT
+		internal
+#else
+		private
+#endif // SILVERLIGHT
+		sealed class DictionarySerializerFactory<TDictionary, TKey, TValue> : IVariantSerializerFactory
 			where TDictionary : IDictionary<TKey, TValue>
 		{
 			public DictionarySerializerFactory() { }
 
-			public IMessagePackSingleObjectSerializer Create( SerializationContext context, Type targetType, PolymorphismSchema schema )
+			public MessagePackSerializer Create( SerializationContext context, Type targetType, PolymorphismSchema schema )
 			{
 				return new AbstractDictionaryMessagePackSerializer<TDictionary, TKey, TValue>( context, targetType, schema );
 			}
 		}
 
-#if !NETFX_35 && !UNITY && !NETFX_40 && !( SILVERLIGHT && !WINDOWS_PHONE )
+#if !NET35 && !UNITY && !NET40 && !( SILVERLIGHT && !WINDOWS_PHONE )
+		[Preserve( AllMembers = true )]
 		private sealed class ReadOnlyDictionarySerializerFactory<TDictionary, TKey, TValue> : IVariantSerializerFactory
 			where TDictionary : IReadOnlyDictionary<TKey, TValue>
 		{
 			public ReadOnlyDictionarySerializerFactory() { }
 
-			public IMessagePackSingleObjectSerializer Create( SerializationContext context, Type targetType, PolymorphismSchema schema )
+			public MessagePackSerializer Create( SerializationContext context, Type targetType, PolymorphismSchema schema )
 			{
 				return new AbstractReadOnlyDictionaryMessagePackSerializer<TDictionary, TKey, TValue>( context, targetType, schema );
 			}
 		}
-#endif // !NETFX_35 && !UNITY && !NETFX_40 && !( SILVERLIGHT && !WINDOWS_PHONE )
+#endif // !NET35 && !UNITY && !NET40 && !( SILVERLIGHT && !WINDOWS_PHONE )
 		// ReSharper restore MemberHidesStaticFromOuterClass
 #endif // !UNITY
 
-#if !NETFX_35 && !NETFX_40 && !SILVERLIGHT
+#if !NET35 && !NET40 && !SILVERLIGHT && !UNITY
 		private enum ImmutableCollectionType
 		{
 			Unknown = 0,
@@ -704,7 +848,10 @@ namespace MsgPack.Serialization.DefaultSerializers
 			ImmutableSortedDictionary,
 			ImmutableSortedSet,
 			ImmutableStack,
+			FSharpList,
+			FSharpMap,
+			FSharpSet,
 		}
-#endif // !NETFX_35 && !NETFX_40 && !SILVERLIGHT
+#endif // !NET35 && !NET40 && !SILVERLIGHT && !UNITY
 	}
 }

@@ -23,9 +23,13 @@
 #endif
 
 using System;
-#if DEBUG && !UNITY
+#if DEBUG
+#if FEATURE_MPCONTRACT
+using Contract = MsgPack.MPContract;
+#else
 using System.Diagnostics.Contracts;
-#endif // DEBUG && !UNITY
+#endif // FEATURE_MPCONTRACT
+#endif // DEBUG
 using System.Globalization;
 
 namespace MsgPack.Serialization
@@ -63,7 +67,7 @@ namespace MsgPack.Serialization
 		/// </value>
 		public PolymorphismSchema PolymorphismSchema { get; private set; }
 
-		private IMessagePackSerializer _foundSerializer;
+		private MessagePackSerializer _foundSerializer;
 
 		/// <summary>
 		///		Gets the found serializer the event subscriber specified.
@@ -73,9 +77,9 @@ namespace MsgPack.Serialization
 		/// </returns>
 		internal MessagePackSerializer<T> GetFoundSerializer<T>()
 		{
-#if DEBUG && !UNITY
+#if DEBUG
 			Contract.Assert( typeof( T ) == this.TargetType, typeof( T ) + "==" + this.TargetType );
-#endif // DEBUG && !UNITY
+#endif // DEBUG
 			return ( MessagePackSerializer<T> ) this._foundSerializer;
 		}
 

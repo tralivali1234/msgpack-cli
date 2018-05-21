@@ -23,13 +23,11 @@
 #endif
 
 using System;
-#if !UNITY
-#if XAMIOS || XAMDROID
+#if FEATURE_MPCONTRACT
 using Contract = MsgPack.MPContract;
 #else
 using System.Diagnostics.Contracts;
-#endif // XAMIOS || XAMDROID
-#endif // !UNITY
+#endif // FEATURE_MPCONTRACT || NETSTANDARD1_1
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.Serialization;
@@ -42,6 +40,7 @@ namespace MsgPack.Serialization
 #if !UNITY
 	internal struct DataMemberContract
 #else
+#warning TODO: To struct if possible
 	internal sealed class DataMemberContract
 #endif // !UNITY
 	{
@@ -66,9 +65,9 @@ namespace MsgPack.Serialization
 		{
 			get
 			{
-#if !UNITY
+#if DEBUG
 				Contract.Ensures( !String.IsNullOrEmpty( Contract.Result<string>() ) );
-#endif // !UNITY
+#endif // DEBUG
 
 				return this._name;
 			}
@@ -86,9 +85,9 @@ namespace MsgPack.Serialization
 		{
 			get
 			{
-#if !UNITY
+#if DEBUG
 				Contract.Ensures( Contract.Result<int>() >= -1 );
-#endif // !UNITY
+#endif // DEBUG
 
 				return this._id;
 			}
@@ -122,9 +121,7 @@ namespace MsgPack.Serialization
 		/// <param name="member">The target member.</param>
 		public DataMemberContract( MemberInfo member )
 		{
-#if !UNITY
-			Contract.Requires( member != null );
-#endif // !UNITY
+			Contract.Assert( member != null );
 
 			this._name = member.Name;
 			this._nilImplication = NilImplication.MemberDefault;
@@ -140,9 +137,7 @@ namespace MsgPack.Serialization
 		/// <param name="id">The ID of the member. This value cannot be negative and must be unique in the type.</param>
 		public DataMemberContract( MemberInfo member, string name, NilImplication nilImplication, int? id )
 		{
-#if !UNITY
-			Contract.Requires( member != null );
-#endif // !UNITY
+			Contract.Assert( member != null );
 
 			if ( id < 0 )
 			{
@@ -161,10 +156,8 @@ namespace MsgPack.Serialization
 		/// <param name="attribute">The MessagePack member attribute.</param>
 		public DataMemberContract( MemberInfo member, MessagePackMemberAttribute attribute )
 		{
-#if !UNITY
-			Contract.Requires( member != null );
-			Contract.Requires( attribute != null );
-#endif // !UNITY
+			Contract.Assert( member != null );
+			Contract.Assert( attribute != null );
 
 			if ( attribute.Id < 0 )
 			{

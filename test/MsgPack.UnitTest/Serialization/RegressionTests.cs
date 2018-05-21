@@ -1,4 +1,4 @@
-﻿#region -- License Terms --
+#region -- License Terms --
 //
 // MessagePack for CLI
 //
@@ -24,9 +24,21 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
+#if !WINDOWS_PHONE
+#if !NET35 && !UNITY
+#if !UNITY || MSGPACK_UNITY_FULL
+using System.Numerics;
+#endif // !UNITY || MSGPACK_UNITY_FULL
+#endif // !NET35 && !UNITY
+#endif // !WINDOWS_PHONE
 using System.Runtime.Serialization;
+#if FEATURE_TAP
+using System.Threading;
+using System.Threading.Tasks;
+#endif // FEATURE_TAP
 #if !MSTEST
 using NUnit.Framework;
 #else
@@ -176,12 +188,16 @@ namespace MsgPack.Serialization
 			var context = new SerializationContext
 			{
 				SerializationMethod = SerializationMethod.Map,
-				EnumSerializationMethod = EnumSerializationMethod.ByName,
+				EnumSerializationOptions =
+				{
+					SerializationMethod = EnumSerializationMethod.ByName
+				},
 				CompatibilityOptions =
 				{
 					PackerCompatibilityOptions = PackerCompatibilityOptions.None
 				}
 			};
+
 			var serializer = context.GetSerializer<Dictionary<string, object>>();
 
 			var dict = new Dictionary<string, object>();
@@ -252,6 +268,284 @@ namespace MsgPack.Serialization
 				Assert.That( unpacker.Read() );
 				return new TestValueTypeWrapper { Value = this._serializer0.UnpackFrom( unpacker ) };
 			}
+		}
+
+		[Test]
+		public void Issue143()
+		{
+			var array =
+				new object[]
+				{
+					"111",
+					32432,
+					new int[] { 9, 8 },
+					909
+				};
+			var serializer = MessagePackSerializer.Get<object>( new SerializationContext() );
+			var packedBinary = serializer.PackSingleObject( array );
+			var unpacked = serializer.UnpackSingleObject( packedBinary );
+			var unpackedList = ( ( MessagePackObject )unpacked ).AsList();
+			Assert.That( unpackedList.Count, Is.EqualTo( 4 ) );
+			Assert.That( unpackedList[ 0 ] == "111" );
+			Assert.That( unpackedList[ 1 ] == 32432 );
+			Assert.That( unpackedList[ 2 ].IsList );
+			Assert.That( unpackedList[ 2 ].AsList().Count, Is.EqualTo( 2 ) );
+			Assert.That( unpackedList[ 2 ].AsList()[ 0 ] == 9 );
+			Assert.That( unpackedList[ 2 ].AsList()[ 1 ] == 8 );
+			Assert.That( unpackedList[ 3 ] == 909 );
+		}
+
+#if !SILVERLIGHT && !AOT && !NETSTANDARD1_1 && !NETSTANDARD1_3
+		[Test]
+		public void Issue145()
+		{
+			var results =
+				SerializerGenerator.GenerateSerializerSourceCodes(
+					new SerializerCodeGenerationConfiguration
+					{
+						EnumSerializationMethod = EnumSerializationMethod.ByUnderlyingValue,
+						IsRecursive = true,
+						OutputDirectory = Path.GetTempPath(),
+						WithNullableSerializers = false,
+						PreferReflectionBasedSerializer = true,
+						SerializationMethod = SerializationMethod.Array
+					},
+					typeof( Issue145Class )
+				).ToArray();
+			foreach ( var result in results )
+			{
+				File.Delete( result.FilePath );
+			}
+		}
+
+		[DataContract]
+		public class Issue145Class
+		{
+			[DataMember( Order = 0 )]
+			public int MyProperty1 { get; set; }
+			[DataMember( Order = 2 )]
+			public int MyProperty2 { get; set; }
+		}
+
+		[Test]
+		public void TestIssue152()
+		{
+			var serializer = MessagePackSerializer.Get<Issue152>( new SerializationContext() );
+			using ( var buffer = new MemoryStream() )
+			{
+				var target = new Issue152();
+				target.SetItems( new List<int> { 1, 2, 3 } );
+				serializer.Pack( buffer, target );
+				buffer.Position = 0;
+				var result = serializer.Unpack( buffer );
+				Assert.That( result.GetItems(), Is.EqualTo( target.GetItems() ) );
+			}
+		}
+
+		public class Issue152
+		{
+			[MessagePackMember( 0 )]
+			private List<int> Items { get; set; }
+
+			public List<int> GetItems()
+			{
+				return this.Items;
+			}
+
+			public void SetItems( List<int> items )
+			{
+				this.Items = items;
+			}
+		}
+
+#endif // !SILVERLIGHT && !AOT && !NETSTANDARD1_1 && !NETSTANDARD1_3
+
+		// Issue 168
+		[Test]
+		public void TestMessagePackObject_Binary_PackToMessage_ToBianry()
+		{
+			MessagePackObject obj = new MessagePackObject( new byte[] { 1, 2, 3 }, isBinary: true );
+			var ctx = new SerializationContext( PackerCompatibilityOptions.None );
+			var serializer = ctx.GetSerializer<MessagePackObject>();
+			byte[] serialized = serializer.PackSingleObject( obj );
+			Assert.That( serialized[ 0 ], Is.EqualTo( MessagePackCode.Bin8 ) );
+		}
+
+		// Issue 204
+		[Test]
+		public void TestDateTimeTypeError_SerializationException()
+		{
+			using ( var data = new MemoryStream( new byte[] { 0xA0 } ) )
+			{
+				var context = new SerializationContext();
+				foreach ( var method in new[] { DateTimeConversionMethod.UnixEpoc, DateTimeConversionMethod.Native } )
+				{
+					context.DefaultDateTimeConversionMethod = method;
+					data.Position = 0;
+					Assert.Throws<SerializationException>( () => context.GetSerializer<DateTime>().Unpack( data ) );
+					data.Position = 0;
+					Assert.Throws<SerializationException>( () => context.GetSerializer<DateTime?>().Unpack( data ) );
+					data.Position = 0;
+					Assert.Throws<SerializationException>( () => context.GetSerializer<DateTimeOffset>().Unpack( data ) );
+					data.Position = 0;
+					Assert.Throws<SerializationException>( () => context.GetSerializer<DateTimeOffset?>().Unpack( data ) );
+				}
+			}
+		}
+
+		[Test]
+		public void TestIssue211_ListOfT()
+		{
+			var target = new SerializationContext().GetSerializer<List<SingleValueObject>>();
+			using ( var buffer = new MemoryStream() )
+			{
+				target.Pack( buffer, new List<SingleValueObject> { null } );
+				buffer.Position = 0;
+				var result = target.Unpack( buffer );
+				Assert.That( result.Count, Is.EqualTo( 1 ) );
+				Assert.That( result[ 0 ], Is.Null );
+			}
+		}
+
+		[Test]
+		public void TestIssue211_DictionaryOfT()
+		{
+			var target = new SerializationContext().GetSerializer<Dictionary<string, SingleValueObject>>();
+			using ( var buffer = new MemoryStream() )
+			{
+				target.Pack( buffer, new Dictionary<string, SingleValueObject> { { String.Empty, null } } );
+				buffer.Position = 0;
+				var result = target.Unpack( buffer );
+				Assert.That( result.Count, Is.EqualTo( 1 ) );
+				Assert.That( result.First().Value, Is.Null );
+			}
+		}
+
+		[Test]
+		public void TestIssue211_StackOfT()
+		{
+			var target = new SerializationContext().GetSerializer<Stack<SingleValueObject>>();
+			using ( var buffer = new MemoryStream() )
+			{
+				var obj = new Stack<SingleValueObject>();
+				obj.Push( null );
+				target.Pack( buffer, obj );
+				buffer.Position = 0;
+				var result = target.Unpack( buffer );
+				Assert.That( result.Count, Is.EqualTo( 1 ) );
+				Assert.That( result.Pop(), Is.Null );
+			}
+		}
+
+		[Test]
+		public void TestIssue211_QueueOfT()
+		{
+			var target = new SerializationContext().GetSerializer<Queue<SingleValueObject>>();
+			using ( var buffer = new MemoryStream() )
+			{
+				var obj = new Queue<SingleValueObject>();
+				obj.Enqueue( null );
+				target.Pack( buffer, obj );
+				buffer.Position = 0;
+				var result = target.Unpack( buffer );
+				Assert.That( result.Count, Is.EqualTo( 1 ) );
+				Assert.That( result.Dequeue(), Is.Null );
+			}
+		}
+
+		public class SingleValueObject
+		{
+			public string Value { get; set; }
+		}
+
+		[Test]
+		public void TestIssue252()
+		{
+			var context = new SerializationContext();
+			var serializer = context.GetSerializer<Issue252Class>();
+			var bytes = serializer.PackSingleObject( new Issue252Class() );
+			Assert.That( bytes.Length, Is.EqualTo( MessagePackSerializer.BufferSize + 1 ), Binary.ToHexString( bytes ) );
+		}
+
+		public class Issue252Class
+		{
+			// BufferSize - sizeof( Int32 property ) - sizeof( byte array type header with 1bit length ) - sizeof( array header );
+			public byte[] ByteArray = new byte[ MessagePackSerializer.BufferSize - sizeof( int ) - sizeof( byte ) - 1 - 1 ];
+			public int Int32 = Int32.MaxValue;
+		}
+
+		[Test]
+		public void TestIssue270_Default()
+		{
+			var context = new SerializationContext();
+			var guidBytes = context.GetSerializer<Guid>().PackSingleObject( Guid.NewGuid() );
+			Assert.That( guidBytes[ 0 ], Is.EqualTo( MessagePackCode.Bin8 ) );
+#if !WINDOWS_PHONE
+#if !NET35 && !UNITY
+#if !UNITY || MSGPACK_UNITY_FULL
+			var bigIntBytes = context.GetSerializer<BigInteger>().PackSingleObject( new BigInteger( 123 ) );
+			Assert.That( bigIntBytes[ 0 ], Is.EqualTo( MessagePackCode.Bin8 ) );
+#endif // !UNITY || MSGPACK_UNITY_FULL
+#endif // !NET35 && !UNITY
+#endif // !WINDOWS_PHONE
+		}
+
+		[Test]
+		public void TestIssue270_AsRaw()
+		{
+			var context = new SerializationContext();
+			context.CompatibilityOptions.PackerCompatibilityOptions = PackerCompatibilityOptions.PackBinaryAsRaw;
+			var guidBytes = context.GetSerializer<Guid>().PackSingleObject( Guid.NewGuid() );
+			Assert.That( guidBytes[ 0 ], Is.EqualTo( 0xB0 ) );
+#if !WINDOWS_PHONE
+#if !NET35 && !UNITY
+#if !UNITY || MSGPACK_UNITY_FULL
+			var bigIntBytes = context.GetSerializer<BigInteger>().PackSingleObject( new BigInteger( 123 ) );
+			Assert.That( bigIntBytes[ 0 ], Is.EqualTo( 0xA1 ) );
+#endif // !UNITY || MSGPACK_UNITY_FULL
+#endif // !NET35 && !UNITY
+#endif // !WINDOWS_PHONE
+		}
+
+#if FEATURE_TAP
+
+		[Test]
+		public async Task TestIssue270Async_Default()
+		{
+			var context = new SerializationContext();
+			var guidBytes = await context.GetSerializer<Guid>().PackSingleObjectAsync( Guid.NewGuid() );
+			Assert.That( guidBytes[ 0 ], Is.EqualTo( MessagePackCode.Bin8 ) );
+			var bigIntBytes = await context.GetSerializer<BigInteger>().PackSingleObjectAsync( new BigInteger( 123 ) );
+			Assert.That( bigIntBytes[ 0 ], Is.EqualTo( MessagePackCode.Bin8 ) );
+		}
+
+		[Test]
+		public async Task TestIssue270Async_AsRaw()
+		{
+			var context = new SerializationContext();
+			context.CompatibilityOptions.PackerCompatibilityOptions = PackerCompatibilityOptions.PackBinaryAsRaw;
+			var guidBytes = await context.GetSerializer<Guid>().PackSingleObjectAsync( Guid.NewGuid() );
+			Assert.That( guidBytes[ 0 ], Is.EqualTo( 0xB0 ) );
+			var bigIntBytes = await context.GetSerializer<BigInteger>().PackSingleObjectAsync( new BigInteger( 123 ) );
+			Assert.That( bigIntBytes[ 0 ], Is.EqualTo( 0xA1 ) );
+		}
+
+#endif // FEATURE_TAP
+
+		[Test]
+		public void TestIssue269()
+		{
+			var input = new MessagePackObject( Timestamp.UtcNow.Encode() );
+			var target = MessagePackSerializer.UnpackMessagePackObject( MessagePackSerializer.Get<MessagePackObject>().PackSingleObject( input ) );
+			Assert.That( target.UnderlyingType, Is.EqualTo( typeof( MessagePackExtendedTypeObject ) ) );
+			Assert.That( target.IsTypeOf<byte[]>(), Is.False );
+			Assert.That( target.IsTypeOf<MessagePackExtendedTypeObject>(), Is.True );
+
+			var forBinary = Assert.Throws<InvalidOperationException>( () => target.AsBinary() );
+			Assert.That( forBinary.Message, Is.EqualTo( "Do not convert MsgPack.MessagePackExtendedTypeObject MessagePackObject to System.Byte[]." ) );
+
+			var forString = Assert.Throws<InvalidOperationException>( () => target.AsString() );
+			Assert.That( forString.Message, Is.EqualTo( "Do not convert MsgPack.MessagePackExtendedTypeObject MessagePackObject to System.String." ) );
 		}
 	}
 }

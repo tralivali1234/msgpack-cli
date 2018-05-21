@@ -2,7 +2,7 @@
 //
 // MessagePack for CLI
 //
-// Copyright (C) 2010-2014 FUJIWARA, Yusuke
+// Copyright (C) 2010-2016 FUJIWARA, Yusuke
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
@@ -26,9 +26,9 @@ namespace MsgPack
 	/// <summary>
 	///		Implements <see cref="EqualityComparer{T}"/> of <see cref="MessagePackObject"/>.
 	/// </summary>
-#if !SILVERLIGHT && !NETFX_CORE
+#if !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 	[Serializable]
-#endif
+#endif // !SILVERLIGHT && !NETSTANDARD1_1 && !NETSTANDARD1_3
 	public sealed class MessagePackObjectEqualityComparer : IEqualityComparer<MessagePackObject>
 	{
 		private static readonly MessagePackObjectEqualityComparer _instance = new MessagePackObjectEqualityComparer();
